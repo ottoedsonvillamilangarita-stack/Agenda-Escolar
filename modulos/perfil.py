@@ -15,4 +15,4 @@ def mostrar_perfil(usuario_data):
         st.write("**Teléfono:**")
         st.write(usuario_data.get("telefono", "No registrado"))
     
-    st.info("🔧 Próximamente: editar perfil y cambiar contraseña")
+    st.info("🔧 Próximamente: editar perfil")
