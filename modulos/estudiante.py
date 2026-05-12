@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import requests
 from utils import get_headers, SUPABASE_URL
-from comun.perfil import mostrar_perfil
+from modulos.comun.perfil import mostrar_perfil
 
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
