@@ -1,65 +1,50 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
+import requests
+from utils import get_headers, SUPABASE_URL
+from perfil import mostrar_perfil
 
 def mostrar(data):
-    st.title(f"👨‍👩‍👧 Panel del Acudiente")
-    st.write(f"Bienvenido, {data['nombre']}")
+    st.title("👨‍👩‍👧 Panel del Acudiente")
     
-    # Selector de hijo (simulado)
-    hijo = st.selectbox(
-        "Seleccionar hijo",
-        ["Laura Méndez (11°A)", "Andrés Méndez (10°A)"]
-    )
+    headers = get_headers()
     
-    # Datos de ejemplo según el hijo seleccionado
-    if "Laura" in hijo:
-        notas_ejemplo = [
-            {"materia": "Matemáticas", "nota": 4.5, "periodo": 1},
-            {"materia": "Ciencias", "nota": 3.8, "periodo": 1},
-            {"materia": "Español", "nota": 4.2, "periodo": 1},
-        ]
-        grado = "11°A"
-    else:
-        notas_ejemplo = [
-            {"materia": "Matemáticas", "nota": 3.5, "periodo": 1},
-            {"materia": "Ciencias", "nota": 4.0, "periodo": 1},
-            {"materia": "Español", "nota": 3.8, "periodo": 1},
-        ]
-        grado = "10°A"
+    # Obtener datos actualizados
+    url = f"{SUPABASE_URL}/rest/v1/personas?id_persona=eq.{data['id_persona']}"
+    response = requests.get(url, headers=headers)
+    acudiente = response.json()[0] if response.status_code == 200 else data
     
-    st.subheader(f"📖 Notas de {hijo}")
-    st.caption(f"Grado: {grado}")
+    # Obtener username
+    url_user = f"{SUPABASE_URL}/rest/v1/usuarios_login?id_persona=eq.{data['id_persona']}"
+    response_user = requests.get(url_user, headers=headers)
+    username = response_user.json()[0]["username"] if response_user.json() else None
     
-    # Crear DataFrame
-    df_notas = pd.DataFrame(notas_ejemplo)
+    usuario_completo = {
+        "id_persona": acudiente["id_persona"],
+        "nombre": acudiente["nombre"],
+        "email": acudiente.get("email"),
+        "telefono": acudiente.get("telefono"),
+        "username": username
+    }
     
-    # Calcular promedio general
-    promedio_general = df_notas["nota"].mean()
+    tab_perfil, tab_hijos = st.tabs(["👤 Mi Perfil", "👨‍👩‍👧 Mis Hijos"])
     
-    # Mostrar notas
-    for _, row in df_notas.iterrows():
-        st.write(f"**{row['materia']}:** {row['nota']}")
+    with tab_perfil:
+        mostrar_perfil(usuario_completo)
     
-    st.divider()
-    st.write(f"**📊 Promedio General:** {promedio_general:.1f}")
-    
-    # Gráfico
-    fig = px.bar(
-        df_notas,
-        x="materia",
-        y="nota",
-        title=f"Calificaciones de {hijo}",
-        color="nota",
-        color_continuous_scale=["red", "yellow", "green"],
-        range_color=[0, 5],
-        text="nota"
-    )
-    fig.update_traces(textposition="outside")
-    fig.update_layout(height=400)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Agendar reunión (opcional)
-    st.subheader("📅 Acciones")
-    if st.button("📞 Solicitar reunión con docente"):
-        st.info("Próximamente: Sistema de agendamiento de reuniones")
+    with tab_hijos:
+        st.subheader("Mis Hijos")
+        
+        # Obtener hijos del acudiente
+        url_hijos = f"{SUPABASE_URL}/rest/v1/estudiantes_acudientes?id_acudiente=eq.{data['id_persona']}"
+        response_hijos = requests.get(url_hijos, headers=headers)
+        
+        if response_hijos.status_code == 200 and response_hijos.json():
+            for hijo_rel in response_hijos.json():
+                id_estudiante = hijo_rel["id_estudiante"]
+                url_est = f"{SUPABASE_URL}/rest/v1/personas?id_persona=eq.{id_estudiante}"
+                resp_est = requests.get(url_est, headers=headers)
+                if resp_est.status_code == 200 and resp_est.json():
+                    estudiante = resp_est.json()[0]
+                    st.write(f"• **{estudiante['nombre']}** (Documento: {estudiante.get('documento', 'N/A')})")
+        else:
+            st.info("No hay hijos registrados")
