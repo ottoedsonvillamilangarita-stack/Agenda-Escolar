@@ -2,35 +2,35 @@ import streamlit as st
 import pandas as pd
 import requests
 from utils import SUPABASE_URL, get_headers
-
+from comun.perfil import mostrar_perfil
 
 def mostrar(data):
     st.title("⚙️ Administración")
     
     headers = get_headers()
     
-    # Obtener datos actualizados del administrador
+    # Obtener datos actualizados
     url = f"{SUPABASE_URL}/rest/v1/personas?id_persona=eq.{data['id_persona']}"
     response = requests.get(url, headers=headers)
-    admin_data = response.json()[0] if response.status_code == 200 else data
+    persona = response.json()[0] if response.status_code == 200 and response.json() else data
     
     # Obtener username
     url_user = f"{SUPABASE_URL}/rest/v1/usuarios_login?id_persona=eq.{data['id_persona']}"
     response_user = requests.get(url_user, headers=headers)
-    username = response_user.json()[0]["username"] if response_user.json() else None
+    username = response_user.json()[0]["username"] if response_user.status_code == 200 and response_user.json() else None
     
-    usuario_completo = {
-        "id_persona": admin_data["id_persona"],
-        "nombre": admin_data["nombre"],
-        "email": admin_data.get("email"),
-        "telefono": admin_data.get("telefono"),
+    usuario = {
+        "id_persona": persona.get("id_persona"),
+        "nombre": persona.get("nombre"),
+        "email": persona.get("email"),
+        "telefono": persona.get("telefono"),
         "username": username
     }
     
     tab_perfil, tab_usuarios, tab_carga, tab_config = st.tabs(["👤 Mi Perfil", "👥 Usuarios", "📤 Carga Masiva", "⚙️ Configuración"])
     
     with tab_perfil:
-        mostrar_perfil(usuario_completo)
+        mostrar_perfil(usuario)
     
     with tab_usuarios:
         st.subheader("Usuarios del Sistema")
