@@ -145,30 +145,49 @@ def procesar_estudiantes(df):
 
 
 def procesar_docentes(df):
+    st.write("=== DIAGNÓSTICO ===")
+    st.write(f"Columnas encontradas: {list(df.columns)}")
+    st.write(f"Primeras filas:")
+    st.dataframe(df.head())
+    
     headers = get_headers()
     
-    df["documento_docente"] = df["documento_docente"].astype(str).str.split('.').str[0]
+    # Limpiar decimales
+    if "documento_docente" in df.columns:
+        df["documento_docente"] = df["documento_docente"].astype(str).str.split('.').str[0]
+    else:
+        return "❌ Error: No se encontró la columna 'documento_docente'"
+    
     docentes_ok = 0
     
-    docentes_unicos = df[["nombre_docente", "apellidos_docente", "documento_docente", "telefono_docente", "email_docente"]].drop_duplicates(subset=["documento_docente"])
-    
-    for _, row in docentes_unicos.iterrows():
+    for idx, row in df.iterrows():
         doc = str(row["documento_docente"])
+        st.write(f"Procesando: {doc}")
+        
+        # Verificar si el docente ya existe
         url = f"{SUPABASE_URL}/rest/v1/personas?documento=eq.{doc}"
         resp = requests.get(url, headers=headers)
         
-        if resp.status_code == 200 and not resp.json():
-            docente = {
-                "nombre": f"{row['nombre_docente']} {row['apellidos_docente']}",
-                "documento": doc,
-                "telefono": str(row.get("telefono_docente", "")),
-                "email": row.get("email_docente"),
-                "rol": "docente"
-            }
-            r = requests.post(f"{SUPABASE_URL}/rest/v1/personas", 
-                              headers={**headers, "Content-Type": "application/json"}, 
-                              json=docente)
-            if r.status_code == 201:
-                docentes_ok += 1
+        if resp.status_code == 200:
+            if resp.json():
+                st.write(f"⚠️ Docente {doc} ya existe")
+            else:
+                # Insertar nuevo docente
+                nombre_completo = f"{row['nombre_docente']} {row['apellidos_docente']}"
+                docente = {
+                    "nombre": nombre_completo,
+                    "documento": doc,
+                    "rol": "docente"
+                }
+                r = requests.post(f"{SUPABASE_URL}/rest/v1/personas", 
+                                  headers={**headers, "Content-Type": "application/json"}, 
+                                  json=docente)
+                if r.status_code == 201:
+                    docentes_ok += 1
+                    st.write(f"✅ Docente {nombre_completo} insertado")
+                else:
+                    st.write(f"❌ Error al insertar: {r.text}")
+        else:
+            st.write(f"❌ Error de conexión: {resp.status_code}")
     
     return f"✅ {docentes_ok} docentes insertados"
