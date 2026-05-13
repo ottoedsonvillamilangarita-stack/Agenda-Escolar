@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 from utils import get_headers, SUPABASE_URL
-from perfil import mostrar_perfil
 
 def mostrar(data):
     st.title("👁️ Supervisión")
