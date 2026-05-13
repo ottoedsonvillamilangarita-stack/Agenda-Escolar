@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from utils import SUPABASE_URL, get_headers
-from perfil import mostrar_perfil
+
 def mostrar(data):
     st.title("⚙️ Administración")
     
