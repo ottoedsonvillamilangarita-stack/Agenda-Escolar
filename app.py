@@ -1,45 +1,43 @@
 import streamlit as st
 from modulos import login, estudiante, docente, acudiente, director, coordinador, secretaria, supervisor, admin
 
-st.set_page_config(page_title="Plataforma Escolar", page_icon="📚", layout="wide")
+st.set_page_config(page_title="Plataforma Escolar", layout="wide")
 
-# Inicializar sesión
+# Inicializar session_state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# Mostrar login o panel según corresponda
+# Login
 if not st.session_state.logged_in:
     login.mostrar()
 else:
-    # Barra lateral común
-    with st.sidebar:
-        st.write(f"👤 {st.session_state.user_data['nombre']}")
-        st.write(f"📌 Rol: {st.session_state.user_data['rol']}")
-        st.divider()
-        if st.button("🚪 Cerrar Sesión"):
-            st.session_state.logged_in = False
-            st.rerun()
+    # Mostrar información del usuario (corregido)
+    st.sidebar.title("Menú")
+    st.sidebar.write(f"👤 {st.session_state.user_data.get('username', 'Usuario')}")
+    st.sidebar.write(f"📌 Rol: {st.session_state.user_data.get('rol', 'Sin rol')}")
     
-    # Mostrar el panel según el rol
-    rol = st.session_state.user_data["rol"]
-    data = st.session_state.user_data
+    if st.sidebar.button("Cerrar sesión"):
+        st.session_state.logged_in = False
+        st.rerun()
     
-    if rol == "estudiante":
-        estudiante.mostrar(data)
-    elif rol == "docente":
-        docente.mostrar(data)
-    elif rol == "acudiente":
-        acudiente.mostrar(data)
-    elif rol == "director":
-        director.mostrar(data)
-    elif rol == "coordinador":
-        coordinador.mostrar(data)
-    elif rol == "secretaria":
-        secretaria.mostrar(data)
-    elif rol == "supervisor":
-        supervisor.mostrar(data)
-    elif rol == "admin":
-        admin.mostrar(data)
+    # Redirigir según el rol
+    rol = st.session_state.user_data.get('rol')
     
-    st.divider()
-    st.caption("📚 Plataforma Escolar Demo - 2026")
+    if rol == 'estudiante':
+        estudiante.mostrar(st.session_state.user_data)
+    elif rol == 'docente':
+        docente.mostrar(st.session_state.user_data)
+    elif rol == 'acudiente':
+        acudiente.mostrar(st.session_state.user_data)
+    elif rol == 'director':
+        director.mostrar(st.session_state.user_data)
+    elif rol == 'coordinador':
+        coordinador.mostrar(st.session_state.user_data)
+    elif rol == 'secretaria':
+        secretaria.mostrar(st.session_state.user_data)
+    elif rol == 'supervisor':
+        supervisor.mostrar(st.session_state.user_data)
+    elif rol == 'admin':
+        admin.mostrar(st.session_state.user_data)
+    else:
+        st.error("Rol no reconocido")
