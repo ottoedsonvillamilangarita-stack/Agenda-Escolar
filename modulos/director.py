@@ -54,7 +54,9 @@ def mostrar(data):
         
         if estudiantes:
             df = pd.DataFrame(estudiantes)
-            st.dataframe(df[['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante']], use_container_width=True)
+            columnas = ['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante']
+            columnas_existentes = [col for col in columnas if col in df.columns]
+            st.dataframe(df[columnas_existentes], use_container_width=True)
             st.caption(f"Total: {len(estudiantes)} estudiantes")
         else:
             st.info(f"No hay estudiantes en el curso {curso_dirige}")
