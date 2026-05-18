@@ -1,48 +1,100 @@
 import streamlit as st
 import requests
-from utils import get_headers, SUPABASE_URL
+import pandas as pd
+from utils import SUPABASE_URL, get_headers
 
 def mostrar(data):
-    st.title("👁️ Supervisión")
+    st.title("🔍 Panel de Supervisor")
+    st.write(f"Bienvenido, {data.get('username', 'Supervisor')}")
+    
+    opcion = st.sidebar.selectbox(
+        "Seleccionar función",
+        ["📊 Dashboard", "📈 Rendimiento Académico", "👨‍🏫 Evaluación Docente", "📊 Estadísticas", "📋 Reportes"]
+    )
+    
+    if opcion == "📊 Dashboard":
+        mostrar_dashboard()
+    elif opcion == "📈 Rendimiento Académico":
+        rendimiento_academico()
+    elif opcion == "👨‍🏫 Evaluación Docente":
+        evaluacion_docente()
+    elif opcion == "📊 Estadísticas":
+        estadisticas()
+    elif opcion == "📋 Reportes":
+        reportes()
+
+def mostrar_dashboard():
+    st.subheader("📊 Dashboard Supervisor")
     
     headers = get_headers()
     
-    # Obtener datos actualizados
-    url = f"{SUPABASE_URL}/rest/v1/personas?id_persona=eq.{data['id_persona']}"
+    # Estadísticas rápidas
+    url_est = f"{SUPABASE_URL}/rest/v1/estudiantes"
+    response_est = requests.get(url_est, headers=headers)
+    total_estudiantes = len(response_est.json()) if response_est.status_code == 200 else 0
+    
+    # Cursos
+    cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("👨‍🎓 Estudiantes", total_estudiantes)
+    col2.metric("📚 Cursos", len(cursos))
+    col3.metric("👨‍🏫 Docentes", "Por definir")
+    
+    st.info("📊 Supervisión académica - Vista general del sistema")
+
+def rendimiento_academico():
+    st.subheader("📈 Rendimiento Académico por Curso")
+    
+    curso = st.selectbox("Seleccionar curso", ["901", "902", "903", "1001", "1002", "1003", "1101"])
+    
+    st.write(f"**Rendimiento del curso {curso}:**")
+    st.write("- Promedio general: 4.2 (próximamente)")
+    st.write("- Materias con mejor rendimiento: (próximamente)")
+    st.write("- Materias con menor rendimiento: (próximamente)")
+    st.write("- Asistencia promedio: (próximamente)")
+
+def evaluacion_docente():
+    st.subheader("👨‍🏫 Evaluación Docente")
+    
+    headers = get_headers()
+    url = f"{SUPABASE_URL}/rest/v1/docentes?select=nombre_docente,asignatura,curso"
     response = requests.get(url, headers=headers)
-    persona = response.json()[0] if response.status_code == 200 and response.json() else data
     
-    # Obtener username
-    url_user = f"{SUPABASE_URL}/rest/v1/usuarios_login?id_persona=eq.{data['id_persona']}"
-    response_user = requests.get(url_user, headers=headers)
-    username = response_user.json()[0]["username"] if response_user.status_code == 200 and response_user.json() else None
+    if response.status_code == 200:
+        docentes = response.json()
+        if docentes:
+            df = pd.DataFrame(docentes)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No hay docentes registrados")
+    else:
+        st.error(f"Error {response.status_code}")
+
+def estadisticas():
+    st.subheader("📊 Estadísticas Avanzadas")
     
-    usuario = {
-        "id_persona": persona.get("id_persona"),
-        "nombre": persona.get("nombre"),
-        "email": persona.get("email"),
-        "telefono": persona.get("telefono"),
-        "username": username
-    }
+    st.write("**Estadísticas por curso:**")
     
-    tab_perfil, tab_supervision = st.tabs(["👤 Mi Perfil", "📊 Supervisión"])
+    cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
     
-    with tab_perfil:
-        mostrar_perfil(usuario)
+    for curso in cursos:
+        with st.expander(f"Curso {curso}"):
+            headers = get_headers()
+            url = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}&select=count"
+            response = requests.get(url, headers=headers)
+            
+            if response.status_code == 200:
+                total = len(response.json())
+                st.write(f"**Total estudiantes:** {total}")
+                st.write(f"**Materias:** 6-7")
+                st.write(f"**Docentes asignados:** Por definir")
+
+def reportes():
+    st.subheader("📋 Reportes de Supervisión")
     
-    with tab_supervision:
-        st.subheader("Resumen General")
-        
-        url_est = f"{SUPABASE_URL}/rest/v1/estudiantes_grados"
-        response_est = requests.get(url_est, headers=headers)
-        total_estudiantes = len(response_est.json()) if response_est.status_code == 200 else 0
-        
-        url_doc = f"{SUPABASE_URL}/rest/v1/personas?rol=eq.docente"
-        response_doc = requests.get(url_doc, headers=headers)
-        total_docentes = len(response_doc.json()) if response_doc.status_code == 200 else 0
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total Estudiantes", total_estudiantes)
-        with col2:
-            st.metric("Total Docentes", total_docentes)
+    st.write("**Reportes disponibles:**")
+    st.write("- Reporte de rendimiento por curso")
+    st.write("- Reporte de evaluación docente")
+    st.write("- Reporte de asistencia general")
+    st.write("- Reporte comparativo entre cursos")
