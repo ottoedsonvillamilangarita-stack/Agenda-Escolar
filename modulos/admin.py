@@ -653,3 +653,23 @@ def mostrar_sistema():
         if st.button("📀 Crear Respaldo", type="primary"):
             with st.spinner("Generando respaldo..."):
                 st.success("✅ Respaldo creado exitosamente")
+
+def mostrar_asignacion():
+    st.subheader("📚 Asignación Académica")
+    
+    # ============================================
+    # DIAGNÓSTICO
+    # ============================================
+    headers = get_headers()
+    
+    # Probar consulta a docentes
+    response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+    st.write(f"**Status code docentes:** {response_docentes.status_code}")
+    st.write(f"**Respuesta docentes:** {response_docentes.json() if response_docentes.status_code == 200 else 'Error'}")
+    
+    # Probar consulta a asignacion_academica
+    response_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
+    st.write(f"**Status code asignacion:** {response_asig.status_code}")
+    # ============================================
+    
+    # ... resto del código ...
