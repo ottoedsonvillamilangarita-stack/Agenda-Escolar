@@ -28,12 +28,10 @@ def mostrar_dashboard():
     
     headers = get_headers()
     
-    # Contar estudiantes
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes"
     response_est = requests.get(url_est, headers=headers)
     total_estudiantes = len(response_est.json()) if response_est.status_code == 200 else 0
     
-    # Contar docentes únicos
     url_doc = f"{SUPABASE_URL}/rest/v1/docentes"
     response_doc = requests.get(url_doc, headers=headers)
     if response_doc.status_code == 200:
@@ -95,7 +93,6 @@ def gestion_docentes():
     if response.status_code == 200:
         datos = response.json()
         if datos:
-            # Agrupar por docente
             df = pd.DataFrame(datos)
             st.dataframe(df, use_container_width=True)
             st.caption(f"Total asignaciones: {len(datos)}")
@@ -112,7 +109,6 @@ def gestion_cursos():
     for curso in cursos:
         with st.expander(f"Curso {curso}"):
             st.write(f"**Asignaturas del curso {curso}:**")
-            # Aquí puedes cargar las asignaturas desde la tabla docentes
             headers = get_headers()
             url = f"{SUPABASE_URL}/rest/v1/docentes?curso=eq.{curso}&select=asignatura,nombre_docente"
             response = requests.get(url, headers=headers)
@@ -121,7 +117,8 @@ def gestion_cursos():
                 materias = response.json()
                 if materias:
                     for m in materias:
-                        st.write(f"- {m.get('asignatura')}: {m.get('nombre_docente')")
+                        # Línea corregida:
+                        st.write(f"- {m.get('asignatura')}: {m.get('nombre_docente')}")
                 else:
                     st.write("Sin asignaturas asignadas")
 
