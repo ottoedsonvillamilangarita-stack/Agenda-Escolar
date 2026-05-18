@@ -29,7 +29,8 @@ def mostrar():
                     if response.status_code == 200:
                         datos = response.json()
                         
-                        if datos:
+                        # ✅ IMPORTANTE: Verificar que datos NO esté vacío
+                        if datos and len(datos) > 0:
                             user_data = datos[0]
                             
                             # Verificar contraseña
@@ -62,7 +63,7 @@ def mostrar():
                 st.rerun()
         
         st.divider()
-        st.caption("Usuarios de prueba: admin, docente_1, estudiante_1, acudiente_1")
+        st.caption("Usuarios de prueba: admin, secretaria, docente_1, estudiante_1, acudiente_1")
         st.caption("Contraseña: demo2026")
     
     else:
