@@ -66,7 +66,7 @@ def mostrar(data):
                     st.write(f"- {materia}")
     
     # ============================================
-    # MENÚ DE FUNCIONES (8 botones)
+    # MENÚ DE FUNCIONES
     # ============================================
     
     st.divider()
@@ -76,7 +76,7 @@ def mostrar(data):
     if "funcion_actual" not in st.session_state:
         st.session_state.funcion_actual = "mis_cursos"
     
-    # Primera fila de botones (4)
+    # Primera fila de botones
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -103,7 +103,7 @@ def mostrar(data):
             st.session_state.funcion_actual = "reportes"
             st.rerun()
     
-    # Segunda fila de botones (4)
+    # Segunda fila de botones
     col5, col6, col7, col8 = st.columns(4)
     
     with col5:
@@ -203,5 +203,3 @@ def mostrar_mensajes():
 def mostrar_mi_rendimiento():
     st.subheader("📈 Mi Rendimiento")
     st.info("Módulo en desarrollo - Próximamente podrás ver tu rendimiento")
-        if st.button("📊 Mis Cursos", use_container_width=True):
-            st.info("Módulo en desarrollo")
