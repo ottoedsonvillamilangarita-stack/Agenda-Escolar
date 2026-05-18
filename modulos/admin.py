@@ -73,6 +73,7 @@ def mostrar(data):
     elif st.session_state.admin_seccion == "sistema":
         mostrar_sistema()
 
+
 # ============================================
 # DASHBOARD
 # ============================================
@@ -86,8 +87,7 @@ def mostrar_dashboard():
     
     response_doc = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     if response_doc.status_code == 200:
-        datos = response_doc.json()
-        total_docentes = len(datos)
+        total_docentes = len(response_doc.json())
     else:
         total_docentes = 0
     
@@ -98,6 +98,7 @@ def mostrar_dashboard():
     col4.metric("👥 Usuarios", "Por definir")
     
     st.info("🔐 Panel de control del Administrador")
+
 
 # ============================================
 # ALUMNOS
@@ -137,6 +138,7 @@ def mostrar_alumnos():
             if st.form_submit_button("💾 Guardar"):
                 st.success(f"✅ Alumno {nombre} registrado")
 
+
 # ============================================
 # ACUDIENTES
 # ============================================
@@ -172,6 +174,7 @@ def mostrar_acudientes():
             st.dataframe(df, use_container_width=True)
         else:
             st.info("No hay acudientes registrados")
+
 
 # ============================================
 # DOCENTES
@@ -209,33 +212,35 @@ def mostrar_docentes():
             if st.form_submit_button("💾 Guardar"):
                 st.success(f"✅ Docente {nombre} registrado")
 
+
 # ============================================
 # ASIGNACIÓN ACADÉMICA
 # ============================================
 def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
     
-    # ============================================
-    # SECCIÓN 1: DIRECTORES DE CURSO
-    # ============================================
-    st.markdown("### 🎓 Directores de Curso")
-    st.info("Asigna un docente como director para cada curso")
-    
     headers = get_headers()
     
-    # Obtener docentes
+    # ============================================
+    # OBTENER DATOS BÁSICOS
+    # ============================================
+    
+    # Obtener todos los docentes
     response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
-    docentes_lista = ["-- Sin asignar --"]
+    todos_docentes = []
     docentes_dict = {}
     
     if response_docentes.status_code == 200:
         for d in response_docentes.json():
             nombre = f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip()
             if nombre and nombre != " ":
-                docentes_lista.append(nombre)
+                todos_docentes.append({
+                    "nombre": nombre,
+                    "documento": d.get('documento_docente')
+                })
                 docentes_dict[nombre] = d.get('documento_docente')
     
-    if len(docentes_lista) == 1:
+    if not todos_docentes:
         st.warning("⚠️ No hay docentes registrados. Por favor, carga docentes primero.")
         return
     
@@ -244,12 +249,25 @@ def mostrar_asignacion():
     # Obtener directores actuales
     response_directores = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?asignatura=eq.Dirección de Curso", headers=headers)
     directores_actuales = {}
+    docentes_con_direccion = set()
     
     if response_directores.status_code == 200:
         for d in response_directores.json():
-            directores_actuales[d.get('curso')] = d.get('documento_docente')
+            curso = d.get('curso')
+            doc_docente = d.get('documento_docente')
+            directores_actuales[curso] = doc_docente
+            if doc_docente:
+                docentes_con_direccion.add(doc_docente)
+    
+    # ============================================
+    # SECCIÓN 1: DIRECTORES DE CURSO
+    # ============================================
+    st.markdown("### 🎓 Directores de Curso")
+    st.info("Asigna un docente como director para cada curso (un docente no puede ser director de más de un curso)")
     
     with st.form("directores_form"):
+        st.write("**Asignación de Directores por Curso:**")
+        
         directores_asignados = {}
         for curso in cursos:
             col1, col2 = st.columns([1, 2])
@@ -263,10 +281,19 @@ def mostrar_asignacion():
                         current_nombre = nombre
                         break
                 
-                index = docentes_lista.index(current_nombre) if current_nombre in docentes_lista else 0
+                # Construir lista de docentes disponibles
+                docentes_disponibles = ["-- Sin asignar --"]
+                for docente in todos_docentes:
+                    if current_doc and docente['documento'] == current_doc:
+                        docentes_disponibles.append(docente['nombre'])
+                    elif docente['documento'] not in docentes_con_direccion:
+                        docentes_disponibles.append(docente['nombre'])
+                
+                index = docentes_disponibles.index(current_nombre) if current_nombre in docentes_disponibles else 0
+                
                 director = st.selectbox(
                     "Director",
-                    docentes_lista,
+                    docentes_disponibles,
                     index=index,
                     key=f"director_{curso}",
                     label_visibility="collapsed"
@@ -298,7 +325,41 @@ def mostrar_asignacion():
     
     asignaturas = asignaturas_por_curso.get(curso, [])
     
-    response_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=neq.Dirección de Curso", headers=headers)
+    # Obtener qué docentes ya están asignados a este curso
+    response_materias_curso = requests.get(
+        f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=neq.Dirección de Curso&select=documento_docente",
+        headers=headers
+    )
+    
+    docentes_del_curso = set()
+    if response_materias_curso.status_code == 200:
+        for a in response_materias_curso.json():
+            if a.get('documento_docente'):
+                docentes_del_curso.add(a.get('documento_docente'))
+    
+    # Agregar el director del curso
+    director_curso = directores_actuales.get(curso)
+    if director_curso:
+        docentes_del_curso.add(director_curso)
+    
+    # Construir lista de docentes disponibles para este curso
+    docentes_curso_lista = ["-- Sin asignar --"]
+    docentes_curso_dict = {}
+    
+    for docente in todos_docentes:
+        if docente['documento'] in docentes_del_curso:
+            docentes_curso_lista.append(docente['nombre'])
+            docentes_curso_dict[docente['nombre']] = docente['documento']
+    
+    if len(docentes_curso_lista) == 1:
+        st.warning(f"⚠️ No hay docentes asignados al curso {curso}. Primero asigna materias o un director.")
+        return
+    
+    # Obtener asignaciones existentes
+    response_asig = requests.get(
+        f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=neq.Dirección de Curso",
+        headers=headers
+    )
     asignaciones_existentes = {}
     
     if response_asig.status_code == 200:
@@ -306,6 +367,8 @@ def mostrar_asignacion():
             asignaciones_existentes[a.get('asignatura')] = a.get('documento_docente')
     
     with st.form("materias_form"):
+        st.write(f"**Asignación de materias para el curso {curso}:**")
+        
         materias_asignadas = {}
         for asignatura in asignaturas:
             col1, col2 = st.columns([2, 3])
@@ -314,15 +377,15 @@ def mostrar_asignacion():
             with col2:
                 current_doc = asignaciones_existentes.get(asignatura)
                 current_nombre = "-- Sin asignar --"
-                for nombre, doc in docentes_dict.items():
+                for nombre, doc in docentes_curso_dict.items():
                     if doc == current_doc:
                         current_nombre = nombre
                         break
                 
-                index = docentes_lista.index(current_nombre) if current_nombre in docentes_lista else 0
+                index = docentes_curso_lista.index(current_nombre) if current_nombre in docentes_curso_lista else 0
                 docente = st.selectbox(
                     "Docente",
-                    docentes_lista,
+                    docentes_curso_lista,
                     index=index,
                     key=f"materia_{curso}_{asignatura}",
                     label_visibility="collapsed"
@@ -330,18 +393,14 @@ def mostrar_asignacion():
                 materias_asignadas[asignatura] = docente if docente != "-- Sin asignar --" else None
         
         if st.form_submit_button("💾 Guardar Asignación de Materias", type="primary"):
-            guardar_materias(curso, materias_asignadas, docentes_dict, headers)
+            guardar_materias(curso, materias_asignadas, docentes_curso_dict, headers)
     
     st.divider()
-    mostrar_resumen_asignaciones(curso, headers, docentes_dict)
+    mostrar_resumen_asignaciones(curso, headers, docentes_curso_dict)
 
-
-# ============================================
-# FUNCIONES AUXILIARES PARA ASIGNACIÓN
-# ============================================
 
 def guardar_directores(directores_asignados, docentes_dict, headers, cursos):
-    """Guarda los directores de curso"""
+    """Guarda los directores de curso y actualiza roles"""
     exitos = 0
     errores = 0
     
@@ -349,30 +408,30 @@ def guardar_directores(directores_asignados, docentes_dict, headers, cursos):
         if director_nombre:
             documento_docente = docentes_dict.get(director_nombre)
             
+            # Guardar en asignacion_academica
             data = {
                 "curso": curso,
                 "asignatura": "Dirección de Curso",
                 "documento_docente": documento_docente
             }
             
-            # Verificar si ya existe
             check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.Dirección de Curso"
             check_response = requests.get(check_url, headers=headers)
             
             if check_response.status_code == 200 and check_response.json():
-                # Actualizar
                 update_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.Dirección de Curso"
                 response = requests.patch(update_url, headers=headers, json={"documento_docente": documento_docente})
             else:
-                # Insertar
                 response = requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
             
             if response.status_code in [200, 201, 204]:
                 exitos += 1
+                # Actualizar roles del docente para incluir 'director'
+                actualizar_roles_docente(documento_docente, 'director', headers)
             else:
                 errores += 1
         else:
-            # Eliminar si existe
+            # Eliminar dirección si existe
             delete_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.Dirección de Curso"
             requests.delete(delete_url, headers=headers)
     
@@ -409,6 +468,8 @@ def guardar_materias(curso, materias_asignadas, docentes_dict, headers):
             
             if response.status_code in [200, 201, 204]:
                 exitos += 1
+                # Asegurar que el docente tenga el rol 'docente'
+                actualizar_roles_docente(documento_docente, 'docente', headers)
             else:
                 errores += 1
         else:
@@ -420,6 +481,25 @@ def guardar_materias(curso, materias_asignadas, docentes_dict, headers):
         st.rerun()
     else:
         st.warning(f"⚠️ {exitos} guardadas, {errores} errores")
+
+
+def actualizar_roles_docente(documento_docente, nuevo_rol, headers):
+    """Actualiza los roles del docente en usuarios_login"""
+    # Buscar el usuario por documento
+    url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200 and response.json():
+        user = response.json()[0]
+        roles_actuales = user.get('roles', [user.get('rol')])
+        
+        # Agregar el nuevo rol si no existe
+        if nuevo_rol not in roles_actuales:
+            roles_actuales.append(nuevo_rol)
+            
+            # Actualizar en Supabase
+            update_url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
+            requests.patch(update_url, headers=headers, json={"roles": roles_actuales})
 
 
 def mostrar_resumen_asignaciones(curso, headers, docentes_dict):
