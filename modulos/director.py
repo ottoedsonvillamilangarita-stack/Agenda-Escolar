@@ -9,12 +9,9 @@ def mostrar(data):
     documento_docente = data.get('documento')
     st.write(f"Bienvenido, {data.get('username', 'Director')}")
     
-    # ============================================
-    # OBTENER CURSO QUE DIRIGE
-    # ============================================
     headers = get_headers()
     
-    # Buscar en asignacion_academica si es director de algún curso
+    # Buscar curso que dirige
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
     response = requests.get(url, headers=headers)
     
@@ -31,9 +28,7 @@ def mostrar(data):
     curso_dirige = direccion[0].get('curso')
     st.success(f"🎓 Eres director del curso: **{curso_dirige}**")
     
-    # ============================================
-    # OBTENER ESTUDIANTES DEL CURSO
-    # ============================================
+    # Obtener estudiantes
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso_dirige}"
     response_est = requests.get(url_est, headers=headers)
     
@@ -42,10 +37,6 @@ def mostrar(data):
         return
     
     estudiantes = response_est.json()
-    
-    # ============================================
-    # MOSTRAR PANEL DE DIRECTOR
-    # ============================================
     
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Estudiantes", "📈 Rendimiento", "📋 Asistencia", "📊 Reportes"])
     
@@ -63,12 +54,12 @@ def mostrar(data):
     
     with tab2:
         st.subheader("📈 Rendimiento Académico")
-        st.info("Módulo en desarrollo - Próximamente")
+        st.info("Módulo en desarrollo")
     
     with tab3:
         st.subheader("📋 Asistencia")
-        st.info("Módulo en desarrollo - Próximamente")
+        st.info("Módulo en desarrollo")
     
     with tab4:
         st.subheader("📊 Reportes")
-        st.info("Módulo en desarrollo - Próximamente")
+        st.info("Módulo en desarrollo")
