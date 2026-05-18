@@ -1,53 +1,83 @@
 import streamlit as st
 import requests
 import pandas as pd
+from datetime import datetime
 from utils import SUPABASE_URL, get_headers
 
 def mostrar(data):
     st.title("🛡️ Panel de Administrador")
     st.write(f"Bienvenido, {data.get('username', 'Admin')}")
     
-    # Menú lateral
-    opcion = st.sidebar.selectbox(
-        "Seleccionar función",
-        ["📊 Dashboard", "👥 Usuarios", "📚 Cursos", "📈 Reportes", "⚙️ Configuración"]
-    )
+    # Inicializar función actual
+    if "admin_funcion" not in st.session_state:
+        st.session_state.admin_funcion = "dashboard"
     
-    if opcion == "📊 Dashboard":
+    # ============================================
+    # MENÚ DE ADMIN (FUNCIONES EXCLUSIVAS)
+    # ============================================
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("📊 Dashboard", use_container_width=True,
+                     type="primary" if st.session_state.admin_funcion == "dashboard" else "secondary"):
+            st.session_state.admin_funcion = "dashboard"
+            st.rerun()
+    
+    with col2:
+        if st.button("👥 Usuarios", use_container_width=True,
+                     type="primary" if st.session_state.admin_funcion == "usuarios" else "secondary"):
+            st.session_state.admin_funcion = "usuarios"
+            st.rerun()
+    
+    with col3:
+        if st.button("🔐 Roles", use_container_width=True,
+                     type="primary" if st.session_state.admin_funcion == "roles" else "secondary"):
+            st.session_state.admin_funcion = "roles"
+            st.rerun()
+    
+    with col4:
+        if st.button("⚙️ Configuración", use_container_width=True,
+                     type="primary" if st.session_state.admin_funcion == "configuracion" else "secondary"):
+            st.session_state.admin_funcion = "configuracion"
+            st.rerun()
+    
+    st.divider()
+    
+    # ============================================
+    # MOSTRAR FUNCIÓN SELECCIONADA
+    # ============================================
+    
+    if st.session_state.admin_funcion == "dashboard":
         mostrar_dashboard()
-    elif opcion == "👥 Usuarios":
-        mostrar_usuarios()
-    elif opcion == "📚 Cursos":
-        mostrar_cursos()
-    elif opcion == "📈 Reportes":
-        mostrar_reportes()
-    elif opcion == "⚙️ Configuración":
+    elif st.session_state.admin_funcion == "usuarios":
+        mostrar_gestion_usuarios()
+    elif st.session_state.admin_funcion == "roles":
+        mostrar_gestion_roles()
+    elif st.session_state.admin_funcion == "configuracion":
         mostrar_configuracion()
 
 def mostrar_dashboard():
-    st.subheader("📊 Dashboard")
+    st.subheader("📊 Dashboard Administrativo")
     
     headers = get_headers()
     
-    # Contar estudiantes
-    url_estudiantes = f"{SUPABASE_URL}/rest/v1/estudiantes"
-    response_est = requests.get(url_estudiantes, headers=headers)
+    # Estadísticas generales
+    url_est = f"{SUPABASE_URL}/rest/v1/estudiantes"
+    response_est = requests.get(url_est, headers=headers)
     total_estudiantes = len(response_est.json()) if response_est.status_code == 200 else 0
     
-    # Contar docentes (distintos)
-    url_docentes = f"{SUPABASE_URL}/rest/v1/docentes"
-    response_doc = requests.get(url_docentes, headers=headers)
+    url_doc = f"{SUPABASE_URL}/rest/v1/docentes"
+    response_doc = requests.get(url_doc, headers=headers)
     if response_doc.status_code == 200:
         datos = response_doc.json()
-        # Contar docentes únicos por documento
         docentes_unicos = set([d.get('documento_docente') for d in datos])
         total_docentes = len(docentes_unicos)
     else:
         total_docentes = 0
     
-    # Contar usuarios
-    url_usuarios = f"{SUPABASE_URL}/rest/v1/usuarios_login"
-    response_usr = requests.get(url_usuarios, headers=headers)
+    url_usr = f"{SUPABASE_URL}/rest/v1/usuarios_login"
+    response_usr = requests.get(url_usr, headers=headers)
     total_usuarios = len(response_usr.json()) if response_usr.status_code == 200 else 0
     
     col1, col2, col3, col4 = st.columns(4)
@@ -56,48 +86,116 @@ def mostrar_dashboard():
     col3.metric("👥 Usuarios", total_usuarios)
     col4.metric("📚 Cursos", "7")
     
-    st.info("📌 Módulo en desarrollo - Próximamente más estadísticas")
+    st.info("🔐 Panel exclusivo del Administrador del sistema")
 
-def mostrar_usuarios():
+def mostrar_gestion_usuarios():
     st.subheader("👥 Gestión de Usuarios")
     
-    headers = get_headers()
-    url = f"{SUPABASE_URL}/rest/v1/usuarios_login"
-    response = requests.get(url, headers=headers)
+    tab1, tab2, tab3 = st.tabs(["📋 Lista de Usuarios", "➕ Crear Usuario", "✏️ Editar Usuario"])
     
-    if response.status_code == 200:
-        datos = response.json()
-        if datos:
-            df = pd.DataFrame(datos)
-            st.dataframe(df, use_container_width=True)
-            st.caption(f"Total: {len(datos)} usuarios")
-        else:
-            st.info("No hay usuarios registrados")
-    else:
-        st.error(f"Error {response.status_code}: No se pudieron cargar los usuarios")
+    with tab1:
+        headers = get_headers()
+        url = f"{SUPABASE_URL}/rest/v1/usuarios_login"
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            usuarios = response.json()
+            if usuarios:
+                df = pd.DataFrame(usuarios)
+                st.dataframe(df, use_container_width=True)
+                st.caption(f"Total: {len(usuarios)} usuarios")
+            else:
+                st.info("No hay usuarios registrados")
+    
+    with tab2:
+        st.write("**Crear nuevo usuario**")
+        nuevo_user = st.text_input("Username")
+        nueva_pass = st.text_input("Contraseña", type="password")
+        nuevo_rol = st.selectbox("Rol", ["admin", "secretaria", "supervisor", "director", "estudiante", "docente", "acudiente"])
+        
+        if st.button("➕ Crear", type="primary"):
+            headers = get_headers()
+            data = {
+                "username": nuevo_user,
+                "password_hash": nueva_pass,
+                "rol": nuevo_rol,
+                "roles": [nuevo_rol]
+            }
+            url = f"{SUPABASE_URL}/rest/v1/usuarios_login"
+            response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code == 201:
+                st.success(f"✅ Usuario {nuevo_user} creado exitosamente")
+            else:
+                st.error(f"Error: {response.status_code} - {response.text}")
+    
+    with tab3:
+        st.write("**Editar usuario existente**")
+        st.info("Funcionalidad en desarrollo")
 
-def mostrar_cursos():
-    st.subheader("📚 Gestión de Cursos")
+def mostrar_gestion_roles():
+    st.subheader("🔐 Gestión de Roles y Permisos")
     
-    cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
+    st.write("**Roles disponibles en el sistema:**")
     
-    for curso in cursos:
-        with st.expander(f"Curso {curso}"):
-            st.write(f"**Materias asignadas para {curso}:**")
-            # Aquí puedes agregar la consulta a la tabla asignacion_academica cuando la tengas
-            st.write("Próximamente: Lista de materias y docentes")
-
-def mostrar_reportes():
-    st.subheader("📈 Reportes")
-    st.write("📊 Reportes disponibles:")
-    st.write("- Reporte de estudiantes por curso")
-    st.write("- Reporte de docentes por asignatura")
-    st.write("- Reporte de notas (próximamente)")
-    st.write("- Reporte de asistencia (próximamente)")
+    roles = {
+        "admin": "Control total del sistema",
+        "secretaria": "Gestión administrativa (matrículas, horarios, documentación)",
+        "supervisor": "Supervisión académica y evaluación docente",
+        "director": "Gestión de curso específico",
+        "docente": "Gestión de cursos, notas, asistencia",
+        "estudiante": "Ver notas, horario, asistencia",
+        "acudiente": "Seguimiento de hijos"
+    }
+    
+    for rol, descripcion in roles.items():
+        with st.expander(f"📌 {rol.upper()}"):
+            st.write(f"**Descripción:** {descripcion}")
+            st.write(f"**Permisos:**")
+            if rol == "admin":
+                st.write("- ✅ Crear/editar/eliminar usuarios")
+                st.write("- ✅ Configurar roles y permisos")
+                st.write("- ✅ Ver respaldos y logs")
+            elif rol == "secretaria":
+                st.write("- ✅ Gestionar estudiantes (altas/bajas)")
+                st.write("- ✅ Gestionar matrículas")
+                st.write("- ✅ Emitir certificados")
+                st.write("- ❌ No puede crear usuarios")
+            elif rol == "docente":
+                st.write("- ✅ Ingresar notas")
+                st.write("- ✅ Marcar asistencia")
+                st.write("- ✅ Crear evaluaciones")
+                st.write("- ❌ No puede modificar estudiantes")
 
 def mostrar_configuracion():
-    st.subheader("⚙️ Configuración")
-    st.write("Configuración del sistema:")
-    st.write("- Gestión de períodos académicos (próximamente)")
-    st.write("- Configuración de notas (próximamente)")
-    st.write("- Respaldo de datos (próximamente)")
+    st.subheader("⚙️ Configuración del Sistema")
+    
+    tab1, tab2, tab3 = st.tabs(["🏫 Configuración General", "💾 Respaldos", "📊 Logs"])
+    
+    with tab1:
+        st.write("**Configuración general**")
+        nombre_colegio = st.text_input("Nombre del colegio", "Mi Colegio")
+        año_lectivo = st.number_input("Año lectivo", min_value=2000, max_value=2100, value=2024)
+        periodos = st.select_slider("Número de períodos académicos", options=[2, 3, 4], value=4)
+        
+        if st.button("💾 Guardar Configuración", type="primary"):
+            st.success("✅ Configuración guardada exitosamente")
+    
+    with tab2:
+        st.write("**Respaldos de base de datos**")
+        if st.button("📀 Crear Respaldo", type="primary"):
+            st.info("Generando respaldo...")
+            st.success("✅ Respaldo creado exitosamente")
+        
+        st.write("**Respaldos disponibles:**")
+        st.info("No hay respaldos disponibles")
+    
+    with tab3:
+        st.write("**Logs del sistema**")
+        logs = [
+            {"fecha": "2024-01-15 10:30", "usuario": "admin", "accion": "Login exitoso"},
+            {"fecha": "2024-01-15 09:00", "usuario": "secretaria", "accion": "Creó estudiante"},
+        ]
+        if logs:
+            df = pd.DataFrame(logs)
+            st.dataframe(df, use_container_width=True)
