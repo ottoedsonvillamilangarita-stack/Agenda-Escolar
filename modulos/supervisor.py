@@ -28,17 +28,13 @@ def mostrar_dashboard():
     
     headers = get_headers()
     
-    # Estadísticas rápidas
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes"
     response_est = requests.get(url_est, headers=headers)
     total_estudiantes = len(response_est.json()) if response_est.status_code == 200 else 0
     
-    # Cursos
-    cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
-    
     col1, col2, col3 = st.columns(3)
     col1.metric("👨‍🎓 Estudiantes", total_estudiantes)
-    col2.metric("📚 Cursos", len(cursos))
+    col2.metric("📚 Cursos", "7")
     col3.metric("👨‍🏫 Docentes", "Por definir")
     
     st.info("📊 Supervisión académica - Vista general del sistema")
@@ -52,7 +48,6 @@ def rendimiento_academico():
     st.write("- Promedio general: 4.2 (próximamente)")
     st.write("- Materias con mejor rendimiento: (próximamente)")
     st.write("- Materias con menor rendimiento: (próximamente)")
-    st.write("- Asistencia promedio: (próximamente)")
 
 def evaluacion_docente():
     st.subheader("👨‍🏫 Evaluación Docente")
@@ -73,28 +68,10 @@ def evaluacion_docente():
 
 def estadisticas():
     st.subheader("📊 Estadísticas Avanzadas")
-    
-    st.write("**Estadísticas por curso:**")
-    
-    cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
-    
-    for curso in cursos:
-        with st.expander(f"Curso {curso}"):
-            headers = get_headers()
-            url = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}&select=count"
-            response = requests.get(url, headers=headers)
-            
-            if response.status_code == 200:
-                total = len(response.json())
-                st.write(f"**Total estudiantes:** {total}")
-                st.write(f"**Materias:** 6-7")
-                st.write(f"**Docentes asignados:** Por definir")
+    st.write("Próximamente: Estadísticas detalladas por curso y materia")
 
 def reportes():
     st.subheader("📋 Reportes de Supervisión")
-    
     st.write("**Reportes disponibles:**")
-    st.write("- Reporte de rendimiento por curso")
-    st.write("- Reporte de evaluación docente")
-    st.write("- Reporte de asistencia general")
-    st.write("- Reporte comparativo entre cursos")
+    st.write("- Reporte de rendimiento por curso (próximamente)")
+    st.write("- Reporte de evaluación docente (próximamente)")
