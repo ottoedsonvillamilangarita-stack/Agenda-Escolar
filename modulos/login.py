@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from utils import SUPABASE_URL, get_headers
+from modulos.utils import SUPABASE_URL, get_headers
 import json  # Añade esta línea
 
 def mostrar():
