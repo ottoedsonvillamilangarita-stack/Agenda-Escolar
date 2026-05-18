@@ -1,4 +1,3 @@
-# modulos/estudiante.py
 import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
@@ -6,24 +5,36 @@ from utils import SUPABASE_URL, get_headers
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
     
-    # data contiene: username, password_hash, rol, documento
     documento_estudiante = data.get('documento')
-    
     st.write(f"Bienvenido, Estudiante")
     st.write(f"Documento: {documento_estudiante}")
     
-    # Buscar información del estudiante por documento
     headers = get_headers()
+    
+    # Consultar la tabla estudiantes
     url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_estudiante}"
+    
+    # Para depuración (lo puedes quitar después)
+    st.write(f"🔍 URL: {url}")
     
     response = requests.get(url, headers=headers)
     
-    if response.status_code == 200 and response.json():
-        estudiante_data = response.json()[0]
-        st.write(f"Nombre: {estudiante_data.get('nombre_estudiante', 'N/A')}")
-        st.write(f"Curso: {estudiante_data.get('curso', 'N/A')}")
+    st.write(f"📡 Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        datos = response.json()
+        st.write(f"📦 Datos recibidos: {datos}")
+        
+        if datos:
+            estudiante = datos[0]
+            st.success(f"✅ Estudiante encontrado: {estudiante.get('nombre_estudiante', 'N/A')}")
+            st.write(f"**Nombre:** {estudiante.get('nombre_estudiante', 'N/A')}")
+            st.write(f"**Apellidos:** {estudiante.get('apellidos_estudiante', 'N/A')}")
+            st.write(f"**Curso:** {estudiante.get('curso', 'N/A')}")
+        else:
+            st.warning("No se encontró el estudiante en la tabla 'estudiantes'")
     else:
-        st.warning("No se pudo cargar la información del estudiante")
+        st.error(f"Error {response.status_code}: {response.text}")
     
     st.subheader("📖 Mis Notas")
     st.write("**Matemáticas:** 4.5")
