@@ -49,11 +49,11 @@ def mostrar(data):
             st.info(f"📌 Curso: **{d.get('curso')}**")
     
     # Mostrar materias por curso
+    materias_por_curso = {}
     if materias:
         st.subheader("📚 Mis Materias")
         
         # Agrupar por curso
-        materias_por_curso = {}
         for m in materias:
             curso = m.get('curso')
             if curso not in materias_por_curso:
@@ -66,7 +66,7 @@ def mostrar(data):
                     st.write(f"- {materia}")
     
     # ============================================
-    # MENÚ DE FUNCIONES
+    # MENÚ DE FUNCIONES (8 botones)
     # ============================================
     
     st.divider()
@@ -137,7 +137,7 @@ def mostrar(data):
     # ============================================
     
     if st.session_state.funcion_actual == "mis_cursos":
-        mostrar_mis_cursos(materias_por_curso if materias else {})
+        mostrar_mis_cursos(materias_por_curso)
     elif st.session_state.funcion_actual == "calificaciones":
         mostrar_calificaciones()
     elif st.session_state.funcion_actual == "asistencia":
