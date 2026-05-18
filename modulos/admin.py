@@ -445,33 +445,187 @@ def mostrar_docentes():
 # ============================================
 def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
-    st.info("🚧 Módulo en construcción - Próximamente")
-    st.write("Aquí se configurarán:")
-    st.write("- Asignación de docentes a cursos")
-    st.write("- Horarios de clase")
-    st.write("- Planes de estudio")
-
-# ============================================
-# SISTEMA
-# ============================================
-def mostrar_sistema():
-    st.subheader("⚙️ Configuración del Sistema")
     
-    tab1, tab2 = st.tabs(["🏫 General", "💾 Respaldos"])
+    # ============================================
+    # Paso 1: Seleccionar Curso
+    # ============================================
+    curso = st.selectbox(
+        "1. Seleccionar curso",
+        ["901", "902", "903", "1001", "1002", "1003", "1101"],
+        key="curso_asignacion"
+    )
     
-    with tab1:
-        st.write("**Configuración institucional**")
-        
-        nombre_colegio = st.text_input("Nombre del colegio", "Mi Colegio")
-        año_lectivo = st.number_input("Año lectivo", min_value=2000, max_value=2100, value=2024)
-        periodos = st.select_slider("Número de períodos académicos", options=[2, 3, 4], value=4)
-        
-        if st.button("💾 Guardar Configuración", type="primary"):
-            st.success("✅ Configuración guardada exitosamente")
+    st.divider()
     
-    with tab2:
-        st.write("**Respaldos de base de datos**")
+    # ============================================
+    # Paso 2: Ver asignaturas por defecto del curso
+    # ============================================
+    st.subheader(f"📖 Asignaturas del curso {curso}")
+    
+    # Asignaturas por curso según el plan de estudios
+    asignaturas_por_curso = {
+        "901": ["Matemáticas", "Sociales", "Español", "Inglés", "Biología", "Artes", "Educación Física", "Ética", "Administración"],
+        "902": ["Matemáticas", "Sociales", "Español", "Inglés", "Biología", "Artes", "Educación Física", "Ética", "Administración"],
+        "903": ["Matemáticas", "Sociales", "Español", "Inglés", "Biología", "Artes", "Educación Física", "Ética", "Administración"],
+        "1001": ["Trigonometría", "Sociales", "Español", "Inglés", "Química", "Física", "Educación Física", "Artes", "Filosofía", "Ética", "Administración", "Proyecto"],
+        "1002": ["Trigonometría", "Sociales", "Español", "Inglés", "Química", "Física", "Educación Física", "Artes", "Filosofía", "Ética", "Administración", "Proyecto"],
+        "1003": ["Trigonometría", "Sociales", "Español", "Inglés", "Química", "Física", "Educación Física", "Artes", "Filosofía", "Ética", "Administración", "Proyecto"],
+        "1101": ["Cálculo", "Sociales", "Español", "Inglés", "Química", "Física", "Educación Física", "Artes", "Filosofía", "Ética", "Administración", "Proyecto"]
+    }
+    
+    asignaturas = asignaturas_por_curso.get(curso, [])
+    
+    # ============================================
+    # Paso 3: Obtener lista de docentes
+    # ============================================
+    headers = get_headers()
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+    
+    docentes_disponibles = []
+    docentes_dict = {}
+    
+    if response.status_code == 200:
+        docentes_data = response.json()
+        # Obtener docentes únicos por documento
+        docentes_unicos = {}
+        for d in docentes_data:
+            doc = d.get('documento_docente')
+            if doc not in docentes_unicos:
+                docentes_unicos[doc] = {
+                    "nombre": d.get('nombre_docente'),
+                    "documento": doc,
+                    "apellidos": d.get('apellidos_docente', '')
+                }
         
-        if st.button("📀 Crear Respaldo", type="primary"):
-            with st.spinner("Generando respaldo..."):
-                st.success("✅ Respaldo creado exitosamente")
+        for doc in docentes_unicos.values():
+            nombre_completo = f"{doc['nombre']} {doc['apellidos']}".strip()
+            docentes_disponibles.append(nombre_completo)
+            docentes_dict[nombre_completo] = doc['documento']
+    
+    if not docentes_disponibles:
+        st.warning("⚠️ No hay docentes registrados. Por favor, carga docentes primero.")
+        return
+    
+    # ============================================
+    # Paso 4: Mostrar asignaturas con selector de docente
+    # ============================================
+    st.write("### 3. Asignar docentes a cada asignatura")
+    st.info("📌 Selecciona el docente para cada asignatura")
+    
+    # Ver asignaciones existentes
+    response_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}", headers=headers)
+    asignaciones_existentes = {}
+    
+    if response_asig.status_code == 200:
+        for a in response_asig.json():
+            asignaciones_existentes[a.get('asignatura')] = a.get('documento_docente')
+    
+    # Formulario de asignación
+    with st.form("asignacion_form"):
+        asignaciones = {}
+        
+        for asignatura in asignaturas:
+            col1, col2 = st.columns([2, 3])
+            with col1:
+                st.write(f"**{asignatura}**")
+            with col2:
+                # Buscar docente actual si existe
+                current_doc = asignaciones_existentes.get(asignatura)
+                current_nombre = ""
+                for nombre, doc in docentes_dict.items():
+                    if doc == current_doc:
+                        current_nombre = nombre
+                        break
+                
+                docente = st.selectbox(
+                    "Docente",
+                    ["-- Sin asignar --"] + docentes_disponibles,
+                    index=0 if not current_nombre else docentes_disponibles.index(current_nombre) + 1,
+                    key=f"docente_{asignatura}",
+                    label_visibility="collapsed"
+                )
+                asignaciones[asignatura] = docente if docente != "-- Sin asignar --" else None
+        
+        st.divider()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            guardar = st.form_submit_button("💾 Guardar Asignaciones", type="primary", use_container_width=True)
+        with col2:
+            limpiar = st.form_submit_button("🗑️ Limpiar Todo", use_container_width=True)
+        
+        if guardar:
+            headers = get_headers()
+            exitos = 0
+            errores = 0
+            
+            for asignatura, docente_nombre in asignaciones.items():
+                if docente_nombre:
+                    documento_docente = docentes_dict.get(docente_nombre)
+                    
+                    # Verificar si ya existe
+                    check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.{asignatura}"
+                    check_response = requests.get(check_url, headers=headers)
+                    
+                    data = {
+                        "curso": curso,
+                        "asignatura": asignatura,
+                        "documento_docente": documento_docente,
+                        "anio": 2024
+                    }
+                    
+                    if check_response.status_code == 200 and check_response.json():
+                        # Actualizar
+                        update_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.{asignatura}"
+                        response = requests.patch(update_url, headers=headers, json={"documento_docente": documento_docente})
+                    else:
+                        # Insertar
+                        response = requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
+                    
+                    if response.status_code in [200, 201, 204]:
+                        exitos += 1
+                    else:
+                        errores += 1
+                else:
+                    # Si no hay docente, eliminar asignación si existe
+                    if asignatura in asignaciones_existentes:
+                        delete_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.{asignatura}"
+                        requests.delete(delete_url, headers=headers)
+            
+            if errores == 0:
+                st.success(f"✅ Asignaciones guardadas exitosamente para el curso {curso}")
+                st.rerun()
+            else:
+                st.warning(f"⚠️ {exitos} asignaciones guardadas, {errores} errores")
+        
+        if limpiar:
+            st.session_state.clear()
+            st.rerun()
+    
+    # ============================================
+    # Paso 5: Mostrar resumen de asignaciones
+    # ============================================
+    st.divider()
+    st.subheader("📋 Resumen de Asignaciones")
+    
+    response_resumen = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}", headers=headers)
+    
+    if response_resumen.status_code == 200:
+        asignaciones = response_resumen.json()
+        
+        if asignaciones:
+            # Enriquecer con nombres de docentes
+            for a in asignaciones:
+                doc_response = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{a.get('documento_docente')}", headers=headers)
+                if doc_response.status_code == 200 and doc_response.json():
+                    docente = doc_response.json()[0]
+                    a['nombre_docente'] = f"{docente.get('nombre_docente', '')} {docente.get('apellidos_docente', '')}".strip()
+                else:
+                    a['nombre_docente'] = "No asignado"
+            
+            df = pd.DataFrame(asignaciones)
+            columnas_mostrar = ['asignatura', 'nombre_docente', 'curso']
+            df_mostrar = df[[c for c in columnas_mostrar if c in df.columns]]
+            st.dataframe(df_mostrar, use_container_width=True)
+        else:
+            st.info(f"No hay asignaciones para el curso {curso}")
