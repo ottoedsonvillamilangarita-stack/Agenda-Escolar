@@ -1,35 +1,39 @@
 import streamlit as st
 import requests
-from utils import get_headers, SUPABASE_URL
+from utils import SUPABASE_URL, get_headers
 
 def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
     
+    # data contiene: username, password_hash, rol, documento
+    documento_acudiente = data.get('documento')
+    
+    st.write(f"Bienvenido, Acudiente")
+    st.write(f"Documento: {documento_acudiente}")
+    
     headers = get_headers()
     
-    # Obtener datos actualizados
-    url = f"{SUPABASE_URL}/rest/v1/personas?id_persona=eq.{data['id_persona']}"
+    # Buscar los hijos de este acudiente en la tabla estudiantes
+    url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_acudiente=eq.{documento_acudiente}"
+    
     response = requests.get(url, headers=headers)
-    persona = response.json()[0] if response.status_code == 200 and response.json() else data
     
-    # Obtener username
-    url_user = f"{SUPABASE_URL}/rest/v1/usuarios_login?id_persona=eq.{data['id_persona']}"
-    response_user = requests.get(url_user, headers=headers)
-    username = response_user.json()[0]["username"] if response_user.status_code == 200 and response_user.json() else None
+    if response.status_code == 200:
+        datos = response.json()
+        if datos:
+            st.success(f"✅ Acudiente encontrado con {len(datos)} hijo(s)")
+            
+            for hijo in datos:
+                with st.expander(f"📘 {hijo.get('nombre_estudiante', 'N/A')}"):
+                    st.write(f"**Nombre:** {hijo.get('nombre_estudiante', 'N/A')}")
+                    st.write(f"**Apellidos:** {hijo.get('apellidos_estudiante', 'N/A')}")
+                    st.write(f"**Curso:** {hijo.get('curso', 'N/A')}")
+                    st.write(f"**Parentesco:** {hijo.get('parentesco', 'N/A')}")
+                    st.write(f"**Teléfono:** {hijo.get('telefono_acudiente', 'N/A')}")
+        else:
+            st.warning("No se encontraron hijos asociados a este acudiente")
+    else:
+        st.error(f"Error {response.status_code}: {response.text}")
     
-    usuario = {
-        "id_persona": persona.get("id_persona"),
-        "nombre": persona.get("nombre"),
-        "email": persona.get("email"),
-        "telefono": persona.get("telefono"),
-        "username": username
-    }
-    
-    tab_perfil, tab_hijos = st.tabs(["👤 Mi Perfil", "👨‍👩‍👧 Mis Hijos"])
-    
-    with tab_perfil:
-        mostrar_perfil(usuario)
-    
-    with tab_hijos:
-        st.subheader("Mis Hijos")
-        st.write("Próximamente: lista de hijos y sus notas")
+    st.subheader("📊 Seguimiento Académico")
+    st.write("Próximamente: Notas, asistencia y comunicados de tus hijos")
