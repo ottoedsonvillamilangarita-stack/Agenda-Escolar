@@ -136,7 +136,25 @@ def mostrar_alumnos():
                 telefono = st.text_input("Teléfono del acudiente")
             
             if st.form_submit_button("💾 Guardar"):
-                st.success(f"✅ Alumno {nombre} registrado")
+                headers = get_headers()
+                # Guardar alumno
+                data_alumno = {
+                    "nombre_estudiante": nombre,
+                    "apellidos_estudiante": apellidos,
+                    "documento_estudiante": documento,
+                    "curso": curso,
+                    "nombre_acudiente": nombre_acudiente,
+                    "documento_acudiente": documento_acudiente,
+                    "telefono_acudiente": telefono
+                }
+                response = requests.post(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers, json=data_alumno)
+                
+                if response.status_code == 201:
+                    # Actualizar rol del acudiente automáticamente
+                    actualizar_rol_acudiente(documento_acudiente, nombre_acudiente, headers)
+                    st.success(f"✅ Alumno {nombre} registrado")
+                else:
+                    st.error("Error al registrar alumno")
 
 
 # ============================================
@@ -210,7 +228,31 @@ def mostrar_docentes():
                 email = st.text_input("Email")
             
             if st.form_submit_button("💾 Guardar"):
-                st.success(f"✅ Docente {nombre} registrado")
+                headers = get_headers()
+                data = {
+                    "nombre_docente": nombre,
+                    "apellidos_docente": apellidos,
+                    "documento_docente": documento,
+                    "telefono_docente": telefono,
+                    "email_docente": email
+                }
+                response = requests.post(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers, json=data)
+                
+                if response.status_code == 201:
+                    # Crear usuario con rol docente
+                    username = nombre.lower().replace(" ", "_")
+                    user_data = {
+                        "username": username,
+                        "password_hash": "demo2026",
+                        "rol": "docente",
+                        "documento": documento,
+                        "roles": ["docente"]
+                    }
+                    requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_data)
+                    st.success(f"✅ Docente {nombre} registrado")
+                    st.info(f"🔑 Usuario: {username} | Contraseña: demo2026")
+                else:
+                    st.error("Error al registrar docente")
 
 
 # ============================================
@@ -281,7 +323,6 @@ def mostrar_asignacion():
                         current_nombre = nombre
                         break
                 
-                # Construir lista de docentes disponibles
                 docentes_disponibles = ["-- Sin asignar --"]
                 for docente in todos_docentes:
                     if current_doc and docente['documento'] == current_doc:
@@ -337,12 +378,10 @@ def mostrar_asignacion():
             if a.get('documento_docente'):
                 docentes_del_curso.add(a.get('documento_docente'))
     
-    # Agregar el director del curso
     director_curso = directores_actuales.get(curso)
     if director_curso:
         docentes_del_curso.add(director_curso)
     
-    # Construir lista de docentes disponibles para este curso
     docentes_curso_lista = ["-- Sin asignar --"]
     docentes_curso_dict = {}
     
@@ -355,7 +394,6 @@ def mostrar_asignacion():
         st.warning(f"⚠️ No hay docentes asignados al curso {curso}. Primero asigna materias o un director.")
         return
     
-    # Obtener asignaciones existentes
     response_asig = requests.get(
         f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=neq.Dirección de Curso",
         headers=headers
@@ -399,16 +437,120 @@ def mostrar_asignacion():
     mostrar_resumen_asignaciones(curso, headers, docentes_curso_dict)
 
 
+# ============================================
+# FUNCIONES DE ACTUALIZACIÓN AUTOMÁTICA DE ROLES
+# ============================================
+
+def actualizar_rol_docente(documento_docente, rol_a_agregar, headers):
+    """Agrega un rol a un docente si no lo tiene"""
+    url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200 and response.json():
+        user = response.json()[0]
+        roles_actuales = user.get('roles', [user.get('rol')])
+        
+        if rol_a_agregar not in roles_actuales:
+            roles_actuales.append(rol_a_agregar)
+            update_url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
+            requests.patch(update_url, headers=headers, json={"roles": roles_actuales})
+
+
+def quitar_rol_docente(documento_docente, rol_a_quitar, headers):
+    """Quita un rol a un docente si lo tiene"""
+    url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200 and response.json():
+        user = response.json()[0]
+        roles_actuales = user.get('roles', [user.get('rol')])
+        
+        if rol_a_quitar in roles_actuales:
+            roles_actuales.remove(rol_a_quitar)
+            update_url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
+            requests.patch(update_url, headers=headers, json={"roles": roles_actuales})
+
+
+def actualizar_rol_acudiente(documento_acudiente, nombre_acudiente, headers):
+    """Crea o actualiza el rol de acudiente"""
+    url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_acudiente}"
+    response = requests.get(url, headers=headers)
+    
+    username_base = nombre_acudiente.lower().replace(" ", "_") if nombre_acudiente else "acudiente"
+    username = f"{username_base}_{documento_acudiente[-4:]}"
+    
+    if response.status_code == 200 and response.json():
+        user = response.json()[0]
+        roles_actuales = user.get('roles', [user.get('rol')])
+        if 'acudiente' not in roles_actuales:
+            roles_actuales.append('acudiente')
+            update_url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_acudiente}"
+            requests.patch(update_url, headers=headers, json={"roles": roles_actuales})
+    else:
+        # Crear nuevo usuario acudiente
+        user_data = {
+            "username": username,
+            "password_hash": "demo2026",
+            "rol": "acudiente",
+            "documento": documento_acudiente,
+            "roles": ["acudiente"]
+        }
+        requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_data)
+
+
+def sincronizar_todos_los_roles(headers):
+    """Sincroniza todos los roles basados en las asignaciones actuales"""
+    # 1. Docentes que dictan materias
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?asignatura=neq.Dirección de Curso&select=documento_docente", headers=headers)
+    if response.status_code == 200:
+        docentes_materias = set()
+        for a in response.json():
+            if a.get('documento_docente'):
+                docentes_materias.add(a.get('documento_docente'))
+        for doc in docentes_materias:
+            actualizar_rol_docente(doc, 'docente', headers)
+    
+    # 2. Directores de curso
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?asignatura=eq.Dirección de Curso&select=documento_docente", headers=headers)
+    if response.status_code == 200:
+        for a in response.json():
+            if a.get('documento_docente'):
+                actualizar_rol_docente(a.get('documento_docente'), 'director', headers)
+    
+    # 3. Acudientes
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=documento_acudiente,nombre_acudiente", headers=headers)
+    if response.status_code == 200:
+        acudientes = {}
+        for e in response.json():
+            doc = e.get('documento_acudiente')
+            nombre = e.get('nombre_acudiente')
+            if doc and doc not in acudientes:
+                acudientes[doc] = nombre
+                actualizar_rol_acudiente(doc, nombre, headers)
+
+
 def guardar_directores(directores_asignados, docentes_dict, headers, cursos):
-    """Guarda los directores de curso y actualiza roles"""
+    """Guarda los directores de curso y actualiza roles automáticamente"""
     exitos = 0
     errores = 0
     
+    # Obtener directores actuales
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?asignatura=eq.Dirección de Curso", headers=headers)
+    directores_anteriores = {}
+    
+    if response.status_code == 200:
+        for d in response.json():
+            directores_anteriores[d.get('curso')] = d.get('documento_docente')
+    
     for curso, director_nombre in directores_asignados.items():
-        if director_nombre:
-            documento_docente = docentes_dict.get(director_nombre)
-            
-            # Guardar en asignacion_academica
+        documento_docente = docentes_dict.get(director_nombre) if director_nombre else None
+        
+        # Quitar rol al director anterior si es diferente
+        director_anterior = directores_anteriores.get(curso)
+        if director_anterior and director_anterior != documento_docente:
+            quitar_rol_docente(director_anterior, 'director', headers)
+        
+        if director_nombre and documento_docente:
             data = {
                 "curso": curso,
                 "asignatura": "Dirección de Curso",
@@ -426,14 +568,15 @@ def guardar_directores(directores_asignados, docentes_dict, headers, cursos):
             
             if response.status_code in [200, 201, 204]:
                 exitos += 1
-                # Actualizar roles del docente para incluir 'director'
-                actualizar_roles_docente(documento_docente, 'director', headers)
+                actualizar_rol_docente(documento_docente, 'director', headers)
             else:
                 errores += 1
         else:
-            # Eliminar dirección si existe
             delete_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.Dirección de Curso"
             requests.delete(delete_url, headers=headers)
+    
+    # Sincronizar acudientes también
+    sincronizar_todos_los_roles(headers)
     
     if errores == 0:
         st.success(f"✅ Directores de curso guardados exitosamente")
@@ -443,7 +586,7 @@ def guardar_directores(directores_asignados, docentes_dict, headers, cursos):
 
 
 def guardar_materias(curso, materias_asignadas, docentes_dict, headers):
-    """Guarda la asignación de materias"""
+    """Guarda la asignación de materias y actualiza roles automáticamente"""
     exitos = 0
     errores = 0
     
@@ -468,8 +611,7 @@ def guardar_materias(curso, materias_asignadas, docentes_dict, headers):
             
             if response.status_code in [200, 201, 204]:
                 exitos += 1
-                # Asegurar que el docente tenga el rol 'docente'
-                actualizar_roles_docente(documento_docente, 'docente', headers)
+                actualizar_rol_docente(documento_docente, 'docente', headers)
             else:
                 errores += 1
         else:
@@ -481,25 +623,6 @@ def guardar_materias(curso, materias_asignadas, docentes_dict, headers):
         st.rerun()
     else:
         st.warning(f"⚠️ {exitos} guardadas, {errores} errores")
-
-
-def actualizar_roles_docente(documento_docente, nuevo_rol, headers):
-    """Actualiza los roles del docente en usuarios_login"""
-    # Buscar el usuario por documento
-    url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200 and response.json():
-        user = response.json()[0]
-        roles_actuales = user.get('roles', [user.get('rol')])
-        
-        # Agregar el nuevo rol si no existe
-        if nuevo_rol not in roles_actuales:
-            roles_actuales.append(nuevo_rol)
-            
-            # Actualizar en Supabase
-            update_url = f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_docente}"
-            requests.patch(update_url, headers=headers, json={"roles": roles_actuales})
 
 
 def mostrar_resumen_asignaciones(curso, headers, docentes_dict):
@@ -551,5 +674,10 @@ def mostrar_sistema():
             st.success("Configuración guardada")
     
     with col2:
+        if st.button("🔄 Sincronizar Roles", type="primary"):
+            headers = get_headers()
+            sincronizar_todos_los_roles(headers)
+            st.success("✅ Roles sincronizados correctamente")
+        
         if st.button("📀 Crear Respaldo"):
             st.success("Respaldo creado")
