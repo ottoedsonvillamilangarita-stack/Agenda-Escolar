@@ -1,7 +1,7 @@
 # modulos/estudiante.py
 import streamlit as st
 import requests
-from .utils import SUPABASE_URL, get_headers
+from utils import SUPABASE_URL, get_headers
 
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
