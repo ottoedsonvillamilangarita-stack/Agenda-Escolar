@@ -335,6 +335,126 @@ def mostrar_asignacion():
     st.divider()
     mostrar_resumen_asignaciones(curso, headers, docentes_dict)
 
+
+# ============================================
+# FUNCIONES AUXILIARES PARA ASIGNACIÓN
+# ============================================
+
+def guardar_directores(directores_asignados, docentes_dict, headers, cursos):
+    """Guarda los directores de curso"""
+    exitos = 0
+    errores = 0
+    
+    for curso, director_nombre in directores_asignados.items():
+        if director_nombre:
+            documento_docente = docentes_dict.get(director_nombre)
+            
+            data = {
+                "curso": curso,
+                "asignatura": "Dirección de Curso",
+                "documento_docente": documento_docente
+            }
+            
+            # Verificar si ya existe
+            check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.Dirección de Curso"
+            check_response = requests.get(check_url, headers=headers)
+            
+            if check_response.status_code == 200 and check_response.json():
+                # Actualizar
+                update_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.Dirección de Curso"
+                response = requests.patch(update_url, headers=headers, json={"documento_docente": documento_docente})
+            else:
+                # Insertar
+                response = requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
+            
+            if response.status_code in [200, 201, 204]:
+                exitos += 1
+            else:
+                errores += 1
+        else:
+            # Eliminar si existe
+            delete_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.Dirección de Curso"
+            requests.delete(delete_url, headers=headers)
+    
+    if errores == 0:
+        st.success(f"✅ Directores de curso guardados exitosamente")
+        st.rerun()
+    else:
+        st.warning(f"⚠️ {exitos} guardados, {errores} errores")
+
+
+def guardar_materias(curso, materias_asignadas, docentes_dict, headers):
+    """Guarda la asignación de materias"""
+    exitos = 0
+    errores = 0
+    
+    for asignatura, docente_nombre in materias_asignadas.items():
+        if docente_nombre:
+            documento_docente = docentes_dict.get(docente_nombre)
+            
+            data = {
+                "curso": curso,
+                "asignatura": asignatura,
+                "documento_docente": documento_docente
+            }
+            
+            check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.{asignatura}"
+            check_response = requests.get(check_url, headers=headers)
+            
+            if check_response.status_code == 200 and check_response.json():
+                update_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.{asignatura}"
+                response = requests.patch(update_url, headers=headers, json={"documento_docente": documento_docente})
+            else:
+                response = requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
+            
+            if response.status_code in [200, 201, 204]:
+                exitos += 1
+            else:
+                errores += 1
+        else:
+            delete_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}&asignatura=eq.{asignatura}"
+            requests.delete(delete_url, headers=headers)
+    
+    if errores == 0:
+        st.success(f"✅ Asignación de materias guardada para el curso {curso}")
+        st.rerun()
+    else:
+        st.warning(f"⚠️ {exitos} guardadas, {errores} errores")
+
+
+def mostrar_resumen_asignaciones(curso, headers, docentes_dict):
+    """Muestra el resumen de asignaciones del curso"""
+    st.subheader(f"📋 Resumen del Curso {curso}")
+    
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}", headers=headers)
+    
+    if response.status_code == 200:
+        asignaciones = response.json()
+        if asignaciones:
+            for a in asignaciones:
+                doc_response = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{a.get('documento_docente')}", headers=headers)
+                if doc_response.status_code == 200 and doc_response.json():
+                    docente = doc_response.json()[0]
+                    a['nombre_docente'] = f"{docente.get('nombre_docente', '')} {docente.get('apellidos_docente', '')}".strip()
+                else:
+                    a['nombre_docente'] = "No asignado"
+            
+            df = pd.DataFrame(asignaciones)
+            
+            df_director = df[df['asignatura'] == 'Dirección de Curso']
+            df_materias = df[df['asignatura'] != 'Dirección de Curso']
+            
+            if not df_director.empty:
+                st.write("**🎓 Director de Curso:**")
+                st.write(df_director[['asignatura', 'nombre_docente']].iloc[0].to_dict())
+            
+            if not df_materias.empty:
+                st.write("**📚 Materias y Docentes:**")
+                st.dataframe(df_materias[['asignatura', 'nombre_docente']], use_container_width=True)
+        else:
+            st.info(f"No hay asignaciones para el curso {curso}")
+
+
 # ============================================
 # SISTEMA
 # ============================================
