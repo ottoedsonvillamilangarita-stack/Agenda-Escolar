@@ -13,7 +13,6 @@ def mostrar_configuracion_notas(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
-    # Obtener materias del docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=neq.Dirección de Curso"
     response = requests.get(url, headers=headers)
     
@@ -32,6 +31,71 @@ def mostrar_configuracion_notas(data):
     asignatura = seleccion.split(" - ")[1]
     
     st.write(f"**Configurando: {curso} - {asignatura}**")
+    
+    # Agregar nuevo tipo de nota
+    st.write("**➕ Agregar nuevo tipo de nota:**")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        nuevo_tipo = st.text_input("Nombre (Ej: Taller, Quiz, Examen)")
+    with col2:
+        nuevo_porcentaje = st.number_input("Porcentaje (%)", min_value=0, max_value=100, value=20)
+    with col3:
+        nuevo_orden = st.number_input("Orden", min_value=1, max_value=20, value=1)
+    
+    if st.button("➕ Agregar Tipo de Nota", type="primary"):
+        if not nuevo_tipo:
+            st.error("❌ Ingresa un nombre para el tipo de nota")
+        else:
+            data = {
+                "curso": curso,
+                "asignatura": asignatura,
+                "tipo_nota": nuevo_tipo,
+                "porcentaje": nuevo_porcentaje,
+                "orden": nuevo_orden,
+                "documento_docente": documento_docente
+            }
+            response = requests.post(f"{SUPABASE_URL}/rest/v1/config_tipos_nota", headers=headers, json=data)
+            if response.status_code == 201:
+                st.success(f"✅ Tipo de nota '{nuevo_tipo}' agregado")
+                st.rerun()
+            else:
+                st.error(f"Error: {response.status_code}")
+    
+    # Ver configuración existente
+    url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&order=orden.asc"
+    response_config = requests.get(url_config, headers=headers)
+    
+    tipos = []
+    if response_config.status_code == 200:
+        tipos = response_config.json()
+    
+    if tipos:
+        st.write("**📋 Configuración actual:**")
+        df = pd.DataFrame(tipos)
+        st.dataframe(df[['tipo_nota', 'porcentaje', 'orden']], use_container_width=True)
+        
+        # ============================================
+        # ELIMINAR TIPOS DE NOTA
+        # ============================================
+        st.divider()
+        st.write("**🗑️ Eliminar tipo de nota:**")
+        
+        for tipo in tipos:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.write(f"{tipo.get('tipo_nota')} ({tipo.get('porcentaje')}%)")
+            with col2:
+                if st.button("Eliminar", key=f"del_{tipo.get('id')}"):
+                    delete_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
+                    response = requests.delete(delete_url, headers=headers)
+                    if response.status_code == 204:
+                        st.success(f"✅ Tipo '{tipo.get('tipo_nota')}' eliminado")
+                        st.rerun()
+                    else:
+                        st.error(f"Error al eliminar: {response.status_code}")
+    else:
+        st.info("No hay tipos de nota configurados para esta materia")
     
     # ============================================
     # AGREGAR NUEVO TIPO DE NOTA
