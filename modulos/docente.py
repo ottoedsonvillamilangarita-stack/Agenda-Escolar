@@ -131,7 +131,26 @@ def mostrar(data):
             st.rerun()
     
     st.divider()
-    
+
+    # Tercera fila de botones
+col9, col10, col11, col12 = st.columns(4)
+
+with col9:
+    if st.button("⚙️ Configurar Notas", use_container_width=True,
+                 type="primary" if st.session_state.funcion_actual == "configurar_notas" else "secondary"):
+        st.session_state.funcion_actual = "configurar_notas"
+        st.rerun()
+
+with col10:
+    # Placeholder para futuras funciones
+    st.empty()
+
+with col11:
+    st.empty()
+
+with col12:
+    st.empty()
+
     # ============================================
     # MOSTRAR FUNCIÓN SELECCIONADA
     # ============================================
