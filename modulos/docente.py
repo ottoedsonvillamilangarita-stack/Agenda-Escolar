@@ -203,3 +203,10 @@ def mostrar_mensajes():
 def mostrar_mi_rendimiento():
     st.subheader("📈 Mi Rendimiento")
     st.info("Módulo en desarrollo - Próximamente podrás ver tu rendimiento")
+
+# Agregar después de los 8 botones existentes
+with col9:
+    if st.button("⚙️ Configurar Notas", use_container_width=True,
+                 type="primary" if st.session_state.funcion_actual == "configurar_notas" else "secondary"):
+        st.session_state.funcion_actual = "configurar_notas"
+        st.rerun()
