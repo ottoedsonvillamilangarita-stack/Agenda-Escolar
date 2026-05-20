@@ -143,9 +143,9 @@ def mostrar_ingreso_notas(data):
     
     if not tipos_nota:
         st.warning("⚠️ No hay tipos de nota configurados. Ve a 'Configurar Notas' primero.")
-        if st.button("Ir a Configurar Notas"):
-            st.session_state.funcion_actual = "configurar_notas"
-            st.rerun()
+        if st.button("Ir a Configurar Notas", key="ir_configurar"):
+    st.session_state.menu_docente = "⚙️ Configurar Notas"
+    st.rerun()
         return
     
     # 4. Mostrar configuración actual
