@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
+from modulos.features.calificaciones import mostrar_configuracion_notas, mostrar_ingreso_notas
 
 def mostrar(data):
     st.title("👨‍🏫 Panel del Docente")
@@ -14,7 +15,6 @@ def mostrar(data):
     # ============================================
     headers = get_headers()
     
-    # Buscar todas las asignaciones de este docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
     response = requests.get(url, headers=headers)
     
@@ -31,18 +31,10 @@ def mostrar(data):
     # ============================================
     # SEPARAR POR TIPO
     # ============================================
-    
-    # Buscar si es director de algún curso
     direcciones = [a for a in asignaciones if a.get('asignatura') == 'Dirección de Curso']
-    
-    # Buscar materias que dicta
     materias = [a for a in asignaciones if a.get('asignatura') != 'Dirección de Curso']
     
-    # ============================================
-    # MOSTRAR INFORMACIÓN
-    # ============================================
-    
-    # Tarjeta de Director de Curso
+    # Mostrar información del director de curso
     if direcciones:
         st.success("🎓 **Eres Director de Curso**")
         for d in direcciones:
@@ -52,8 +44,6 @@ def mostrar(data):
     materias_por_curso = {}
     if materias:
         st.subheader("📚 Mis Materias")
-        
-        # Agrupar por curso
         for m in materias:
             curso = m.get('curso')
             if curso not in materias_por_curso:
@@ -66,110 +56,50 @@ def mostrar(data):
                     st.write(f"- {materia}")
     
     # ============================================
-    # MENÚ DE FUNCIONES (8 botones)
+    # MENÚ DESPLEGABLE (SELECTBOX)
     # ============================================
-    
     st.divider()
     st.subheader("📌 Funciones disponibles")
     
-    # Inicializar función actual
-    if "funcion_actual" not in st.session_state:
-        st.session_state.funcion_actual = "mis_cursos"
-    
-    # Primera fila de botones
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        if st.button("📚 Mis Cursos", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "mis_cursos" else "secondary"):
-            st.session_state.funcion_actual = "mis_cursos"
-            st.rerun()
-    
-    with col2:
-        if st.button("📝 Calificaciones", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "calificaciones" else "secondary"):
-            st.session_state.funcion_actual = "calificaciones"
-            st.rerun()
-    
-    with col3:
-        if st.button("📋 Asistencia", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "asistencia" else "secondary"):
-            st.session_state.funcion_actual = "asistencia"
-            st.rerun()
-    
-    with col4:
-        if st.button("📊 Reportes", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "reportes" else "secondary"):
-            st.session_state.funcion_actual = "reportes"
-            st.rerun()
-    
-    # Segunda fila de botones
-    col5, col6, col7, col8 = st.columns(4)
-    
-    with col5:
-        if st.button("🤝 Convivencia", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "convivencia" else "secondary"):
-            st.session_state.funcion_actual = "convivencia"
-            st.rerun()
-    
-    with col6:
-        if st.button("✏️ Evaluaciones", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "evaluaciones" else "secondary"):
-            st.session_state.funcion_actual = "evaluaciones"
-            st.rerun()
-    
-    with col7:
-        if st.button("💬 Mensajes", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "mensajes" else "secondary"):
-            st.session_state.funcion_actual = "mensajes"
-            st.rerun()
-    
-    with col8:
-        if st.button("📈 Mi Rendimiento", use_container_width=True,
-                     type="primary" if st.session_state.funcion_actual == "mi_rendimiento" else "secondary"):
-            st.session_state.funcion_actual = "mi_rendimiento"
-            st.rerun()
+    opcion_menu = st.selectbox(
+    "Seleccionar una función",
+    [
+        "📚 Mis Cursos",
+        "📝 Ingresar Notas",
+        "⚙️ Configurar Notas",
+        "📋 Asistencia",
+        "📊 Reportes",
+        "🤝 Convivencia",
+        "✏️ Evaluaciones",
+        "💬 Mensajes",
+        "📈 Mi Rendimiento"
+    ],
+    key="menu_docente"
+)
     
     st.divider()
-
-    # Tercera fila de botones
-col9, col10, col11, col12 = st.columns(4)
-
-with col9:
-    if st.button("⚙️ Configurar Notas", use_container_width=True,
-                 type="primary" if st.session_state.funcion_actual == "configurar_notas" else "secondary"):
-        st.session_state.funcion_actual = "configurar_notas"
-        st.rerun()
-
-with col10:
-    # Placeholder para futuras funciones
-    st.empty()
-
-with col11:
-    st.empty()
-
-with col12:
-    st.empty()
-
+    
     # ============================================
-    # MOSTRAR FUNCIÓN SELECCIONADA
+    # REDIRECCIÓN SEGÚN OPCIÓN SELECCIONADA
     # ============================================
     
-    if st.session_state.funcion_actual == "mis_cursos":
+    if opcion_menu == "📚 Mis Cursos":
         mostrar_mis_cursos(materias_por_curso)
-    elif st.session_state.funcion_actual == "calificaciones":
-        mostrar_calificaciones()
-    elif st.session_state.funcion_actual == "asistencia":
+    elif opcion_menu == "📝 Ingresar Notas":
+        mostrar_ingreso_notas(data)
+    elif opcion_menu == "⚙️ Configurar Notas":
+        mostrar_configuracion_notas(data)
+    elif opcion_menu == "📋 Asistencia":
         mostrar_asistencia()
-    elif st.session_state.funcion_actual == "reportes":
+    elif opcion_menu == "📊 Reportes":
         mostrar_reportes()
-    elif st.session_state.funcion_actual == "convivencia":
+    elif opcion_menu == "🤝 Convivencia":
         mostrar_convivencia()
-    elif st.session_state.funcion_actual == "evaluaciones":
+    elif opcion_menu == "✏️ Evaluaciones":
         mostrar_evaluaciones()
-    elif st.session_state.funcion_actual == "mensajes":
+    elif opcion_menu == "💬 Mensajes":
         mostrar_mensajes()
-    elif st.session_state.funcion_actual == "mi_rendimiento":
+    elif opcion_menu == "📈 Mi Rendimiento":
         mostrar_mi_rendimiento()
 
 
@@ -188,44 +118,26 @@ def mostrar_mis_cursos(materias_por_curso):
     else:
         st.info("No tienes cursos asignados")
 
-
-def mostrar_calificaciones():
-    st.subheader("📝 Calificaciones")
-    st.info("Módulo en desarrollo - Próximamente podrás ingresar y editar notas")
-
-
 def mostrar_asistencia():
     st.subheader("📋 Asistencia")
     st.info("Módulo en desarrollo - Próximamente podrás marcar asistencia")
-
 
 def mostrar_reportes():
     st.subheader("📊 Reportes")
     st.info("Módulo en desarrollo - Próximamente podrás generar reportes")
 
-
 def mostrar_convivencia():
     st.subheader("🤝 Convivencia Escolar")
     st.info("Módulo en desarrollo - Próximamente podrás registrar novedades")
-
 
 def mostrar_evaluaciones():
     st.subheader("✏️ Evaluaciones")
     st.info("Módulo en desarrollo - Próximamente podrás crear evaluaciones")
 
-
 def mostrar_mensajes():
     st.subheader("💬 Mensajes")
     st.info("Módulo en desarrollo - Próximamente podrás enviar mensajes")
 
-
 def mostrar_mi_rendimiento():
     st.subheader("📈 Mi Rendimiento")
     st.info("Módulo en desarrollo - Próximamente podrás ver tu rendimiento")
-
-# Agregar después de los 8 botones existentes
-with col9:
-    if st.button("⚙️ Configurar Notas", use_container_width=True,
-                 type="primary" if st.session_state.funcion_actual == "configurar_notas" else "secondary"):
-        st.session_state.funcion_actual = "configurar_notas"
-        st.rerun()
