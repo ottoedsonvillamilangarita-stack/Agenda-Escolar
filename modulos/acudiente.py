@@ -4,7 +4,6 @@ from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_acudiente
 from modulos.features.asistencia import mostrar_asistencia_acudiente
 
-
 def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
     
@@ -15,9 +14,6 @@ def mostrar(data):
     
     headers = get_headers()
     
-    # ============================================
-    # MENÚ PRINCIPAL
-    # ============================================
     st.divider()
     st.subheader("📌 Funciones disponibles")
     
@@ -33,12 +29,7 @@ def mostrar(data):
     
     st.divider()
     
-    # ============================================
-    # REDIRECCIÓN SEGÚN OPCIÓN
-    # ============================================
-    
     if opcion == "👨‍👩‍👧 Mis Hijos":
-        # Mostrar lista de hijos
         url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_acudiente=eq.{documento_acudiente}"
         response = requests.get(url, headers=headers)
         
@@ -62,7 +53,7 @@ def mostrar(data):
     elif opcion == "📖 Notas de mis hijos":
         mostrar_notas_acudiente(data)
     
-     elif opcion == "📋 Asistencia":
+    elif opcion == "📋 Asistencia":
         mostrar_asistencia_acudiente(data)
     
     elif opcion == "👤 Mi Perfil":
