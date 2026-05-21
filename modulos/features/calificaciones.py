@@ -91,9 +91,7 @@ def mostrar_configuracion_notas(data):
                         if response_del.status_code == 204:
                             st.success(f"✅ '{tipo['tipo_nota']}' eliminado")
                             st.rerun()
-                        else:
-                            st.error("Error al eliminar")
-                
+                                    
                 # Formulario de edición (aparece solo cuando se activa)
                 if st.session_state.get(f"editando_{tipo['id']}", False):
                     col_a, col_b, col_c = st.columns([2, 1, 1])
