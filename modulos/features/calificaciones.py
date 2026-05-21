@@ -13,6 +13,7 @@ def mostrar_configuracion_notas(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
+    # Obtener materias del docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=neq.Dirección de Curso"
     response = requests.get(url, headers=headers)
     
@@ -32,83 +33,19 @@ def mostrar_configuracion_notas(data):
     
     st.write(f"**Configurando: {curso} - {asignatura}**")
     
-    # Agregar nuevo tipo de nota
-    st.write("**➕ Agregar nuevo tipo de nota:**")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        nuevo_tipo = st.text_input("Nombre (Ej: Taller, Quiz, Examen)")
-    with col2:
-        nuevo_porcentaje = st.number_input("Porcentaje (%)", min_value=0, max_value=100, value=20)
-    with col3:
-        nuevo_orden = st.number_input("Orden", min_value=1, max_value=20, value=1)
-    
-    if st.button("➕ Agregar Tipo de Nota", type="primary"):
-        if not nuevo_tipo:
-            st.error("❌ Ingresa un nombre para el tipo de nota")
-        else:
-            data = {
-                "curso": curso,
-                "asignatura": asignatura,
-                "tipo_nota": nuevo_tipo,
-                "porcentaje": nuevo_porcentaje,
-                "orden": nuevo_orden,
-                "documento_docente": documento_docente
-            }
-            response = requests.post(f"{SUPABASE_URL}/rest/v1/config_tipos_nota", headers=headers, json=data)
-            if response.status_code == 201:
-                st.success(f"✅ Tipo de nota '{nuevo_tipo}' agregado")
-                st.rerun()
-            else:
-                st.error(f"Error: {response.status_code}")
-    
-    # Ver configuración existente
-    url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&order=orden.asc"
-    response_config = requests.get(url_config, headers=headers)
-    
-    tipos = []
-    if response_config.status_code == 200:
-        tipos = response_config.json()
-    
-    if tipos:
-        st.write("**📋 Configuración actual:**")
-        df = pd.DataFrame(tipos)
-        st.dataframe(df[['tipo_nota', 'porcentaje', 'orden']], use_container_width=True)
-        
-        # ============================================
-        # ELIMINAR TIPOS DE NOTA
-        # ============================================
-        st.divider()
-        st.write("**🗑️ Eliminar tipo de nota:**")
-        
-        for tipo in tipos:
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.write(f"{tipo.get('tipo_nota')} ({tipo.get('porcentaje')}%)")
-            with col2:
-                if st.button("Eliminar", key=f"del_{tipo.get('id')}"):
-                    delete_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
-                    response = requests.delete(delete_url, headers=headers)
-                    if response.status_code == 204:
-                        st.success(f"✅ Tipo '{tipo.get('tipo_nota')}' eliminado")
-                        st.rerun()
-                    else:
-                        st.error(f"Error al eliminar: {response.status_code}")
-    else:
-        st.info("No hay tipos de nota configurados para esta materia")
-    
     # ============================================
     # AGREGAR NUEVO TIPO DE NOTA
     # ============================================
+    st.markdown("---")
     st.write("**➕ Agregar nuevo tipo de nota:**")
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        nuevo_tipo = st.text_input("Nombre (Ej: Taller, Quiz, Examen)")
+        nuevo_tipo = st.text_input("Nombre", placeholder="Ej: Taller, Quiz, Examen")
     with col2:
-        nuevo_porcentaje = st.number_input("Porcentaje (%)", min_value=0, max_value=100, value=20)
+        nuevo_porcentaje = st.number_input("Porcentaje (%)", min_value=0, max_value=100, value=20, step=5)
     with col3:
-        nuevo_orden = st.number_input("Orden", min_value=1, max_value=20, value=1)
+        nuevo_orden = st.number_input("Orden", min_value=1, max_value=20, value=1, step=1)
     
     if st.button("➕ Agregar Tipo de Nota", type="primary"):
         if not nuevo_tipo:
@@ -127,11 +64,13 @@ def mostrar_configuracion_notas(data):
                 st.success(f"✅ Tipo de nota '{nuevo_tipo}' agregado")
                 st.rerun()
             else:
-                st.error(f"Error: {response.status_code}")
+                st.error(f"Error: {response.status_code} - {response.text}")
     
     # ============================================
-    # MOSTRAR CONFIGURACIÓN ACTUAL
+    # MOSTRAR Y ELIMINAR TIPOS DE NOTA EXISTENTES
     # ============================================
+    st.markdown("---")
+    
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&order=orden.asc"
     response_config = requests.get(url_config, headers=headers)
     
@@ -141,17 +80,16 @@ def mostrar_configuracion_notas(data):
     
     if tipos:
         st.write("**📋 Configuración actual:**")
+        
+        # Mostrar tabla
         df = pd.DataFrame(tipos)
         st.dataframe(df[['tipo_nota', 'porcentaje', 'orden']], use_container_width=True)
         
-        # ============================================
-        # ELIMINAR TIPOS DE NOTA
-        # ============================================
-        st.divider()
+        # Sección de eliminación
         st.write("**🗑️ Eliminar tipo de nota:**")
         
         for tipo in tipos:
-            col1, col2 = st.columns([4, 1])
+            col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
                 st.write(f"{tipo.get('tipo_nota')} ({tipo.get('porcentaje')}%)")
             with col2:
@@ -163,8 +101,11 @@ def mostrar_configuracion_notas(data):
                         st.rerun()
                     else:
                         st.error(f"Error al eliminar: {response.status_code}")
+            with col3:
+                st.write("")
     else:
-        st.info("No hay tipos de nota configurados para esta materia")
+        st.info("📌 No hay tipos de nota configurados para esta materia")
+        st.caption("Usa el formulario de arriba para agregar tus primeros tipos de nota (Ej: Taller 20%, Quiz 30%, Examen 50%)")
 
 
 # ============================================
@@ -232,7 +173,7 @@ def mostrar_ingreso_notas(data):
     df_tipos = pd.DataFrame(tipos_nota)
     st.dataframe(df_tipos[['tipo_nota', 'porcentaje']], use_container_width=True)
     
-    st.divider()
+    st.markdown("---")
     
     # Obtener notas existentes
     notas_existentes = {}
@@ -271,7 +212,7 @@ def mostrar_ingreso_notas(data):
                     label_visibility="collapsed"
                 )
                 datos_notas[doc][tipo_nombre] = nota
-        st.divider()
+        st.markdown("---")
     
     # Calcular definitivas
     st.write("**📊 Resumen de calificaciones**")
@@ -279,15 +220,23 @@ def mostrar_ingreso_notas(data):
     resumen = []
     for doc, datos in datos_notas.items():
         suma_ponderada = 0
+        suma_porcentajes = 0
         for tipo in tipos_nota:
             tipo_nombre = tipo.get('tipo_nota')
             porcentaje = tipo.get('porcentaje', 0) / 100
             nota = datos.get(tipo_nombre, 0)
             suma_ponderada += nota * porcentaje
+            suma_porcentajes += porcentaje
         
+        # Si los porcentajes no suman 100%, ajustar
+        if suma_porcentajes > 0:
+            definitiva = suma_ponderada
+        else:
+            definitiva = 0
+            
         resumen.append({
             "Estudiante": datos["nombre"],
-            "Definitiva": round(suma_ponderada, 1)
+            "Definitiva": round(definitiva, 1)
         })
     
     df_resumen = pd.DataFrame(resumen)
@@ -298,6 +247,7 @@ def mostrar_ingreso_notas(data):
         with st.spinner("Guardando calificaciones..."):
             exitos = 0
             errores = 0
+            errores_lista = []
             
             for doc, datos in datos_notas.items():
                 for tipo in tipos_nota:
@@ -328,12 +278,16 @@ def mostrar_ingreso_notas(data):
                         exitos += 1
                     else:
                         errores += 1
+                        errores_lista.append(f"{doc} - {tipo_nombre}: {response.status_code}")
             
             if errores == 0:
                 st.success(f"✅ {exitos} calificaciones guardadas exitosamente")
                 st.balloons()
             else:
                 st.warning(f"⚠️ {exitos} guardadas, {errores} errores")
+                with st.expander("Ver detalles de errores"):
+                    for err in errores_lista[:10]:
+                        st.write(err)
 
 
 # ============================================
