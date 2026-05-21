@@ -30,58 +30,31 @@ def mostrar_configuracion_notas(data):
     col1, col2 = st.columns(2)
     with col1:
         opciones = [f"{m.get('curso')} - {m.get('asignatura')}" for m in materias]
-        seleccion = st.selectbox("Materia", opciones, key="config_materia")
+        seleccion = st.selectbox("Materia", opciones, key="config_materia_select")
         curso = seleccion.split(" - ")[0]
         asignatura = seleccion.split(" - ")[1]
     
     with col2:
-        periodo = st.selectbox("Período", ["Período 1", "Período 2", "Período 3", "Período 4"], key="config_periodo")
-        periodo_num = int(periodo.split()[1])
+        periodo_opciones = ["1", "2", "3", "4"]
+        periodo = st.selectbox("Período", periodo_opciones, key="config_periodo_select")
+        periodo_num = int(periodo)
     
-    st.success(f"**{curso} - {asignatura} - {periodo}**")
-    
-    # NOTA: Los tipos de nota ahora deben guardarse con el período también
-    # La tabla config_tipos_nota debe tener columna periodo
-    
-    # ... resto del código (agregar, listar, editar, eliminar) ...
-
-    st.subheader("⚙️ Configurar Notas")
-    
-    documento_docente = data.get('documento')
-    headers = get_headers()
-    
-    url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=neq.Dirección de Curso"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code != 200:
-        st.error("Error al cargar materias")
-        return
-    
-    materias = response.json()
-    if not materias:
-        st.warning("No tienes materias asignadas")
-        return
-    
-    opciones = [f"{m.get('curso')} - {m.get('asignatura')}" for m in materias]
-    seleccion = st.selectbox("Materia", opciones, key="config_materia")
-    curso = seleccion.split(" - ")[0]
-    asignatura = seleccion.split(" - ")[1]
-    
-    st.success(f"**{curso} - {asignatura}**")
+    st.success(f"**{curso} - {asignatura} - Período {periodo_num}**")
     
     # Agregar tipo de nota
     with st.expander("➕ Agregar tipo de nota", expanded=False):
         col1, col2 = st.columns(2)
         with col1:
-            nuevo_tipo = st.text_input("Nombre", placeholder="Taller, Quiz, Examen")
+            nuevo_tipo = st.text_input("Nombre", placeholder="Taller, Quiz, Examen", key="nuevo_tipo_input")
         with col2:
-            nuevo_porcentaje = st.number_input("%", min_value=0, max_value=100, value=20, step=5)
+            nuevo_porcentaje = st.number_input("%", min_value=0, max_value=100, value=20, step=5, key="nuevo_porcentaje_input")
         
-        if st.button("Agregar", use_container_width=True):
+        if st.button("Agregar", use_container_width=True, key="agregar_tipo_btn"):
             if nuevo_tipo:
                 data_insert = {
                     "curso": curso,
                     "asignatura": asignatura,
+                    "periodo": periodo_num,
                     "tipo_nota": nuevo_tipo,
                     "porcentaje": nuevo_porcentaje,
                     "orden": 1,
@@ -94,7 +67,7 @@ def mostrar_configuracion_notas(data):
     
     st.divider()
     
-    # Lista de tipos
+    # Lista de tipos de nota
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
     response_config = requests.get(url_config, headers=headers)
     
@@ -136,9 +109,9 @@ def mostrar_configuracion_notas(data):
             else:
                 st.caption(f"⚠️ Total: {total}%")
         else:
-            st.info("No hay tipos de nota")
+            st.info("No hay tipos de nota configurados para este período")
     else:
-        st.error("Error al cargar")
+        st.error("Error al cargar datos")
 
 
 def mostrar_ingreso_notas(data):
@@ -161,22 +134,22 @@ def mostrar_ingreso_notas(data):
         return
     
     opciones = [f"{m.get('curso')} - {m.get('asignatura')}" for m in materias]
-    seleccion = st.selectbox("Materia", opciones, key="ingreso_materia")
+    seleccion = st.selectbox("Materia", opciones, key="ingreso_materia_select")
     curso = seleccion.split(" - ")[0]
     asignatura = seleccion.split(" - ")[1]
     
     periodos = ["1", "2", "3", "4"]
-    periodo = st.selectbox("Período", periodos)
+    periodo = st.selectbox("Período", periodos, key="ingreso_periodo_select")
     periodo_num = int(periodo)
     
-    # Obtener tipos de nota
+    # Obtener tipos de nota (con período)
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
     response_config = requests.get(url_config, headers=headers)
     tipos_nota = response_config.json() if response_config.status_code == 200 else []
     
     if not tipos_nota:
         st.warning("Configura tipos de nota primero")
-        if st.button("Ir a Configurar"):
+        if st.button("Ir a Configurar", key="ir_configurar_btn"):
             st.session_state.menu_docente = "⚙️ Configurar Notas"
             st.rerun()
         return
@@ -217,7 +190,7 @@ def mostrar_ingreso_notas(data):
     
     for est in estudiantes:
         doc = est['documento_estudiante']
-        nombre = est['nombre_estudiante'][:20]  # Limitar longitud
+        nombre = est['nombre_estudiante'][:20]
         
         cols = st.columns([2] + [1] * len(tipos_nota) + [1])
         
@@ -239,7 +212,7 @@ def mostrar_ingreso_notas(data):
                     max_value=5.0,
                     step=0.1,
                     value=float(valor),
-                    key=f"n_{doc}_{tipo_nombre}",
+                    key=f"n_{doc}_{tipo_nombre}_{periodo_num}",
                     label_visibility="collapsed"
                 )
                 datos_notas[doc] = datos_notas.get(doc, {})
@@ -256,7 +229,7 @@ def mostrar_ingreso_notas(data):
     st.markdown("---")
     
     # Botón guardar
-    if st.button("💾 Guardar", type="primary", use_container_width=True):
+    if st.button("💾 Guardar", type="primary", use_container_width=True, key="guardar_notas_btn"):
         for doc, notas in datos_notas.items():
             for tipo in tipos_nota:
                 tipo_nombre = tipo['tipo_nota']
@@ -283,6 +256,7 @@ def mostrar_ingreso_notas(data):
         
         st.success("✅ Notas guardadas")
         st.balloons()
+
 
 # ============================================
 # FUNCIONES PARA ESTUDIANTE
