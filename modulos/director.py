@@ -62,8 +62,8 @@ def mostrar(data):
         st.subheader("📈 Rendimiento Académico")
         st.info("Módulo en desarrollo")
     
-    with tab4:
-        mostrar_asistencia_director(data)
+   with tab4:
+    mostrar_asistencia_director(data)
     
     with tab5:
         st.subheader("📊 Reportes")
