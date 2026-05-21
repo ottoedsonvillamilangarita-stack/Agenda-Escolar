@@ -88,21 +88,19 @@ def mostrar_configuracion_notas(data):
         # Sección de eliminación
         st.write("**🗑️ Eliminar tipo de nota:**")
         
-        for tipo in tipos:
-            col1, col2, col3 = st.columns([3, 1, 1])
+       for tipo in tipos:
+            col1, col2 = st.columns([3, 1])
             with col1:
                 st.write(f"{tipo.get('tipo_nota')} ({tipo.get('porcentaje')}%)")
             with col2:
-                if st.button("Eliminar", key=f"del_{tipo.get('id')}"):
+                if st.button("🗑️ Eliminar", key=f"del_{tipo.get('id')}"):
                     delete_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
                     response = requests.delete(delete_url, headers=headers)
                     if response.status_code == 204:
-                        st.success(f"✅ Tipo '{tipo.get('tipo_nota')}' eliminado")
+                        st.success(f"✅ '{tipo.get('tipo_nota')}' eliminado")
                         st.rerun()
                     else:
-                        st.error(f"Error al eliminar: {response.status_code}")
-            with col3:
-                st.write("")
+                        st.error(f"Error: {response.status_code}")
     else:
         st.info("📌 No hay tipos de nota configurados para esta materia")
         st.caption("Usa el formulario de arriba para agregar tus primeros tipos de nota (Ej: Taller 20%, Quiz 30%, Examen 50%)")
