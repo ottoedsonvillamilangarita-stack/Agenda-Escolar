@@ -17,6 +17,29 @@ def mostrar_asistencia_docente(data):
 # ============================================
 
 def mostrar_asistencia_estudiante(data):
+        st.subheader("📋 Reporte de Asistencia")
+    
+    documento = data.get('documento')
+    headers = get_headers()
+    
+    # DIAGNÓSTICO
+    st.write(f"🔍 Buscando asistencia para documento: {documento}")
+    
+    url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{documento}"
+    st.write(f"🔗 URL: {url}")
+    
+    response = requests.get(url, headers=headers)
+    st.write(f"📡 Status code: {response.status_code}")
+    
+    if response.status_code == 200:
+        asistencias = response.json()
+        st.write(f"📦 Registros encontrados: {len(asistencias)}")
+        if asistencias:
+            st.write(asistencias[:3])  # Muestra los primeros 3 registros
+    else:
+        st.error(f"Error: {response.status_code} - {response.text}")
+        return
+        
     st.subheader("📋 Reporte de Asistencia")
     
     documento = data.get('documento')
