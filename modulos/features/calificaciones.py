@@ -4,14 +4,10 @@ import pandas as pd
 from utils import SUPABASE_URL, get_headers
 
 # ============================================
-# CONFIGURACIÓN DE TIPOS DE NOTA
+# FUNCIONES PARA DOCENTE
 # ============================================
 
 def mostrar_configuracion_notas(data):
-    # Inicializar estado de edición
-    if "editando_tipo" not in st.session_state:
-        st.session_state.editando_tipo = None
-    
     st.subheader("⚙️ Configurar Notas")
     
     documento_docente = data.get('documento')
@@ -36,7 +32,7 @@ def mostrar_configuracion_notas(data):
     
     st.success(f"**{curso} - {asignatura}**")
     
-    # Agregar
+    # Agregar tipo de nota
     with st.expander("➕ Agregar tipo de nota", expanded=False):
         col1, col2 = st.columns(2)
         with col1:
@@ -75,15 +71,14 @@ def mostrar_configuracion_notas(data):
                     st.write(f"**{tipo['tipo_nota']}** - {tipo['porcentaje']}%")
                 with col2:
                     if st.button("✏️", key=f"edit_{tipo['id']}"):
-                        st.session_state.editando_tipo = tipo['id']
-                        st.rerun()
+                        st.session_state[f"editando_{tipo['id']}"] = True
                 with col3:
                     if st.button("🗑️", key=f"del_{tipo['id']}"):
                         requests.delete(f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}", headers=headers)
                         st.success("✅ Eliminado")
                         st.rerun()
                 
-                if st.session_state.editando_tipo == tipo['id']:
+                if st.session_state.get(f"editando_{tipo['id']}", False):
                     col_a, col_b, col_c = st.columns([2, 1, 1])
                     with col_a:
                         new_nombre = st.text_input("", value=tipo['tipo_nota'], key=f"n_{tipo['id']}", label_visibility="collapsed")
@@ -93,7 +88,7 @@ def mostrar_configuracion_notas(data):
                         if st.button("💾", key=f"s_{tipo['id']}"):
                             requests.patch(f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}", 
                                          headers=headers, json={"tipo_nota": new_nombre, "porcentaje": new_pct})
-                            st.session_state.editando_tipo = None
+                            st.session_state[f"editando_{tipo['id']}"] = False
                             st.success("✅ Guardado")
                             st.rerun()
                     st.divider()
@@ -108,10 +103,6 @@ def mostrar_configuracion_notas(data):
     else:
         st.error("Error al cargar")
 
-
-# ============================================
-# INGRESO DE NOTAS
-# ============================================
 
 def mostrar_ingreso_notas(data):
     st.subheader("📝 Ingresar Notas")
@@ -234,11 +225,11 @@ def mostrar_ingreso_notas(data):
 
 
 # ============================================
-# CONSULTA DE NOTAS
+# FUNCIONES PARA ESTUDIANTE
 # ============================================
 
-def mostrar_consulta_notas_estudiante(data):
-    st.subheader("📖 Mis Notas")
+def mostrar_notas_estudiante(data):
+    st.subheader("📖 Mis Calificaciones")
     
     documento = data.get('documento')
     headers = get_headers()
@@ -246,21 +237,111 @@ def mostrar_consulta_notas_estudiante(data):
     url = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{documento}"
     response = requests.get(url, headers=headers)
     
-    if response.status_code == 200:
-        notas = response.json()
-        if notas:
-            for n in notas:
-                st.write(f"**{n['asignatura']}** - {n['tipo_nota']}: {n['nota']}")
-        else:
-            st.info("Sin notas")
-    else:
-        st.error("Error")
+    if response.status_code != 200:
+        st.error("Error al cargar notas")
+        return
+    
+    notas = response.json()
+    if not notas:
+        st.info("No hay calificaciones registradas")
+        return
+    
+    df = pd.DataFrame(notas)
+    
+    for asignatura in df['asignatura'].unique():
+        df_asig = df[df['asignatura'] == asignatura]
+        with st.expander(f"📘 {asignatura}"):
+            st.dataframe(df_asig[['periodo', 'tipo_nota', 'nota']], use_container_width=True)
+            promedio = df_asig['nota'].mean()
+            st.caption(f"📊 Promedio: {promedio:.1f}")
 
 
 # ============================================
-# REPORTE
+# FUNCIONES PARA ACUDIENTE
 # ============================================
 
-def mostrar_reporte_notas(data):
-    st.subheader("📊 Reportes")
-    st.info("Próximamente")
+def mostrar_notas_acudiente(data):
+    st.subheader("👨‍👩‍👧 Calificaciones de mis hijos")
+    
+    documento_acudiente = data.get('documento')
+    headers = get_headers()
+    
+    url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_acudiente=eq.{documento_acudiente}"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        st.error("Error al cargar datos")
+        return
+    
+    hijos = response.json()
+    if not hijos:
+        st.info("No hay hijos asociados")
+        return
+    
+    for hijo in hijos:
+        doc_hijo = hijo.get('documento_estudiante')
+        nombre_hijo = hijo.get('nombre_estudiante')
+        
+        with st.expander(f"📘 {nombre_hijo} - Curso {hijo.get('curso')}"):
+            url_notas = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{doc_hijo}"
+            response_notas = requests.get(url_notas, headers=headers)
+            
+            if response_notas.status_code == 200:
+                notas = response_notas.json()
+                if notas:
+                    df = pd.DataFrame(notas)
+                    st.dataframe(df[['asignatura', 'periodo', 'tipo_nota', 'nota']], use_container_width=True)
+                else:
+                    st.info("Sin calificaciones")
+
+
+# ============================================
+# FUNCIONES PARA DIRECTOR
+# ============================================
+
+def mostrar_notas_curso(data):
+    st.subheader("📊 Calificaciones del Curso")
+    
+    documento_docente = data.get('documento')
+    headers = get_headers()
+    
+    url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
+    response_dir = requests.get(url_dir, headers=headers)
+    
+    if response_dir.status_code != 200 or not response_dir.json():
+        st.warning("No eres director de ningún curso")
+        return
+    
+    curso = response_dir.json()[0].get('curso')
+    st.success(f"📌 Curso: {curso}")
+    
+    url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
+    response_est = requests.get(url_est, headers=headers)
+    
+    if response_est.status_code != 200:
+        st.error("Error al cargar estudiantes")
+        return
+    
+    estudiantes = response_est.json()
+    
+    if not estudiantes:
+        st.info("No hay estudiantes en el curso")
+        return
+    
+    for estudiante in estudiantes:
+        nombre = estudiante.get('nombre_estudiante')
+        doc = estudiante.get('documento_estudiante')
+        
+        url_notas = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{doc}&curso=eq.{curso}"
+        response_notas = requests.get(url_notas, headers=headers)
+        
+        if response_notas.status_code == 200:
+            notas = response_notas.json()
+            if notas:
+                df = pd.DataFrame(notas)
+                promedio = df['nota'].mean()
+                with st.expander(f"📘 {nombre}"):
+                    st.dataframe(df[['asignatura', 'tipo_nota', 'nota']], use_container_width=True)
+                    st.caption(f"Promedio: {promedio:.1f}")
+            else:
+                st.write(f"**{nombre}** - Sin notas")
