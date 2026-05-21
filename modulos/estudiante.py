@@ -15,16 +15,10 @@ def mostrar(data):
     # Consultar la tabla estudiantes
     url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_estudiante}"
     
-    # Para depuración (lo puedes quitar después)
-    st.write(f"🔍 URL: {url}")
-    
     response = requests.get(url, headers=headers)
-    
-    st.write(f"📡 Status: {response.status_code}")
     
     if response.status_code == 200:
         datos = response.json()
-        st.write(f"📦 Datos recibidos: {datos}")
         
         if datos:
             estudiante = datos[0]
@@ -37,19 +31,27 @@ def mostrar(data):
     else:
         st.error(f"Error {response.status_code}: {response.text}")
     
-    st.subheader("📖 Mis Notas")
-    st.write("**Matemáticas:** 4.5")
-    st.write("**Ciencias:** 3.8")
-    st.write("**Español:** 4.2")
-opcion = st.selectbox(
-    "Seleccionar función",
-    [
-        "👨‍👩‍👧 Mis Hijos",
-        "📖 Notas de mis hijos",
-        "📋 Asistencia",
-        "👤 Mi Perfil"
-    ]
-)
-
-elif opcion == "📖 Notas de mis hijos":
-    mostrar_notas_acudiente(data)
+    st.divider()
+    st.subheader("📌 Funciones disponibles")
+    
+    # Menú para el estudiante
+    opcion = st.selectbox(
+        "Seleccionar función",
+        [
+            "📖 Mis Notas",
+            "📅 Mi Horario",
+            "📋 Asistencia",
+            "👤 Mi Perfil"
+        ]
+    )
+    
+    st.divider()
+    
+    if opcion == "📖 Mis Notas":
+        mostrar_notas_estudiante(data)
+    elif opcion == "📅 Mi Horario":
+        st.info("🚧 Módulo en desarrollo")
+    elif opcion == "📋 Asistencia":
+        st.info("🚧 Módulo en desarrollo")
+    elif opcion == "👤 Mi Perfil":
+        st.info("🚧 Módulo en desarrollo")
