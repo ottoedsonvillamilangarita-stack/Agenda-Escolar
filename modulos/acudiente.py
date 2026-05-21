@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_acudiente
+from modulos.features.asistencia import mostrar_asistencia_acudiente
+
 
 def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
@@ -60,9 +62,8 @@ def mostrar(data):
     elif opcion == "📖 Notas de mis hijos":
         mostrar_notas_acudiente(data)
     
-    elif opcion == "📋 Asistencia":
-        st.subheader("📋 Asistencia")
-        st.info("🚧 Módulo en desarrollo")
+     elif opcion == "📋 Asistencia":
+        mostrar_asistencia_acudiente(data)
     
     elif opcion == "👤 Mi Perfil":
         st.subheader("👤 Mi Perfil")
