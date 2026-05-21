@@ -95,7 +95,7 @@ def mostrar_configuracion_notas(data):
     st.divider()
     
     # Lista de tipos
-    url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}"
+    url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
     response_config = requests.get(url_config, headers=headers)
     
     if response_config.status_code == 200:
@@ -170,7 +170,7 @@ def mostrar_ingreso_notas(data):
     periodo_num = int(periodo)
     
     # Obtener tipos de nota
-    url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}"
+    url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
     response_config = requests.get(url_config, headers=headers)
     tipos_nota = response_config.json() if response_config.status_code == 200 else []
     
