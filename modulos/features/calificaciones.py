@@ -110,6 +110,7 @@ def mostrar_ingreso_notas(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
+    # Obtener materias
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=neq.Dirección de Curso"
     response = requests.get(url, headers=headers)
     
@@ -131,9 +132,9 @@ def mostrar_ingreso_notas(data):
     periodo = st.selectbox("Período", periodos)
     periodo_num = int(periodo)
     
+    # Obtener tipos de nota
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}"
     response_config = requests.get(url_config, headers=headers)
-    
     tipos_nota = response_config.json() if response_config.status_code == 200 else []
     
     if not tipos_nota:
@@ -143,6 +144,7 @@ def mostrar_ingreso_notas(data):
             st.rerun()
         return
     
+    # Obtener estudiantes
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
     response_est = requests.get(url_est, headers=headers)
     estudiantes = response_est.json() if response_est.status_code == 200 else []
@@ -151,9 +153,19 @@ def mostrar_ingreso_notas(data):
         st.warning("No hay estudiantes")
         return
     
-    st.caption(f"**{asignatura}** - " + ", ".join([f"{t['tipo_nota']}({t['porcentaje']}%)" for t in tipos_nota]))
-    st.divider()
+    # Mostrar leyenda de tipos de nota (encabezados)
+    st.markdown("---")
+    cols_headers = st.columns([2] + [1] * len(tipos_nota) + [1])
+    with cols_headers[0]:
+        st.markdown("**Estudiante**")
+    for idx, tipo in enumerate(tipos_nota):
+        with cols_headers[idx + 1]:
+            st.markdown(f"**{tipo['tipo_nota'][:8]}**<br><small>({tipo['porcentaje']}%)</small>", unsafe_allow_html=True)
+    with cols_headers[-1]:
+        st.markdown("**Definitiva**")
+    st.markdown("---")
     
+    # Obtener notas existentes
     notas_existentes = {}
     url_notas = f"{SUPABASE_URL}/rest/v1/notas?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
     response_notas = requests.get(url_notas, headers=headers)
@@ -163,43 +175,55 @@ def mostrar_ingreso_notas(data):
             key = f"{n['documento_estudiante']}_{n['tipo_nota']}"
             notas_existentes[key] = n['nota']
     
+    # Formulario compacto (una fila por estudiante)
     datos_notas = {}
     
     for est in estudiantes:
         doc = est['documento_estudiante']
-        nombre = est['nombre_estudiante']
-        datos_notas[doc] = {"nombre": nombre}
+        nombre = est['nombre_estudiante'][:20]  # Limitar longitud
         
-        cols = st.columns([2] + [1] * len(tipos_nota))
+        cols = st.columns([2] + [1] * len(tipos_nota) + [1])
+        
+        # Nombre del estudiante
         with cols[0]:
-            st.write(f"**{nombre[:20]}**")
+            st.write(f"**{nombre}**")
         
+        # Notas por tipo
+        suma_ponderada = 0
         for idx, tipo in enumerate(tipos_nota):
             tipo_nombre = tipo['tipo_nota']
             key = f"{doc}_{tipo_nombre}"
             valor = notas_existentes.get(key, 0.0)
+            
             with cols[idx + 1]:
-                nota = st.number_input("", min_value=0.0, max_value=5.0, step=0.1, value=float(valor), 
-                                      key=f"n_{doc}_{tipo_nombre}", label_visibility="collapsed")
+                nota = st.number_input(
+                    "",
+                    min_value=0.0,
+                    max_value=5.0,
+                    step=0.1,
+                    value=float(valor),
+                    key=f"n_{doc}_{tipo_nombre}",
+                    label_visibility="collapsed"
+                )
+                datos_notas[doc] = datos_notas.get(doc, {})
                 datos_notas[doc][tipo_nombre] = nota
-        st.divider()
+                
+                # Acumular para definitiva
+                pct = tipo['porcentaje'] / 100
+                suma_ponderada += nota * pct
+        
+        # Definitiva en la misma fila
+        with cols[-1]:
+            st.write(f"**{round(suma_ponderada, 1)}**")
     
-    resumen = []
-    for doc, datos in datos_notas.items():
-        suma = 0
-        for tipo in tipos_nota:
-            pct = tipo['porcentaje'] / 100
-            nota = datos.get(tipo['tipo_nota'], 0)
-            suma += nota * pct
-        resumen.append({"Estudiante": datos["nombre"], "Definitiva": round(suma, 1)})
+    st.markdown("---")
     
-    st.dataframe(pd.DataFrame(resumen), use_container_width=True)
-    
+    # Botón guardar
     if st.button("💾 Guardar", type="primary", use_container_width=True):
-        for doc, datos in datos_notas.items():
+        for doc, notas in datos_notas.items():
             for tipo in tipos_nota:
                 tipo_nombre = tipo['tipo_nota']
-                nota = datos.get(tipo_nombre, 0)
+                nota = notas.get(tipo_nombre, 0)
                 
                 check_url = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{doc}&curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}&tipo_nota=eq.{tipo_nombre}"
                 check = requests.get(check_url, headers=headers)
@@ -222,7 +246,6 @@ def mostrar_ingreso_notas(data):
         
         st.success("✅ Notas guardadas")
         st.balloons()
-
 
 # ============================================
 # FUNCIONES PARA ESTUDIANTE
