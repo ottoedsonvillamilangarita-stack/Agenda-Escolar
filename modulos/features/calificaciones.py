@@ -42,7 +42,7 @@ def mostrar_configuracion_notas(data):
         with col2:
             nuevo_porcentaje = st.number_input("%", min_value=0, max_value=100, value=20, step=5)
         
-        if st.button("Agregar", type="primary", use_container_width=True):
+        if st.button("Agregar", use_container_width=True):
             if nuevo_tipo:
                 data_insert = {
                     "curso": curso,
@@ -54,7 +54,7 @@ def mostrar_configuracion_notas(data):
                 }
                 r = requests.post(f"{SUPABASE_URL}/rest/v1/config_tipos_nota", headers=headers, json=data_insert)
                 if r.status_code == 201:
-                    st.success(f"✅ Agregado")
+                    st.success("✅ Agregado")
                     st.rerun()
     
     st.divider()
@@ -75,15 +75,14 @@ def mostrar_configuracion_notas(data):
                     st.write(f"**{tipo['tipo_nota']}** - {tipo['porcentaje']}%")
                 with col2:
                     if st.button("✏️", key=f"edit_{tipo['id']}"):
-                        st.session_state[f"editando_{tipo['id']}"] = True
+                        st.session_state[f"edit_{tipo['id']}"] = True
                 with col3:
                     if st.button("🗑️", key=f"del_{tipo['id']}"):
-                        delete_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}"
-                        r = requests.delete(delete_url, headers=headers)
-                        st.success(f"✅ Eliminado")
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}", headers=headers)
+                        st.success("✅ Eliminado")
                         st.rerun()
                 
-                if st.session_state.get(f"editando_{tipo['id']}", False):
+                if st.session_state.get(f"edit_{tipo['id']}", False):
                     col_a, col_b, col_c = st.columns([2, 1, 1])
                     with col_a:
                         new_nombre = st.text_input("", value=tipo['tipo_nota'], key=f"n_{tipo['id']}", label_visibility="collapsed")
@@ -91,10 +90,10 @@ def mostrar_configuracion_notas(data):
                         new_pct = st.number_input("", min_value=0, max_value=100, value=tipo['porcentaje'], key=f"p_{tipo['id']}", label_visibility="collapsed")
                     with col_c:
                         if st.button("💾", key=f"s_{tipo['id']}"):
-                            update_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}"
-                            r = requests.patch(update_url, headers=headers, json={"tipo_nota": new_nombre, "porcentaje": new_pct})
-                            st.session_state[f"editando_{tipo['id']}"] = False
-                            st.success(f"✅ Guardado")
+                            requests.patch(f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}", 
+                                         headers=headers, json={"tipo_nota": new_nombre, "porcentaje": new_pct})
+                            st.session_state[f"edit_{tipo['id']}"] = False
+                            st.success("✅ Guardado")
                             st.rerun()
                     st.divider()
             
@@ -193,78 +192,6 @@ def mostrar_ingreso_notas(data):
                 datos_notas[doc][tipo_nombre] = nota
         st.divider()
     
-    # Resumen
     resumen = []
     for doc, datos in datos_notas.items():
-        suma = 0
-        for tipo in tipos_nota:
-            pct = tipo['porcentaje'] / 100
-            nota = datos.get(tipo['tipo_nota'], 0)
-            suma += nota * pct
-        resumen.append({"Estudiante": datos["nombre"], "Definitiva": round(suma, 1)})
-    
-    st.dataframe(pd.DataFrame(resumen), use_container_width=True)
-    
-    if st.button("💾 Guardar", type="primary", use_container_width=True):
-        exitos = 0
-        for doc, datos in datos_notas.items():
-            for tipo in tipos_nota:
-                tipo_nombre = tipo['tipo_nota']
-                nota = datos.get(tipo_nombre, 0)
-                
-                check_url = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{doc}&curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}&tipo_nota=eq.{tipo_nombre}"
-                check = requests.get(check_url, headers=headers)
-                
-                data_nota = {
-                    "documento_estudiante": doc,
-                    "curso": curso,
-                    "asignatura": asignatura,
-                    "periodo": periodo_num,
-                    "tipo_nota": tipo_nombre,
-                    "nota": nota,
-                    "documento_docente": documento_docente
-                }
-                
-                if check.status_code == 200 and check.json():
-                    id_nota = check.json()[0]['id']
-                    requests.patch(f"{SUPABASE_URL}/rest/v1/notas?id=eq.{id_nota}", headers=headers, json={"nota": nota})
-                    exitos += 1
-                else:
-                    requests.post(f"{SUPABASE_URL}/rest/v1/notas", headers=headers, json=data_nota)
-                    exitos += 1
-        
-        st.success(f"✅ {exitos} notas guardadas")
-        st.balloons()
-
-
-# ============================================
-# CONSULTA DE NOTAS
-# ============================================
-
-def mostrar_consulta_notas_estudiante(data):
-    st.subheader("📖 Mis Notas")
-    
-    documento = data.get('documento')
-    headers = get_headers()
-    
-    url = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{documento}"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        notas = response.json()
-        if notas:
-            for n in notas:
-                st.write(f"**{n['asignatura']}** - {n['tipo_nota']}: {n['nota']}")
-        else:
-            st.info("Sin notas")
-    else:
-        st.error("Error")
-
-
-# ============================================
-# REPORTE
-# ============================================
-
-def mostrar_reporte_notas(data):
-    st.subheader("📊 Reportes")
-    st.info("Próximamente")
+       
