@@ -8,6 +8,43 @@ from utils import SUPABASE_URL, get_headers
 # ============================================
 
 def mostrar_configuracion_notas(data):
+    st.subheader("⚙️ Configurar Tipos de Nota")
+    
+    documento_docente = data.get('documento')
+    headers = get_headers()
+    
+    # Obtener materias del docente
+    url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=neq.Dirección de Curso"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        st.error("Error al cargar materias")
+        return
+    
+    materias = response.json()
+    if not materias:
+        st.warning("No tienes materias asignadas")
+        return
+    
+    # Selección de materia y período
+    col1, col2 = st.columns(2)
+    with col1:
+        opciones = [f"{m.get('curso')} - {m.get('asignatura')}" for m in materias]
+        seleccion = st.selectbox("Materia", opciones, key="config_materia")
+        curso = seleccion.split(" - ")[0]
+        asignatura = seleccion.split(" - ")[1]
+    
+    with col2:
+        periodo = st.selectbox("Período", ["Período 1", "Período 2", "Período 3", "Período 4"], key="config_periodo")
+        periodo_num = int(periodo.split()[1])
+    
+    st.success(f"**{curso} - {asignatura} - {periodo}**")
+    
+    # NOTA: Los tipos de nota ahora deben guardarse con el período también
+    # La tabla config_tipos_nota debe tener columna periodo
+    
+    # ... resto del código (agregar, listar, editar, eliminar) ...
+
     st.subheader("⚙️ Configurar Notas")
     
     documento_docente = data.get('documento')
