@@ -2,7 +2,8 @@ import streamlit as st
 import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
-from modulos.features.calificaciones import mostrar_notas_curso  # ← NUEVO IMPORT
+from modulos.features.calificaciones import mostrar_notas_curso# ← NUEVO IMPORT
+from modulos.features.asistencia import mostrar_asistencia_director
 
 def mostrar(data):
     st.title("🧭 Director de Grupo")
@@ -62,8 +63,7 @@ def mostrar(data):
         st.info("Módulo en desarrollo")
     
     with tab4:
-        st.subheader("📋 Asistencia")
-        st.info("Módulo en desarrollo")
+        mostrar_asistencia_director(data)
     
     with tab5:
         st.subheader("📊 Reportes")
