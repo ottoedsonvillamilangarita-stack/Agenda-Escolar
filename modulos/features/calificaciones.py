@@ -45,9 +45,9 @@ def mostrar_configuracion_notas(data):
         with col3:
             nuevo_orden = st.number_input("🔢 Orden", min_value=1, max_value=20, value=1, step=1)
         
-        if st.button("➕ Agregar Tipo de Nota", type="primary", use_container_width=True):
+        if st.button("➕ Agregar", type="primary", use_container_width=True):
             if not nuevo_tipo:
-                st.error("❌ Ingresa un nombre para el tipo de nota")
+                st.error("❌ Ingresa un nombre")
             else:
                 data = {
                     "curso": curso,
@@ -59,7 +59,7 @@ def mostrar_configuracion_notas(data):
                 }
                 response = requests.post(f"{SUPABASE_URL}/rest/v1/config_tipos_nota", headers=headers, json=data)
                 if response.status_code == 201:
-                    st.success(f"✅ Tipo de nota '{nuevo_tipo}' agregado")
+                    st.success(f"✅ '{nuevo_tipo}' agregado")
                     st.rerun()
                 else:
                     st.error(f"Error: {response.status_code}")
@@ -67,7 +67,7 @@ def mostrar_configuracion_notas(data):
     st.divider()
     
     # ============================================
-    # MOSTRAR Y GESTIONAR TIPOS DE NOTA
+    # LISTA DE TIPOS DE NOTA
     # ============================================
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&order=orden.asc"
     response_config = requests.get(url_config, headers=headers)
@@ -78,70 +78,70 @@ def mostrar_configuracion_notas(data):
         if tipos:
             st.write("**📋 Tipos de nota configurados:**")
             
-            # Mostrar cada tipo con opciones de editar/eliminar
-            for idx, tipo in enumerate(tipos):
-                with st.container():
-                    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+            # Mostrar tabla resumen
+            data_tabla = []
+            for tipo in tipos:
+                data_tabla.append({
+                    "Tipo": tipo.get('tipo_nota'),
+                    "Porcentaje": f"{tipo.get('porcentaje')}%",
+                    "Orden": tipo.get('orden')
+                })
+            df = pd.DataFrame(data_tabla)
+            st.dataframe(df, use_container_width=True)
+            
+            st.write("**🔧 Gestionar tipos de nota:**")
+            
+            for tipo in tipos:
+                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                with col1:
+                    st.write(f"{tipo.get('tipo_nota')} ({tipo.get('porcentaje')}%)")
+                with col2:
+                    if st.button("✏️", key=f"edit_btn_{tipo.get('id')}"):
+                        st.session_state[f"editando_{tipo.get('id')}"] = True
+                with col3:
+                    if st.button("🗑️", key=f"del_btn_{tipo.get('id')}"):
+                        delete_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
+                        response = requests.delete(delete_url, headers=headers)
+                        if response.status_code == 204:
+                            st.success(f"✅ Eliminado")
+                            st.rerun()
+                        else:
+                            st.error("Error al eliminar")
+                with col4:
+                    st.write("")
+                
+                if st.session_state.get(f"editando_{tipo.get('id')}", False):
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        nuevo_nombre = st.text_input("Nuevo nombre", value=tipo.get('tipo_nota'), key=f"nombre_{tipo.get('id')}")
+                    with col_b:
+                        nuevo_pct = st.number_input("Nuevo porcentaje", min_value=0, max_value=100, value=tipo.get('porcentaje', 0), key=f"pct_{tipo.get('id')}")
                     
-                    with col1:
-                        st.write(f"**{tipo.get('tipo_nota')}**")
-                    with col2:
-                        st.write(f"{tipo.get('porcentaje')}%")
-                    with col3:
-                        if st.button("✏️", key=f"edit_{tipo.get('id')}", help="Editar"):
-                            st.session_state[f"editando_{tipo.get('id')}"] = True
-                    with col4:
-                        if st.button("🗑️", key=f"del_{tipo.get('id')}", help="Eliminar"):
-                            delete_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
-                            response = requests.delete(delete_url, headers=headers)
-                            if response.status_code == 204:
-                                st.success(f"✅ '{tipo.get('tipo_nota')}' eliminado")
+                    col_x, col_y = st.columns(2)
+                    with col_x:
+                        if st.button("💾 Guardar", key=f"save_{tipo.get('id')}"):
+                            update_data = {"tipo_nota": nuevo_nombre, "porcentaje": nuevo_pct}
+                            update_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
+                            response = requests.patch(update_url, headers=headers, json=update_data)
+                            if response.status_code == 200:
+                                st.success("✅ Guardado")
+                                st.session_state[f"editando_{tipo.get('id')}"] = False
                                 st.rerun()
                             else:
-                                st.error(f"Error al eliminar")
-                    with col5:
-                        st.write("")
-                    
-                    # Formulario de edición (se muestra al hacer clic en editar)
-                    if st.session_state.get(f"editando_{tipo.get('id')}", False):
-                        with st.expander(f"✏️ Editando {tipo.get('tipo_nota')}", expanded=True):
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                nuevo_nombre = st.text_input("Nuevo nombre", value=tipo.get('tipo_nota'), key=f"nombre_{tipo.get('id')}")
-                            with col2:
-                                nuevo_porcentaje = st.number_input("Nuevo porcentaje", min_value=0, max_value=100, value=tipo.get('porcentaje', 0), key=f"pct_{tipo.get('id')}")
-                            
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                if st.button("💾 Guardar cambios", key=f"save_{tipo.get('id')}"):
-                                    update_data = {
-                                        "tipo_nota": nuevo_nombre,
-                                        "porcentaje": nuevo_porcentaje
-                                    }
-                                    update_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
-                                    response = requests.patch(update_url, headers=headers, json=update_data)
-                                    if response.status_code == 200:
-                                        st.success("✅ Cambios guardados")
-                                        st.session_state[f"editando_{tipo.get('id')}"] = False
-                                        st.rerun()
-                                    else:
-                                        st.error("Error al guardar")
-                            with col2:
-                                if st.button("❌ Cancelar", key=f"cancel_{tipo.get('id')}"):
-                                    st.session_state[f"editando_{tipo.get('id')}"] = False
-                                    st.rerun()
-                    
+                                st.error(f"Error: {response.status_code}")
+                    with col_y:
+                        if st.button("❌ Cancelar", key=f"cancel_{tipo.get('id')}"):
+                            st.session_state[f"editando_{tipo.get('id')}"] = False
+                            st.rerun()
                     st.divider()
             
-            # Mostrar resumen de porcentajes
-            total_porcentajes = sum(t.get('porcentaje', 0) for t in tipos)
-            if total_porcentajes == 100:
-                st.success(f"**📊 Total de porcentajes: {total_porcentajes}% ✅**")
+            total = sum(t.get('porcentaje', 0) for t in tipos)
+            if total == 100:
+                st.success(f"✅ Total porcentajes: {total}%")
             else:
-                st.warning(f"**📊 Total de porcentajes: {total_porcentajes}%** ⚠️ Deben sumar 100%")
+                st.warning(f"⚠️ Total porcentajes: {total}% (debe ser 100%)")
         else:
             st.info("📌 No hay tipos de nota configurados para esta materia")
-            st.caption("Usa el botón '➕ Agregar nuevo tipo de nota' para comenzar")
     else:
         st.error("Error al cargar la configuración")
 
@@ -274,7 +274,7 @@ def mostrar_ingreso_notas(data):
     
     # Guardar notas
     if st.button("💾 Guardar Calificaciones", type="primary", use_container_width=True):
-        with st.spinner("Guardando calificaciones..."):
+        with st.spinner("Guardando..."):
             exitos = 0
             errores = 0
             
@@ -309,7 +309,7 @@ def mostrar_ingreso_notas(data):
                         errores += 1
             
             if errores == 0:
-                st.success(f"✅ {exitos} calificaciones guardadas exitosamente")
+                st.success(f"✅ {exitos} calificaciones guardadas")
                 st.balloons()
             else:
                 st.warning(f"⚠️ {exitos} guardadas, {errores} errores")
@@ -334,7 +334,6 @@ def mostrar_consulta_notas_estudiante(data):
             df = pd.DataFrame(notas)
             st.dataframe(df[['asignatura', 'periodo', 'tipo_nota', 'nota']], use_container_width=True)
             
-            # Resumen por asignatura
             st.subheader("📊 Resumen por Asignatura")
             resumen = df.groupby('asignatura')['nota'].mean().reset_index()
             resumen.columns = ['Asignatura', 'Promedio']
@@ -377,15 +376,13 @@ def mostrar_reporte_notas(data):
         periodo_num = int(periodo.split()[1])
         
         if st.button("📄 Generar Reporte", type="primary"):
-            with st.spinner("Generando reporte..."):
-                # Obtener estudiantes
+            with st.spinner("Generando..."):
                 url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
                 response_est = requests.get(url_est, headers=headers)
                 
                 if response_est.status_code == 200:
                     estudiantes = response_est.json()
                     
-                    # Obtener notas
                     url_notas = f"{SUPABASE_URL}/rest/v1/notas?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
                     response_notas = requests.get(url_notas, headers=headers)
                     
@@ -399,7 +396,6 @@ def mostrar_reporte_notas(data):
                                 notas_dict[doc] = {}
                             notas_dict[doc][tipo] = nota
                     
-                    # Construir reporte
                     reporte = []
                     for est in estudiantes:
                         doc = est.get('documento_estudiante')
@@ -423,4 +419,4 @@ def mostrar_reporte_notas(data):
                             mime="text/csv"
                         )
                     else:
-                        st.info("No hay datos para generar el reporte")
+                        st.info("No hay datos para el reporte")
