@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_configuracion_notas, mostrar_ingreso_notas
+from modulos.features.asistencia import mostrar_asistencia_docente
 
 def mostrar(data):
     st.title("👨‍🏫 Panel del Docente")
