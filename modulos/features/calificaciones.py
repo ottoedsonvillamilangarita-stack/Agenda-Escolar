@@ -8,6 +8,10 @@ from utils import SUPABASE_URL, get_headers
 # ============================================
 
 def mostrar_configuracion_notas(data):
+    # Inicializar estado de edición
+    if "editando_tipo" not in st.session_state:
+        st.session_state.editando_tipo = None
+    
     st.subheader("⚙️ Configurar Notas")
     
     documento_docente = data.get('documento')
@@ -71,14 +75,15 @@ def mostrar_configuracion_notas(data):
                     st.write(f"**{tipo['tipo_nota']}** - {tipo['porcentaje']}%")
                 with col2:
                     if st.button("✏️", key=f"edit_{tipo['id']}"):
-                        st.session_state[f"edit_{tipo['id']}"] = True
+                        st.session_state.editando_tipo = tipo['id']
+                        st.rerun()
                 with col3:
                     if st.button("🗑️", key=f"del_{tipo['id']}"):
                         requests.delete(f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}", headers=headers)
                         st.success("✅ Eliminado")
                         st.rerun()
                 
-                if st.session_state.get(f"edit_{tipo['id']}", False):
+                if st.session_state.editando_tipo == tipo['id']:
                     col_a, col_b, col_c = st.columns([2, 1, 1])
                     with col_a:
                         new_nombre = st.text_input("", value=tipo['tipo_nota'], key=f"n_{tipo['id']}", label_visibility="collapsed")
@@ -88,7 +93,7 @@ def mostrar_configuracion_notas(data):
                         if st.button("💾", key=f"s_{tipo['id']}"):
                             requests.patch(f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo['id']}", 
                                          headers=headers, json={"tipo_nota": new_nombre, "porcentaje": new_pct})
-                            st.session_state[f"edit_{tipo['id']}"] = False
+                            st.session_state.editando_tipo = None
                             st.success("✅ Guardado")
                             st.rerun()
                     st.divider()
