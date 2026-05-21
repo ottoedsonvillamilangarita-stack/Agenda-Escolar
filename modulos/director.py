@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
-from modulos.features.calificaciones import mostrar_notas_curso# ← NUEVO IMPORT
+from modulos.features.calificaciones import mostrar_notas_curso
 from modulos.features.asistencia import mostrar_asistencia_director
 
 def mostrar(data):
@@ -28,12 +28,10 @@ def mostrar(data):
         return
     
     curso_dirige = direccion[0].get('curso')
-    st.success(f"🎓 Eres director del curso: **{curso_dirige}**")
+    st.success(f"🎓 Director del curso: **{curso_dirige}**")
     
-    # ============================================
-    # PESTAÑAS (AGREGAMOS UNA NUEVA)
-    # ============================================
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Estudiantes", "📖 Notas del Curso", "📈 Rendimiento", "📋 Asistencia", "📊 Reportes"])
+    # Pestañas
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Estudiantes", "📖 Notas del Curso", "📋 Asistencia", "📊 Reportes"])
     
     with tab1:
         st.subheader(f"📋 Estudiantes del Curso {curso_dirige}")
@@ -41,30 +39,20 @@ def mostrar(data):
         url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso_dirige}"
         response_est = requests.get(url_est, headers=headers)
         
-        if response_est.status_code != 200:
-            st.error("Error al cargar los estudiantes")
-        else:
+        if response_est.status_code == 200:
             estudiantes = response_est.json()
             if estudiantes:
                 df = pd.DataFrame(estudiantes)
-                columnas = ['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante']
-                columnas_existentes = [col for col in columnas if col in df.columns]
-                st.dataframe(df[columnas_existentes], use_container_width=True)
+                st.dataframe(df[['nombre_estudiante', 'documento_estudiante']], use_container_width=True)
                 st.caption(f"Total: {len(estudiantes)} estudiantes")
             else:
-                st.info(f"No hay estudiantes en el curso {curso_dirige}")
+                st.info("No hay estudiantes")
     
     with tab2:
-        # NUEVA PESTAÑA: NOTAS DEL CURSO
         mostrar_notas_curso(data)
     
     with tab3:
-        st.subheader("📈 Rendimiento Académico")
-        st.info("Módulo en desarrollo")
+        mostrar_asistencia_director(data)
     
-   with tab4:
-    mostrar_asistencia_director(data)
-    
-    with tab5:
-        st.subheader("📊 Reportes")
-        st.info("Módulo en desarrollo")
+    with tab4:
+        st.info("🚧 Módulo en desarrollo")
