@@ -41,3 +41,15 @@ def mostrar(data):
     st.write("**Matemáticas:** 4.5")
     st.write("**Ciencias:** 3.8")
     st.write("**Español:** 4.2")
+opcion = st.selectbox(
+    "Seleccionar función",
+    [
+        "👨‍👩‍👧 Mis Hijos",
+        "📖 Notas de mis hijos",
+        "📋 Asistencia",
+        "👤 Mi Perfil"
+    ]
+)
+
+elif opcion == "📖 Notas de mis hijos":
+    mostrar_notas_acudiente(data)
