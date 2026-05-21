@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_estudiante
+from modulos.features.asistencia import mostrar_asistencia_estudiante
+
 
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
@@ -49,7 +51,7 @@ def mostrar(data):
         mostrar_notas_estudiante(data)
     elif opcion == "📅 Mi Horario":
         st.info("🚧 Módulo en desarrollo")
-    elif opcion == "📋 Asistencia":
-        st.info("🚧 Módulo en desarrollo")
+      elif opcion == "📋 Asistencia":
+        mostrar_asistencia_estudiante(data)
     elif opcion == "👤 Mi Perfil":
         st.info("🚧 Módulo en desarrollo")
