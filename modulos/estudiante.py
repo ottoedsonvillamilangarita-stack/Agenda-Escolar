@@ -14,7 +14,6 @@ def mostrar(data):
     
     # Consultar la tabla estudiantes
     url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_estudiante}"
-    
     response = requests.get(url, headers=headers)
     
     if response.status_code == 200:
@@ -34,7 +33,6 @@ def mostrar(data):
     st.divider()
     st.subheader("📌 Funciones disponibles")
     
-    # Menú para el estudiante
     opcion = st.selectbox(
         "Seleccionar función",
         [
