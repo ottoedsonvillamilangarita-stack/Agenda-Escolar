@@ -32,9 +32,7 @@ def mostrar_configuracion_notas(data):
     
     st.success(f"**{curso} - {asignatura}**")
     
-    # ============================================
-    # AGREGAR
-    # ============================================
+    # Agregar
     with st.expander("➕ Agregar tipo de nota", expanded=False):
         col1, col2 = st.columns(2)
         with col1:
@@ -59,9 +57,7 @@ def mostrar_configuracion_notas(data):
     
     st.divider()
     
-    # ============================================
-    # LISTA
-    # ============================================
+    # Lista de tipos
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}"
     response_config = requests.get(url_config, headers=headers)
     
@@ -194,4 +190,72 @@ def mostrar_ingreso_notas(data):
     
     resumen = []
     for doc, datos in datos_notas.items():
-       
+        suma = 0
+        for tipo in tipos_nota:
+            pct = tipo['porcentaje'] / 100
+            nota = datos.get(tipo['tipo_nota'], 0)
+            suma += nota * pct
+        resumen.append({"Estudiante": datos["nombre"], "Definitiva": round(suma, 1)})
+    
+    st.dataframe(pd.DataFrame(resumen), use_container_width=True)
+    
+    if st.button("💾 Guardar", type="primary", use_container_width=True):
+        for doc, datos in datos_notas.items():
+            for tipo in tipos_nota:
+                tipo_nombre = tipo['tipo_nota']
+                nota = datos.get(tipo_nombre, 0)
+                
+                check_url = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{doc}&curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}&tipo_nota=eq.{tipo_nombre}"
+                check = requests.get(check_url, headers=headers)
+                
+                data_nota = {
+                    "documento_estudiante": doc,
+                    "curso": curso,
+                    "asignatura": asignatura,
+                    "periodo": periodo_num,
+                    "tipo_nota": tipo_nombre,
+                    "nota": nota,
+                    "documento_docente": documento_docente
+                }
+                
+                if check.status_code == 200 and check.json():
+                    id_nota = check.json()[0]['id']
+                    requests.patch(f"{SUPABASE_URL}/rest/v1/notas?id=eq.{id_nota}", headers=headers, json={"nota": nota})
+                else:
+                    requests.post(f"{SUPABASE_URL}/rest/v1/notas", headers=headers, json=data_nota)
+        
+        st.success("✅ Notas guardadas")
+        st.balloons()
+
+
+# ============================================
+# CONSULTA DE NOTAS
+# ============================================
+
+def mostrar_consulta_notas_estudiante(data):
+    st.subheader("📖 Mis Notas")
+    
+    documento = data.get('documento')
+    headers = get_headers()
+    
+    url = f"{SUPABASE_URL}/rest/v1/notas?documento_estudiante=eq.{documento}"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        notas = response.json()
+        if notas:
+            for n in notas:
+                st.write(f"**{n['asignatura']}** - {n['tipo_nota']}: {n['nota']}")
+        else:
+            st.info("Sin notas")
+    else:
+        st.error("Error")
+
+
+# ============================================
+# REPORTE
+# ============================================
+
+def mostrar_reporte_notas(data):
+    st.subheader("📊 Reportes")
+    st.info("Próximamente")
