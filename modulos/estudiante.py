@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
+from modulos.features.calificaciones import mostrar_notas_estudiante
 
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
