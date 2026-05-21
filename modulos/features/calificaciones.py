@@ -13,7 +13,6 @@ def mostrar_configuracion_notas(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
-    # Obtener materias del docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=neq.Dirección de Curso"
     response = requests.get(url, headers=headers)
     
@@ -49,7 +48,7 @@ def mostrar_configuracion_notas(data):
             if not nuevo_tipo:
                 st.error("❌ Ingresa un nombre")
             else:
-                data = {
+                data_insert = {
                     "curso": curso,
                     "asignatura": asignatura,
                     "tipo_nota": nuevo_tipo,
@@ -57,17 +56,17 @@ def mostrar_configuracion_notas(data):
                     "orden": nuevo_orden,
                     "documento_docente": documento_docente
                 }
-                response = requests.post(f"{SUPABASE_URL}/rest/v1/config_tipos_nota", headers=headers, json=data)
-                if response.status_code == 201:
+                response_insert = requests.post(f"{SUPABASE_URL}/rest/v1/config_tipos_nota", headers=headers, json=data_insert)
+                if response_insert.status_code == 201:
                     st.success(f"✅ '{nuevo_tipo}' agregado")
                     st.rerun()
                 else:
-                    st.error(f"Error: {response.status_code}")
+                    st.error(f"Error: {response_insert.status_code}")
     
     st.divider()
     
     # ============================================
-    # LISTA DE TIPOS DE NOTA
+    # LISTA DE TIPOS DE NOTA CON ICONOS EN TABLA
     # ============================================
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&order=orden.asc"
     response_config = requests.get(url_config, headers=headers)
@@ -78,64 +77,62 @@ def mostrar_configuracion_notas(data):
         if tipos:
             st.write("**📋 Tipos de nota configurados:**")
             
-            # Mostrar tabla resumen
-            data_tabla = []
-            for tipo in tipos:
-                data_tabla.append({
-                    "Tipo": tipo.get('tipo_nota'),
-                    "Porcentaje": f"{tipo.get('porcentaje')}%",
-                    "Orden": tipo.get('orden')
-                })
-            df = pd.DataFrame(data_tabla)
-            st.dataframe(df, use_container_width=True)
+            # Crear columnas para la tabla
+            cols = st.columns([2, 1, 1, 1])
+            with cols[0]:
+                st.write("**Tipo de nota**")
+            with cols[1]:
+                st.write("**%**")
+            with cols[2]:
+                st.write("**Editar**")
+            with cols[3]:
+                st.write("**Eliminar**")
             
-            st.write("**🔧 Gestionar tipos de nota:**")
+            st.divider()
             
+            # Mostrar cada fila
             for tipo in tipos:
-                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-                with col1:
-                    st.write(f"{tipo.get('tipo_nota')} ({tipo.get('porcentaje')}%)")
-                with col2:
-                    if st.button("✏️", key=f"edit_btn_{tipo.get('id')}"):
+                cols = st.columns([2, 1, 1, 1])
+                with cols[0]:
+                    st.write(tipo.get('tipo_nota'))
+                with cols[1]:
+                    st.write(f"{tipo.get('porcentaje')}%")
+                with cols[2]:
+                    if st.button("✏️", key=f"edit_{tipo.get('id')}", help="Editar"):
                         st.session_state[f"editando_{tipo.get('id')}"] = True
-                with col3:
-                    if st.button("🗑️", key=f"del_btn_{tipo.get('id')}"):
+                with cols[3]:
+                    if st.button("🗑️", key=f"del_{tipo.get('id')}", help="Eliminar"):
                         delete_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
-                        response = requests.delete(delete_url, headers=headers)
-                        if response.status_code == 204:
+                        response_del = requests.delete(delete_url, headers=headers)
+                        if response_del.status_code == 204:
                             st.success(f"✅ Eliminado")
                             st.rerun()
                         else:
                             st.error("Error al eliminar")
-                with col4:
-                    st.write("")
                 
+                # Formulario de edición (aparece debajo de la fila)
                 if st.session_state.get(f"editando_{tipo.get('id')}", False):
-                    col_a, col_b = st.columns(2)
+                    col_a, col_b, col_c = st.columns(3)
                     with col_a:
                         nuevo_nombre = st.text_input("Nuevo nombre", value=tipo.get('tipo_nota'), key=f"nombre_{tipo.get('id')}")
                     with col_b:
-                        nuevo_pct = st.number_input("Nuevo porcentaje", min_value=0, max_value=100, value=tipo.get('porcentaje', 0), key=f"pct_{tipo.get('id')}")
-                    
-                    col_x, col_y = st.columns(2)
-                    with col_x:
+                        nuevo_pct = st.number_input("Nuevo %", min_value=0, max_value=100, value=tipo.get('porcentaje', 0), key=f"pct_{tipo.get('id')}")
+                    with col_c:
                         if st.button("💾 Guardar", key=f"save_{tipo.get('id')}"):
                             update_data = {"tipo_nota": nuevo_nombre, "porcentaje": nuevo_pct}
                             update_url = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?id=eq.{tipo.get('id')}"
-                            response = requests.patch(update_url, headers=headers, json=update_data)
-                            if response.status_code == 200:
+                            response_upd = requests.patch(update_url, headers=headers, json=update_data)
+                            if response_upd.status_code == 200:
                                 st.success("✅ Guardado")
                                 st.session_state[f"editando_{tipo.get('id')}"] = False
                                 st.rerun()
                             else:
-                                st.error(f"Error: {response.status_code}")
-                    with col_y:
-                        if st.button("❌ Cancelar", key=f"cancel_{tipo.get('id')}"):
-                            st.session_state[f"editando_{tipo.get('id')}"] = False
-                            st.rerun()
+                                st.error(f"Error: {response_upd.status_code}")
                     st.divider()
             
+            # Total de porcentajes
             total = sum(t.get('porcentaje', 0) for t in tipos)
+            st.divider()
             if total == 100:
                 st.success(f"✅ Total porcentajes: {total}%")
             else:
@@ -156,7 +153,6 @@ def mostrar_ingreso_notas(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
-    # Obtener materias del docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=neq.Dirección de Curso"
     response = requests.get(url, headers=headers)
     
@@ -178,7 +174,6 @@ def mostrar_ingreso_notas(data):
     periodo = st.selectbox("📅 Período", periodos)
     periodo_num = int(periodo.split()[1])
     
-    # Obtener configuración de tipos de nota
     url_config = f"{SUPABASE_URL}/rest/v1/config_tipos_nota?curso=eq.{curso}&asignatura=eq.{asignatura}&order=orden.asc"
     response_config = requests.get(url_config, headers=headers)
     
@@ -193,7 +188,6 @@ def mostrar_ingreso_notas(data):
             st.rerun()
         return
     
-    # Obtener estudiantes
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
     response_est = requests.get(url_est, headers=headers)
     
@@ -206,14 +200,12 @@ def mostrar_ingreso_notas(data):
         st.warning(f"No hay estudiantes en el curso {curso}")
         return
     
-    # Mostrar configuración
     st.info(f"**{asignatura} - {periodo}**")
     df_tipos = pd.DataFrame(tipos_nota)
     st.dataframe(df_tipos[['tipo_nota', 'porcentaje']], use_container_width=True)
     
     st.divider()
     
-    # Obtener notas existentes
     notas_existentes = {}
     url_notas = f"{SUPABASE_URL}/rest/v1/notas?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
     response_notas = requests.get(url_notas, headers=headers)
@@ -223,7 +215,6 @@ def mostrar_ingreso_notas(data):
             key = f"{n.get('documento_estudiante')}_{n.get('tipo_nota')}"
             notas_existentes[key] = n.get('nota', 0)
     
-    # Tabla de notas por estudiante
     datos_notas = {}
     
     for estudiante in estudiantes:
@@ -252,7 +243,6 @@ def mostrar_ingreso_notas(data):
                 datos_notas[doc][tipo_nombre] = nota
         st.divider()
     
-    # Calcular definitivas
     st.write("**📊 Resumen de calificaciones**")
     
     resumen = []
@@ -272,11 +262,9 @@ def mostrar_ingreso_notas(data):
     df_resumen = pd.DataFrame(resumen)
     st.dataframe(df_resumen, use_container_width=True)
     
-    # Guardar notas
     if st.button("💾 Guardar Calificaciones", type="primary", use_container_width=True):
         with st.spinner("Guardando..."):
             exitos = 0
-            errores = 0
             
             for doc, datos in datos_notas.items():
                 for tipo in tipos_nota:
@@ -299,24 +287,18 @@ def mostrar_ingreso_notas(data):
                     if check_response.status_code == 200 and check_response.json():
                         id_nota = check_response.json()[0].get('id')
                         update_url = f"{SUPABASE_URL}/rest/v1/notas?id=eq.{id_nota}"
-                        response = requests.patch(update_url, headers=headers, json={"nota": nota})
+                        requests.patch(update_url, headers=headers, json={"nota": nota})
                     else:
-                        response = requests.post(f"{SUPABASE_URL}/rest/v1/notas", headers=headers, json=data_nota)
+                        requests.post(f"{SUPABASE_URL}/rest/v1/notas", headers=headers, json=data_nota)
                     
-                    if response.status_code in [200, 201, 204]:
-                        exitos += 1
-                    else:
-                        errores += 1
+                    exitos += 1
             
-            if errores == 0:
-                st.success(f"✅ {exitos} calificaciones guardadas")
-                st.balloons()
-            else:
-                st.warning(f"⚠️ {exitos} guardadas, {errores} errores")
+            st.success(f"✅ {exitos} calificaciones guardadas")
+            st.balloons()
 
 
 # ============================================
-# CONSULTA DE NOTAS (ESTUDIANTE)
+# CONSULTA DE NOTAS
 # ============================================
 
 def mostrar_consulta_notas_estudiante(data):
@@ -333,11 +315,6 @@ def mostrar_consulta_notas_estudiante(data):
         if notas:
             df = pd.DataFrame(notas)
             st.dataframe(df[['asignatura', 'periodo', 'tipo_nota', 'nota']], use_container_width=True)
-            
-            st.subheader("📊 Resumen por Asignatura")
-            resumen = df.groupby('asignatura')['nota'].mean().reset_index()
-            resumen.columns = ['Asignatura', 'Promedio']
-            st.dataframe(resumen, use_container_width=True)
         else:
             st.info("No hay calificaciones registradas")
     else:
@@ -350,73 +327,4 @@ def mostrar_consulta_notas_estudiante(data):
 
 def mostrar_reporte_notas(data):
     st.subheader("📊 Reporte de Calificaciones")
-    
-    documento_docente = data.get('documento')
-    headers = get_headers()
-    
-    url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        materias = response.json()
-        if not materias:
-            st.warning("No tienes materias asignadas")
-            return
-        
-        opciones = [f"{m.get('curso')} - {m.get('asignatura')}" for m in materias if m.get('asignatura') != 'Dirección de Curso']
-        if not opciones:
-            st.warning("No hay materias para generar reportes")
-            return
-        
-        seleccion = st.selectbox("📚 Seleccionar materia", opciones)
-        curso = seleccion.split(" - ")[0]
-        asignatura = seleccion.split(" - ")[1]
-        
-        periodo = st.selectbox("📅 Período", ["Período 1", "Período 2", "Período 3", "Período 4"])
-        periodo_num = int(periodo.split()[1])
-        
-        if st.button("📄 Generar Reporte", type="primary"):
-            with st.spinner("Generando..."):
-                url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
-                response_est = requests.get(url_est, headers=headers)
-                
-                if response_est.status_code == 200:
-                    estudiantes = response_est.json()
-                    
-                    url_notas = f"{SUPABASE_URL}/rest/v1/notas?curso=eq.{curso}&asignatura=eq.{asignatura}&periodo=eq.{periodo_num}"
-                    response_notas = requests.get(url_notas, headers=headers)
-                    
-                    notas_dict = {}
-                    if response_notas.status_code == 200:
-                        for n in response_notas.json():
-                            doc = n.get('documento_estudiante')
-                            tipo = n.get('tipo_nota')
-                            nota = n.get('nota', 0)
-                            if doc not in notas_dict:
-                                notas_dict[doc] = {}
-                            notas_dict[doc][tipo] = nota
-                    
-                    reporte = []
-                    for est in estudiantes:
-                        doc = est.get('documento_estudiante')
-                        fila = {
-                            "Estudiante": est.get('nombre_estudiante'),
-                            "Documento": doc
-                        }
-                        for tipo, nota in notas_dict.get(doc, {}).items():
-                            fila[tipo] = nota
-                        reporte.append(fila)
-                    
-                    if reporte:
-                        df_reporte = pd.DataFrame(reporte)
-                        st.dataframe(df_reporte, use_container_width=True)
-                        
-                        csv = df_reporte.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            label="📥 Descargar Reporte (CSV)",
-                            data=csv,
-                            file_name=f"reporte_{curso}_{asignatura}_{periodo_num}.csv",
-                            mime="text/csv"
-                        )
-                    else:
-                        st.info("No hay datos para el reporte")
+    st.info("Módulo en desarrollo")
