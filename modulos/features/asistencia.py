@@ -9,6 +9,10 @@ from utils import SUPABASE_URL, get_headers
 # ============================================
 
 def mostrar_asistencia_docente(data):
+    def mostrar_asistencia_docente(data):
+    st.write("🔍 Versión COMPACTA cargada")  # ← Línea de prueba
+    st.subheader("📋 Marcar Asistencia")
+    
     st.subheader("📋 Marcar Asistencia")
     
     documento_docente = data.get('documento')
