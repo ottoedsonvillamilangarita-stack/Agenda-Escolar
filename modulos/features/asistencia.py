@@ -167,53 +167,32 @@ def mostrar_asistencia_estudiante(data):
     df = pd.DataFrame(asistencias)
     df['fecha'] = pd.to_datetime(df['fecha'])
     
-    # Estadísticas detalladas
+    # Estadísticas compactas
     total = len(df)
     presentes = len(df[df['estado'] == 'Presente'])
-    retardos = len(df[df['estado'] == 'Retardo'])
-    
-    # Ausentes: justificados vs no justificados
     ausentes_total = len(df[df['estado'] == 'Ausente'])
     ausentes_justificados = len(df[(df['estado'] == 'Ausente') & (df['justificada'] == True)])
     ausentes_no_justificados = ausentes_total - ausentes_justificados
+    porcentaje = (presentes / total * 100) if total > 0 else 0
     
-    porcentaje_asistencia = (presentes / total * 100) if total > 0 else 0
+    # Tarjetas compactas
+    col1, col2, col3 = st.columns(3)
+    col1.metric("✅ Presentes", presentes)
+    col2.metric("📊 %", f"{porcentaje:.0f}%")
+    col3.metric("❌ Ausencias", ausentes_total)
     
-    # Tarjetas de estadísticas
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("✅ Presentes", presentes)
-        st.metric("⏰ Retardos", retardos)
-    with col2:
-        st.metric("📊 Asistencia", f"{porcentaje_asistencia:.0f}%")
-        st.metric("❌ Ausencias", ausentes_total)
+    if ausentes_no_justificados > 0:
+        st.warning(f"⚠️ Ausencias sin justificar: {ausentes_no_justificados}")
     
-    st.divider()
-    
-    # Detalle de ausencias justificadas vs no justificadas
-    st.write("**📋 Detalle de ausencias:**")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(f"📌 Justificadas: {ausentes_justificados}")
-    with col2:
-        st.warning(f"⚠️ No justificadas: {ausentes_no_justificados}")
-    
-    if ausentes_no_justificados > 3:
-        st.error(f"🚨 Alerta: {ausentes_no_justificados} ausencias sin justificar")
+    st.progress(porcentaje / 100)
     
     st.divider()
     
-    # Tabla de asistencia
-    st.write("**Registro detallado:**")
-    df_mostrar = df[['fecha', 'estado', 'justificada']].sort_values('fecha', ascending=False)
+    # Tabla compacta (solo fecha y estado)
+    st.write("**Registro:**")
+    df_mostrar = df[['fecha', 'estado']].sort_values('fecha', ascending=False)
     df_mostrar['fecha'] = df_mostrar['fecha'].dt.strftime('%d/%m')
-    df_mostrar['justificada'] = df_mostrar['justificada'].apply(lambda x: "✅" if x else "❌")
-    df_mostrar.columns = ['Fecha', 'Estado', 'Justif.']
     st.dataframe(df_mostrar, use_container_width=True)
-    
-    # Barra de progreso
-    st.progress(porcentaje_asistencia / 100)
-
 
 # ============================================
 # ACUDIENTE - VER ASISTENCIA DE HIJOS
@@ -293,14 +272,14 @@ def mostrar_asistencia_director(data):
     curso = response_dir.json()[0].get('curso')
     st.success(f"📌 Curso: {curso}")
     
-    # Botón para marcar asistencia (director también puede)
+    # Botón para marcar asistencia (compacto)
     if st.button("📋 Marcar Asistencia Hoy", use_container_width=True):
         mostrar_asistencia_docente(data)
         return
     
     st.divider()
     
-    # Seleccionar período
+    # Seleccionar período (mismo renglón)
     col1, col2 = st.columns(2)
     with col1:
         fecha_inicio = st.date_input("Desde")
@@ -317,43 +296,68 @@ def mostrar_asistencia_director(data):
         
         estudiantes = response_est.json()
         
+        # Cabecera compacta
+        st.markdown("---")
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+        with col1:
+            st.markdown("**Estudiante**")
+        with col2:
+            st.markdown("**Ausencias**")
+        with col3:
+            st.markdown("**Justif.**")
+        with col4:
+            st.markdown("**No Justif.**")
+        st.markdown("---")
+        
         reporte = []
         for estudiante in estudiantes:
             doc = estudiante.get('documento_estudiante')
-            nombre = estudiante.get('nombre_estudiante')
+            nombre = estudiante.get('nombre_estudiante')[:25]
             
             url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{doc}&fecha=gte.{fecha_inicio}&fecha=lte.{fecha_fin}"
             response_asist = requests.get(url_asist, headers=headers)
             
+            ausentes_total = 0
+            ausentes_justificados = 0
+            
             if response_asist.status_code == 200:
                 asistencias = response_asist.json()
-                total = len(asistencias)
-                presentes = len([a for a in asistencias if a['estado'] == 'Presente'])
                 ausentes_total = len([a for a in asistencias if a['estado'] == 'Ausente'])
                 ausentes_justificados = len([a for a in asistencias if a['estado'] == 'Ausente' and a.get('justificada', False)])
-                ausentes_no_justificados = ausentes_total - ausentes_justificados
-                porcentaje = (presentes / total * 100) if total > 0 else 0
-                
-                reporte.append({
-                    "Estudiante": nombre,
-                    "Presentes": presentes,
-                    "Ausencias": ausentes_total,
-                    "Justificadas": ausentes_justificados,
-                    "No Justif.": ausentes_no_justificados,
-                    "% Asist.": f"{porcentaje:.0f}"
-                })
+            
+            ausentes_no_justificados = ausentes_total - ausentes_justificados
+            
+            # Una fila por estudiante (compacta)
+            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+            with col1:
+                st.write(f"**{nombre}**")
+            with col2:
+                st.write(f"{ausentes_total}")
+            with col3:
+                st.write(f"✅ {ausentes_justificados}" if ausentes_justificados > 0 else "—")
+            with col4:
+                if ausentes_no_justificados > 0:
+                    st.warning(f"⚠️ {ausentes_no_justificados}")
+                else:
+                    st.write("—")
+            
+            reporte.append({
+                "Estudiante": nombre,
+                "Ausencias": ausentes_total,
+                "Justificadas": ausentes_justificados,
+                "No Justificadas": ausentes_no_justificados
+            })
         
-        if reporte:
-            df = pd.DataFrame(reporte)
-            st.dataframe(df, use_container_width=True)
-            
-            # Resaltar estudiantes con muchas ausencias
-            df_alerta = df[df['No Justif.'] > 3]
-            if not df_alerta.empty:
-                st.warning("🚨 Estudiantes con más de 3 ausencias sin justificar:")
-                st.dataframe(df_alerta[['Estudiante', 'No Justif.']], use_container_width=True)
-            
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar reporte", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
-        else:
-            st.info("No hay datos en el período seleccionado")
+        st.markdown("---")
+        
+        # Resaltar estudiantes con problemas
+        df = pd.DataFrame(reporte)
+        df_alerta = df[df['No Justificadas'] > 3]
+        if not df_alerta.empty:
+            st.error("🚨 Estudiantes con más de 3 ausencias sin justificar:")
+            for _, row in df_alerta.iterrows():
+                st.write(f"• {row['Estudiante']}: {row['No Justificadas']} ausencias sin justificar")
+        
+        # Botón de descarga
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Descargar reporte", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
