@@ -17,11 +17,12 @@ def mostrar_asistencia_docente(data):
 # ============================================
 
 def mostrar_asistencia_estudiante(data):
-    st.subheader("📋 Mi Asistencia")
+    st.subheader("📋 Reporte de Asistencia")
     
     documento = data.get('documento')
     headers = get_headers()
     
+    # Obtener todas las asistencias del estudiante
     url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{documento}"
     response = requests.get(url, headers=headers)
     
@@ -38,29 +39,97 @@ def mostrar_asistencia_estudiante(data):
     df = pd.DataFrame(asistencias)
     df['fecha'] = pd.to_datetime(df['fecha'])
     
-    total = len(df)
+    # ============================================
+    # ESTADÍSTICAS GENERALES
+    # ============================================
+    total_dias = len(df)
     presentes = len(df[df['estado'] == 'Presente'])
+    retardos = len(df[df['estado'] == 'Retardo'])
     ausentes_total = len(df[df['estado'] == 'Ausente'])
     ausentes_justificados = len(df[(df['estado'] == 'Ausente') & (df['justificada'] == True)])
     ausentes_no_justificados = ausentes_total - ausentes_justificados
-    porcentaje = (presentes / total * 100) if total > 0 else 0
+    porcentaje_asistencia = (presentes / total_dias * 100) if total_dias > 0 else 0
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric("✅ Presentes", presentes)
-    col2.metric("📊 %", f"{porcentaje:.0f}%")
-    col3.metric("❌ Ausencias", ausentes_total)
-    
-    if ausentes_no_justificados > 0:
-        st.warning(f"⚠️ Ausencias sin justificar: {ausentes_no_justificados}")
-    
-    st.progress(porcentaje / 100)
+    # Tarjetas de resumen
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("📊 Total días", total_dias)
+    col2.metric("✅ Presente", presentes)
+    col3.metric("⏰ Retardo", retardos)
+    col4.metric("📈 % Asistencia", f"{porcentaje_asistencia:.0f}%")
     
     st.divider()
     
-    st.write("**Registro:**")
-    df_mostrar = df[['fecha', 'estado']].sort_values('fecha', ascending=False)
-    df_mostrar['fecha'] = df_mostrar['fecha'].dt.strftime('%d/%m')
+    # ============================================
+    # REPORTE DE AUSENCIAS
+    # ============================================
+    st.subheader("📋 Reporte de Ausencias")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("❌ Total ausencias", ausentes_total)
+    with col2:
+        if ausentes_no_justificados > 0:
+            st.warning(f"⚠️ Sin justificar: {ausentes_no_justificados}")
+        else:
+            st.success(f"✅ Justificadas: {ausentes_justificados}")
+    
+    # Barra de progreso de ausencias
+    if ausentes_total > 0:
+        justificadas_pct = (ausentes_justificados / ausentes_total * 100) if ausentes_total > 0 else 0
+        st.progress(justificadas_pct / 100)
+        st.caption(f"📊 {justificadas_pct:.0f}% de las ausencias están justificadas")
+    
+    st.divider()
+    
+    # ============================================
+    # ALERTAS
+    # ============================================
+    if ausentes_no_justificados > 3:
+        st.error(f"🚨 ALERTA: Tienes {ausentes_no_justificados} ausencias sin justificar")
+        st.markdown("""
+        ⚠️ **Recomendación:** Justifica tus ausencias con el acudiente o director de curso.
+        """)
+    elif ausentes_no_justificados > 0:
+        st.warning(f"⚠️ Tienes {ausentes_no_justificados} ausencia(s) sin justificar")
+    
+    st.divider()
+    
+    # ============================================
+    # TABLA DETALLADA
+    # ============================================
+    st.write("**📅 Detalle de asistencia:**")
+    
+    df_mostrar = df[['fecha', 'estado', 'justificada']].sort_values('fecha', ascending=False)
+    df_mostrar['fecha'] = df_mostrar['fecha'].dt.strftime('%d/%m/%Y')
+    df_mostrar['justificada'] = df_mostrar['justificada'].apply(lambda x: "✅ Sí" if x else "❌ No")
+    df_mostrar.columns = ['Fecha', 'Estado', '¿Justificada?']
+    
     st.dataframe(df_mostrar, use_container_width=True)
+    
+    # ============================================
+    # GRÁFICA DE ASISTENCIA POR MES
+    # ============================================
+    st.subheader("📊 Evolución mensual")
+    
+    df['mes'] = df['fecha'].dt.strftime('%B')
+    resumen_mensual = df.groupby('mes').agg({
+        'estado': lambda x: (x == 'Presente').sum(),
+        'fecha': 'count'
+    }).rename(columns={'estado': 'presentes', 'fecha': 'total'})
+    resumen_mensual['porcentaje'] = (resumen_mensual['presentes'] / resumen_mensual['total'] * 100).round(0)
+    
+    st.dataframe(resumen_mensual[['porcentaje']].rename(columns={'porcentaje': '% Asistencia'}), use_container_width=True)
+    
+    # ============================================
+    # DESCARGA DE REPORTE
+    # ============================================
+    csv = df_mostrar.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        "📥 Descargar reporte de asistencia (CSV)",
+        data=csv,
+        file_name=f"mi_asistencia_{documento}.csv",
+        mime="text/csv"
+    )
 
 # ============================================
 # ACUDIENTE - VER ASISTENCIA DE HIJOS
