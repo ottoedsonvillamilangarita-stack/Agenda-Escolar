@@ -6,7 +6,6 @@ from modulos.features.calificaciones import mostrar_notas_acudiente
 def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
     
-    # data contiene: username, password_hash, rol, documento
     documento_acudiente = data.get('documento')
     
     st.write(f"Bienvenido, Acudiente")
@@ -14,39 +13,57 @@ def mostrar(data):
     
     headers = get_headers()
     
-    # Buscar los hijos de este acudiente en la tabla estudiantes
-    url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_acudiente=eq.{documento_acudiente}"
+    # ============================================
+    # MENÚ PRINCIPAL
+    # ============================================
+    st.divider()
+    st.subheader("📌 Funciones disponibles")
     
-    response = requests.get(url, headers=headers)
+    opcion = st.selectbox(
+        "Seleccionar función",
+        [
+            "👨‍👩‍👧 Mis Hijos",
+            "📖 Notas de mis hijos",
+            "📋 Asistencia",
+            "👤 Mi Perfil"
+        ]
+    )
     
-    if response.status_code == 200:
-        datos = response.json()
-        if datos:
-            st.success(f"✅ Acudiente encontrado con {len(datos)} hijo(s)")
-            
-            for hijo in datos:
-                with st.expander(f"📘 {hijo.get('nombre_estudiante', 'N/A')}"):
-                    st.write(f"**Nombre:** {hijo.get('nombre_estudiante', 'N/A')}")
-                    st.write(f"**Apellidos:** {hijo.get('apellidos_estudiante', 'N/A')}")
-                    st.write(f"**Curso:** {hijo.get('curso', 'N/A')}")
-                    st.write(f"**Parentesco:** {hijo.get('parentesco', 'N/A')}")
-                    st.write(f"**Teléfono:** {hijo.get('telefono_acudiente', 'N/A')}")
+    st.divider()
+    
+    # ============================================
+    # REDIRECCIÓN SEGÚN OPCIÓN
+    # ============================================
+    
+    if opcion == "👨‍👩‍👧 Mis Hijos":
+        # Mostrar lista de hijos
+        url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_acudiente=eq.{documento_acudiente}"
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            datos = response.json()
+            if datos:
+                st.success(f"✅ Acudiente encontrado con {len(datos)} hijo(s)")
+                
+                for hijo in datos:
+                    with st.expander(f"📘 {hijo.get('nombre_estudiante', 'N/A')}"):
+                        st.write(f"**Nombre:** {hijo.get('nombre_estudiante', 'N/A')}")
+                        st.write(f"**Apellidos:** {hijo.get('apellidos_estudiante', 'N/A')}")
+                        st.write(f"**Curso:** {hijo.get('curso', 'N/A')}")
+                        st.write(f"**Parentesco:** {hijo.get('parentesco', 'N/A')}")
+                        st.write(f"**Teléfono:** {hijo.get('telefono_acudiente', 'N/A')}")
+            else:
+                st.warning("No se encontraron hijos asociados a este acudiente")
         else:
-            st.warning("No se encontraron hijos asociados a este acudiente")
-    else:
-        st.error(f"Error {response.status_code}: {response.text}")
+            st.error(f"Error {response.status_code}: {response.text}")
     
-    st.subheader("📊 Seguimiento Académico")
-    st.write("Próximamente: Notas, asistencia y comunicados de tus hijos")
-opcion = st.selectbox(
-    "Seleccionar función",
-    [
-        "👨‍👩‍👧 Mis Hijos",
-        "📖 Notas de mis hijos",
-        "📋 Asistencia",
-        "👤 Mi Perfil"
-    ]
-)
-
-elif opcion == "📖 Notas de mis hijos":
-    mostrar_notas_acudiente(data)
+    elif opcion == "📖 Notas de mis hijos":
+        mostrar_notas_acudiente(data)
+    
+    elif opcion == "📋 Asistencia":
+        st.subheader("📋 Asistencia")
+        st.info("🚧 Módulo en desarrollo")
+    
+    elif opcion == "👤 Mi Perfil":
+        st.subheader("👤 Mi Perfil")
+        st.info("🚧 Módulo en desarrollo")
