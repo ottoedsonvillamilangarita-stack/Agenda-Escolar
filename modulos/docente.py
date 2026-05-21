@@ -91,7 +91,7 @@ def mostrar(data):
     elif opcion_menu == "⚙️ Configurar Notas":
         mostrar_configuracion_notas(data)
     elif opcion_menu == "📋 Asistencia":
-        mostrar_asistencia()
+        mostrar_asistencia_docente(data)
     elif opcion_menu == "📊 Reportes":
         mostrar_reportes()
     elif opcion_menu == "🤝 Convivencia":
