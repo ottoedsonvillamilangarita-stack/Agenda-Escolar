@@ -347,3 +347,81 @@ def mostrar_horario_semanal_detallado(curso, headers):
                             st.write(f"📌 {clase['salon']}")
     except Exception as e:
         st.info("No hay horario configurado para este curso")
+
+def mostrar_horario_curso_tabla(curso, headers):
+    """Muestra el horario completo de un curso en formato tabla"""
+    
+    # Obtener nivel del curso
+    url_nivel = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&select=nivel_id&limit=1"
+    response_nivel = requests.get(url_nivel, headers=headers)
+    
+    if response_nivel.status_code != 200 or not response_nivel.json():
+        st.info(f"No hay horario configurado para el curso {curso}")
+        return
+    
+    nivel_id = response_nivel.json()[0].get('nivel_id')
+    
+    # Obtener configuración del nivel
+    url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
+    response_config = requests.get(url_config, headers=headers)
+    
+    if response_config.status_code != 200 or not response_config.json():
+        st.info("No hay configuración de jornada para este nivel")
+        return
+    
+    config = response_config.json()[0]
+    dias_laborales = config.get('dias_laborales', [1,2,3,4,5])
+    num_clases = config.get('num_clases_por_dia', 6)
+    hora_inicio = parse_hora(config.get('hora_inicio_jornada', '07:00'))
+    duracion = config.get('duracion_clase_minutos', 50)
+    
+    # Calcular todas las horas
+    horas = []
+    hoy = datetime.now().date()
+    for orden in range(1, num_clases + 1):
+        minutos_desde_inicio = (orden - 1) * duracion
+        hora_inicio_dt = datetime.combine(hoy, hora_inicio) + pd.Timedelta(minutes=minutos_desde_inicio)
+        hora_fin_dt = hora_inicio_dt + pd.Timedelta(minutes=duracion)
+        horas.append(f"{hora_inicio_dt.strftime('%H:%M')} - {hora_fin_dt.strftime('%H:%M')}")
+    
+    # Obtener horario base del curso
+    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+    response_horario = requests.get(url_horario, headers=headers)
+    
+    if response_horario.status_code != 200:
+        st.info("No hay horario configurado")
+        return
+    
+    horarios = response_horario.json()
+    
+    # Crear mapa de horario
+    dias_map = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
+    
+    # Crear matriz de horario
+    matriz = {}
+    for dia in dias_laborales:
+        matriz[dias_map[dia]] = {}
+        for hora in horas:
+            matriz[dias_map[dia]][hora] = "—"
+    
+    # Llenar matriz con datos
+    for clase in horarios:
+        dia = dias_map.get(clase.get('dia_semana'), "Lunes")
+        orden = clase.get('orden_clase', 1)
+        if 1 <= orden <= len(horas):
+            hora = horas[orden - 1]
+            matriz[dia][hora] = f"{clase.get('asignatura', 'Sin asignar')}\n📌 {clase.get('salon', 'N/A')}"
+    
+    # Crear DataFrame para mostrar
+    data = []
+    for hora in horas:
+        fila = {"Horario": hora}
+        for dia in dias_map.values():
+            if dia in matriz:
+                fila[dia] = matriz[dia].get(hora, "—")
+            else:
+                fila[dia] = "—"
+        data.append(fila)
+    
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True)
