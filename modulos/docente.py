@@ -5,7 +5,7 @@ from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_configuracion_notas, mostrar_ingreso_notas
 from modulos.features.asistencia import mostrar_asistencia_docente
 from modulos.features.reportes import mostrar_reportes_docente
-from modulos.features.horarios import mostrar_horario_semanal_detallado
+from modulos.features.horarios import mostrar_horario_docente_tabla
 
 def mostrar(data):
     st.title("👨‍🏫 Panel del Docente")
@@ -36,17 +36,11 @@ def mostrar(data):
         for d in direcciones:
             st.info(f"📌 Curso: {d.get('curso')}")
     
-    # Horario personal del docente
+    # ============================================
+    # HORARIO PERSONAL DEL DOCENTE (tabla)
+    # ============================================
     st.subheader("📅 Mi Horario Semanal")
-    
-    cursos_docente = list(set([a.get('curso') for a in asignaciones if a.get('curso')]))
-    
-    if cursos_docente:
-        for curso in cursos_docente:
-            with st.expander(f"📖 Curso {curso}"):
-                mostrar_horario_semanal_detallado(curso, headers)
-    else:
-        st.info("No hay horario asignado")
+    mostrar_horario_docente_tabla(documento_docente, headers)
     
     st.divider()
     st.subheader("📌 Funciones disponibles")
