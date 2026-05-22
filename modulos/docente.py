@@ -5,6 +5,7 @@ from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_configuracion_notas, mostrar_ingreso_notas
 from modulos.features.asistencia import mostrar_asistencia_docente
 from modulos.features.reportes import mostrar_reportes_docente
+from modulos.features.horarios import mostrar_horario_semanal_detallado
 
 def mostrar(data):
     st.title("👨‍🏫 Panel del Docente")
@@ -14,6 +15,7 @@ def mostrar(data):
     
     headers = get_headers()
     
+    # Obtener asignaciones
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
     response = requests.get(url, headers=headers)
     
@@ -27,11 +29,24 @@ def mostrar(data):
         st.warning("No tienes asignaciones académicas")
         return
     
+    # Mostrar si es director
     direcciones = [a for a in asignaciones if a.get('asignatura') == 'Dirección de Curso']
     if direcciones:
         st.success("🎓 Eres Director de Curso")
         for d in direcciones:
             st.info(f"📌 Curso: {d.get('curso')}")
+    
+    # ============================================
+    # HORARIO SEMANAL para cada curso que dicta
+    # ============================================
+    cursos_docente = list(set([a.get('curso') for a in asignaciones if a.get('curso')]))
+    
+    if cursos_docente:
+        st.subheader("📅 Mi Horario Semanal")
+        
+        for curso in cursos_docente:
+            with st.expander(f"📖 Curso {curso}"):
+                mostrar_horario_semanal_detallado(curso, headers)
     
     st.divider()
     st.subheader("📌 Funciones disponibles")
@@ -64,15 +79,8 @@ def mostrar(data):
         mostrar_asistencia_docente(data)
     elif opcion_menu == "📊 Reportes":
         mostrar_reportes_docente(data)
-    elif opcion_menu == "🤝 Convivencia":
+    else:
         st.info("🚧 Módulo en desarrollo")
-    elif opcion_menu == "✏️ Evaluaciones":
-        st.info("🚧 Módulo en desarrollo")
-    elif opcion_menu == "💬 Mensajes":
-        st.info("🚧 Módulo en desarrollo")
-    elif opcion_menu == "📈 Mi Rendimiento":
-        st.info("🚧 Módulo en desarrollo")
-
 
 def mostrar_mis_cursos(asignaciones):
     st.subheader("📚 Mis Cursos")
