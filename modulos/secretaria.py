@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
+from modulos.features.horarios import mostrar_horario_semanal_detallado
 
 def mostrar(data):
     st.title("📋 Panel de Secretaria")
@@ -81,7 +82,8 @@ def mostrar(data):
         gestion_documentacion()
     elif st.session_state.secretaria_funcion == "comunicados":
         gestion_comunicados()
-
+    elif opcion == "📅 Consultar Horarios":
+    mostrar_consultar_horarios(data)
 def mostrar_dashboard():
     st.subheader("📊 Dashboard Secretaria")
     
