@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
 from modulos.features.horarios import mostrar_horario_semanal_detallado
+from modulos.features.horarios import mostrar_horario_curso_tabla
 
 def mostrar(data):
     st.title("📋 Panel de Coordinador")
@@ -93,6 +94,7 @@ def consultar_horarios():
         
         if st.button("Ver horario", type="primary"):
             mostrar_horario_semanal_detallado(curso, headers)
+            mostrar_horario_curso_tabla(curso, headers)
     
     else:
         url = f"{SUPABASE_URL}/rest/v1/docentes"
