@@ -4,6 +4,7 @@ import pandas as pd
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_curso
 from modulos.features.asistencia import mostrar_asistencia_director
+from modulos.features.horarios import mostrar_horario_semanal_detallado
 
 def mostrar(data):
     st.title("🧭 Director de Grupo")
@@ -13,29 +14,29 @@ def mostrar(data):
     
     headers = get_headers()
     
-    # Buscar curso que dirige
+    # Obtener curso que dirige
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
     response = requests.get(url, headers=headers)
     
-    if response.status_code != 200:
-        st.error("Error al cargar la información")
-        return
-    
-    direccion = response.json()
-    
-    if not direccion:
+    if response.status_code != 200 or not response.json():
         st.warning("No eres director de ningún curso")
         return
     
-    curso_dirige = direccion[0].get('curso')
+    curso_dirige = response.json()[0].get('curso')
     st.success(f"🎓 Director del curso: **{curso_dirige}**")
+    
+    # ============================================
+    # HORARIO SEMANAL del curso
+    # ============================================
+    st.subheader("📅 Horario Semanal del Curso")
+    mostrar_horario_semanal_detallado(curso_dirige, headers)
+    
+    st.divider()
     
     # Pestañas
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Estudiantes", "📖 Notas del Curso", "📋 Asistencia", "📊 Reportes"])
     
     with tab1:
-        st.subheader(f"📋 Estudiantes del Curso {curso_dirige}")
-        
         url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso_dirige}"
         response_est = requests.get(url_est, headers=headers)
         
