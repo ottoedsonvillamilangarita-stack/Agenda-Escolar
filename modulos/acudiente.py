@@ -9,6 +9,8 @@ def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
     
     documento_acudiente = data.get('documento')
+    st.write(f"Bienvenido, Acudiente")
+    
     headers = get_headers()
     
     # Obtener hijos
@@ -21,16 +23,23 @@ def mostrar(data):
         if hijos:
             st.success(f"✅ Acudiente con {len(hijos)} hijo(s)")
             
-            # ============================================
-            # HORARIO SEMANAL para cada hijo
-            # ============================================
-            for hijo in hijos:
+            # Horario semanal
+            if len(hijos) == 1:
+                hijo = hijos[0]
                 curso = hijo.get('curso')
                 nombre = hijo.get('nombre_estudiante')
-                
-                with st.expander(f"📘 {nombre} - Curso {curso}"):
-                    st.subheader("📅 Horario Semanal")
-                    mostrar_horario_semanal_detallado(curso, headers)
+                st.subheader(f"📅 Horario Semanal - {nombre}")
+                mostrar_horario_semanal_detallado(curso, headers)
+            else:
+                hijo_seleccionado = st.selectbox(
+                    "Seleccionar hijo",
+                    [f"{h.get('nombre_estudiante')} - {h.get('curso')}" for h in hijos]
+                )
+                idx = [f"{h.get('nombre_estudiante')} - {h.get('curso')}" for h in hijos].index(hijo_seleccionado)
+                curso = hijos[idx].get('curso')
+                nombre = hijos[idx].get('nombre_estudiante')
+                st.subheader(f"📅 Horario Semanal - {nombre}")
+                mostrar_horario_semanal_detallado(curso, headers)
         else:
             st.info("No hay hijos asociados")
     
