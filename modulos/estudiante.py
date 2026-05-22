@@ -5,7 +5,6 @@ from datetime import datetime
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_estudiante
 from modulos.features.asistencia import mostrar_asistencia_estudiante
-from modulos.features.horarios import mostrar_horario_semanal_detallado
 from modulos.features.horarios import mostrar_horario_curso_tabla
 
 
