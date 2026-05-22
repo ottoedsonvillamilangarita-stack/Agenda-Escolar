@@ -3,9 +3,7 @@ import requests
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_acudiente
 from modulos.features.asistencia import mostrar_asistencia_acudiente
-from modulos.features.horarios import mostrar_horario_semanal_detallado
-from modulos.features.horarios import mostrar_horario_curso_tabla
-
+from modulos.features.horarios import mostrar_horario_tabla
 
 def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
@@ -31,7 +29,7 @@ def mostrar(data):
                 curso = hijo.get('curso')
                 nombre = hijo.get('nombre_estudiante')
                 st.subheader(f"📅 Horario Semanal - {nombre}")
-                mostrar_horario_curso_tabla(curso, headers)
+                mostrar_horario_tabla(curso, headers)
             else:
                 hijo_seleccionado = st.selectbox(
                     "Seleccionar hijo",
@@ -41,7 +39,7 @@ def mostrar(data):
                 curso = hijos[idx].get('curso')
                 nombre = hijos[idx].get('nombre_estudiante')
                 st.subheader(f"📅 Horario Semanal - {nombre}")
-                mostrar_horario_semanal_detallado(curso, headers)
+                mostrar_horario_tabla(curso, headers)
         else:
             st.info("No hay hijos asociados")
     
