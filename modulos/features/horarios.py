@@ -58,6 +58,12 @@ def configurar_jornada_nivel(headers):
     
     if response_config.status_code == 200 and response_config.json():
         config = response_config.json()[0]
+        hora_inicio_str = config.get('hora_inicio_jornada', '07:00')
+        # Si es string, convertir a objeto time
+        if isinstance(hora_inicio_str, str):
+            hora_inicio_default = datetime.strptime(hora_inicio_str, '%H:%M:%S').time()
+        else:
+            hora_inicio_default = hora_inicio_str
     else:
         config = {
             "dias_laborales": [1,2,3,4,5],
@@ -66,6 +72,7 @@ def configurar_jornada_nivel(headers):
             "hora_inicio_jornada": "07:00",
             "horario_rotativo": False
         }
+        hora_inicio_default = datetime.strptime('07:00', '%H:%M').time()
     
     dias_opciones = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
@@ -84,7 +91,7 @@ def configurar_jornada_nivel(headers):
         duracion_clase = st.number_input("Duración (minutos)", min_value=30, max_value=120, 
                                           value=config.get('duracion_clase_minutos', 50), step=5)
     with col3:
-        hora_inicio = st.time_input("Hora inicio", value=datetime.strptime(config.get('hora_inicio_jornada', '07:00'), '%H:%M').time())
+        hora_inicio = st.time_input("Hora inicio", value=hora_inicio_default)
     
     horario_rotativo = st.checkbox("Horario rotativo", value=config.get('horario_rotativo', False))
     
@@ -107,7 +114,6 @@ def configurar_jornada_nivel(headers):
         
         st.success("✅ Configuración guardada")
         st.rerun()
-
 
 def configurar_horario_curso(headers):
     st.subheader("📅 Configurar Horario por Curso")
@@ -308,17 +314,22 @@ def obtener_horario_dia(curso, fecha, headers):
     
     clases = response_horario.json()
     
-    # Calcular horas
-    hora_inicio = datetime.strptime(config['hora_inicio_jornada'], '%H:%M')
+    # Procesar hora inicio
+    hora_inicio_str = config.get('hora_inicio_jornada', '07:00')
+    if isinstance(hora_inicio_str, str):
+        hora_inicio = datetime.strptime(hora_inicio_str, '%H:%M:%S').time()
+        hora_inicio_dt = datetime.combine(fecha, hora_inicio)
+    else:
+        hora_inicio_dt = datetime.combine(fecha, hora_inicio_str)
+    
     duracion = config['duracion_clase_minutos']
     
     for idx, clase in enumerate(clases):
-        hora_clase = hora_inicio + pd.Timedelta(minutes=idx * duracion)
+        hora_clase = hora_inicio_dt + pd.Timedelta(minutes=idx * duracion)
         clase['hora_inicio'] = hora_clase.strftime('%H:%M')
         clase['hora_fin'] = (hora_clase + pd.Timedelta(minutes=duracion)).strftime('%H:%M')
     
     return clases
-
 
 def mostrar_horario_estudiante(data):
     st.subheader("📅 Mi Horario")
