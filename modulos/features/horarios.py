@@ -490,3 +490,114 @@ def mostrar_horario_director(data):
         with col4:
             st.write(f"📌 {clase.get('salon', 'N/A')}")
         st.divider()
+def obtener_horario_semanal(curso, headers):
+    """Obtiene el horario completo de la semana para un curso"""
+    
+    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
+    
+    # Obtener nivel del curso
+    url_nivel = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&select=nivel_id&limit=1"
+    response_nivel = requests.get(url_nivel, headers=headers)
+    
+    if response_nivel.status_code != 200 or not response_nivel.json():
+        return {}
+    
+    nivel_id = response_nivel.json()[0].get('nivel_id')
+    
+    # Obtener configuración del nivel
+    url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
+    response_config = requests.get(url_config, headers=headers)
+    
+    if response_config.status_code != 200 or not response_config.json():
+        return {}
+    
+    config = response_config.json()[0]
+    dias_laborales = config.get('dias_laborales', [1,2,3,4,5])
+    num_clases = config.get('num_clases_por_dia', 6)
+    hora_inicio = datetime.strptime(config['hora_inicio_jornada'], '%H:%M')
+    duracion = config['duracion_clase_minutos']
+    
+    # Obtener todo el horario base del curso
+    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+    response_horario = requests.get(url_horario, headers=headers)
+    
+    if response_horario.status_code != 200:
+        return {}
+    
+    horarios = response_horario.json()
+    
+    # Organizar por día
+    horario_semanal = {}
+    for dia in dias_laborales:
+        horario_semanal[dias[dia]] = []
+        clases_dia = [h for h in horarios if h['dia_semana'] == dia]
+        
+        for clase in clases_dia:
+            hora_clase = hora_inicio + pd.Timedelta(minutes=(clase['orden_clase'] - 1) * duracion)
+            horario_semanal[dias[dia]].append({
+                "orden": clase['orden_clase'],
+                "hora_inicio": hora_clase.strftime('%H:%M'),
+                "hora_fin": (hora_clase + pd.Timedelta(minutes=duracion)).strftime('%H:%M'),
+                "asignatura": clase['asignatura'],
+                "salon": clase.get('salon', 'N/A')
+            })
+    
+    return horario_semanal
+
+
+def mostrar_horario_semanal(curso, headers, titulo="📅 Horario Semanal"):
+    """Muestra el horario semanal en formato tabla"""
+    
+    horario_semanal = obtener_horario_semanal(curso, headers)
+    
+    if not horario_semanal:
+        st.info("No hay horario configurado")
+        return
+    
+    # Crear tabla en formato columnas
+    dias = list(horario_semanal.keys())
+    
+    # Encabezados
+    cols = st.columns(len(dias))
+    for idx, dia in enumerate(dias):
+        with cols[idx]:
+            st.markdown(f"**{dia}**")
+    
+    # Encontrar el número máximo de clases por día
+    max_clases = max([len(horario_semanal[dia]) for dia in dias]) if dias else 0
+    
+    # Mostrar filas
+    for fila in range(max_clases):
+        cols = st.columns(len(dias))
+        for idx, dia in enumerate(dias):
+            with cols[idx]:
+                if fila < len(horario_semanal[dia]):
+                    clase = horario_semanal[dia][fila]
+                    st.write(f"**{clase['hora_inicio']}**")
+                    st.write(f"{clase['asignatura']}")
+                    st.caption(f"📌 {clase['salon']}")
+                else:
+                    st.write("")
+
+
+def mostrar_horario_semanal_detallado(curso, headers, titulo="📅 Horario Semanal"):
+    """Muestra el horario semanal en formato expandible por día"""
+    
+    horario_semanal = obtener_horario_semanal(curso, headers)
+    
+    if not horario_semanal:
+        st.info("No hay horario configurado")
+        return
+    
+    for dia, clases in horario_semanal.items():
+        if clases:
+            with st.expander(f"📅 {dia}"):
+                for clase in clases:
+                    col1, col2, col3 = st.columns([2, 3, 1])
+                    with col1:
+                        st.write(f"**{clase['hora_inicio']} - {clase['hora_fin']}**")
+                    with col2:
+                        st.write(clase['asignatura'])
+                    with col3:
+                        st.write(f"📌 {clase['salon']}")
+                st.divider()
