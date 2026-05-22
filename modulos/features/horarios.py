@@ -9,7 +9,7 @@ from utils import SUPABASE_URL, get_headers
 # ============================================
 
 def parse_hora(hora_str):
-    """Convierte string de hora a objeto time, manejando diferentes formatos"""
+    """Convierte string de hora a objeto time"""
     if isinstance(hora_str, time):
         return hora_str
     if isinstance(hora_str, str):
@@ -58,7 +58,7 @@ def configurar_jornada_nivel(headers):
     niveles = response_niveles.json()
     
     if not niveles:
-        st.warning("No hay niveles configurados. Crea uno primero.")
+        st.warning("No hay niveles configurados")
         return
     
     nivel_nombres = [n['nombre'] for n in niveles]
@@ -138,6 +138,7 @@ def configurar_horario_curso(headers):
     nivel_curso = st.selectbox("Nivel", [n['nombre'] for n in niveles], key="nivel_curso")
     nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_curso)
     
+    # Obtener configuración del nivel
     url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
     response_config = requests.get(url_config, headers=headers)
     
@@ -149,10 +150,12 @@ def configurar_horario_curso(headers):
         st.warning("Primero configura la jornada para este nivel")
         return
     
+    # Obtener horario actual
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
     response_horario = requests.get(url_horario, headers=headers)
     horarios = response_horario.json() if response_horario.status_code == 200 else []
     
+    # Obtener docentes
     response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     docentes = response_docentes.json() if response_docentes.status_code == 200 else []
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
@@ -264,99 +267,18 @@ def gestion_horarios_admin(data):
 
 
 # ============================================
-# VISUALIZACIÓN DE HORARIO
+# VISUALIZACIÓN DE HORARIO - PARA TODOS LOS PERFILES
 # ============================================
 
-def obtener_horario_semanal(curso, headers):
-    """Obtiene el horario completo de la semana para un curso"""
-    
-    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
-    
-    url_nivel = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&select=nivel_id&limit=1"
-    response_nivel = requests.get(url_nivel, headers=headers)
-    
-    if response_nivel.status_code != 200 or not response_nivel.json():
-        return {}
-    
-    nivel_id = response_nivel.json()[0].get('nivel_id')
-    
-    url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
-    response_config = requests.get(url_config, headers=headers)
-    
-    if response_config.status_code != 200 or not response_config.json():
-        return {}
-    
-    config = response_config.json()[0]
-    dias_laborales = config.get('dias_laborales', [1,2,3,4,5])
-    hora_inicio = parse_hora(config.get('hora_inicio_jornada', '07:00'))
-    duracion = config.get('duracion_clase_minutos', 50)
-    
-    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
-    response_horario = requests.get(url_horario, headers=headers)
-    
-    if response_horario.status_code != 200:
-        return {}
-    
-    horarios = response_horario.json()
-    
-    horario_semanal = {}
-    hoy = datetime.now().date()
-    
-    for dia in dias_laborales:
-        horario_semanal[dias[dia]] = []
-        clases_dia = [h for h in horarios if h['dia_semana'] == dia]
-        clases_dia.sort(key=lambda x: x.get('orden_clase', 0))
-        
-        for clase in clases_dia:
-            orden = clase.get('orden_clase', 1)
-            minutos_desde_inicio = (orden - 1) * duracion
-            hora_inicio_dt = datetime.combine(hoy, hora_inicio) + pd.Timedelta(minutes=minutos_desde_inicio)
-            hora_fin_dt = hora_inicio_dt + pd.Timedelta(minutes=duracion)
-            
-            horario_semanal[dias[dia]].append({
-                "orden": orden,
-                "hora_inicio": hora_inicio_dt.strftime('%H:%M'),
-                "hora_fin": hora_fin_dt.strftime('%H:%M'),
-                "asignatura": clase.get('asignatura', 'Sin asignar'),
-                "salon": clase.get('salon', 'N/A')
-            })
-    
-    return horario_semanal
-
-
-def mostrar_horario_semanal_detallado(curso, headers):
-    """Muestra el horario semanal en formato expandible por día"""
-    
-    try:
-        horario_semanal = obtener_horario_semanal(curso, headers)
-        
-        if not horario_semanal:
-            st.info("No hay horario configurado para este curso")
-            return
-        
-        for dia, clases in horario_semanal.items():
-            if clases:
-                with st.expander(f"📅 {dia}"):
-                    for clase in clases:
-                        col1, col2, col3 = st.columns([2, 3, 1])
-                        with col1:
-                            st.write(f"**{clase['hora_inicio']} - {clase['hora_fin']}**")
-                        with col2:
-                            st.write(clase['asignatura'])
-                        with col3:
-                            st.write(f"📌 {clase['salon']}")
-    except Exception as e:
-        st.info("No hay horario configurado para este curso")
-
-def mostrar_horario_curso_tabla(curso, headers):
-    """Muestra el horario completo de un curso en formato tabla"""
+def mostrar_horario_tabla(curso, headers, titulo="📅 Horario Semanal"):
+    """Muestra el horario de un curso en formato tabla"""
     
     # Obtener nivel del curso
     url_nivel = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&select=nivel_id&limit=1"
     response_nivel = requests.get(url_nivel, headers=headers)
     
     if response_nivel.status_code != 200 or not response_nivel.json():
-        st.info(f"No hay horario configurado para el curso {curso}")
+        st.info(f"No hay horario configurado para {curso}")
         return
     
     nivel_id = response_nivel.json()[0].get('nivel_id')
@@ -366,7 +288,7 @@ def mostrar_horario_curso_tabla(curso, headers):
     response_config = requests.get(url_config, headers=headers)
     
     if response_config.status_code != 200 or not response_config.json():
-        st.info("No hay configuración de jornada para este nivel")
+        st.info("No hay configuración de jornada")
         return
     
     config = response_config.json()[0]
@@ -375,16 +297,16 @@ def mostrar_horario_curso_tabla(curso, headers):
     hora_inicio = parse_hora(config.get('hora_inicio_jornada', '07:00'))
     duracion = config.get('duracion_clase_minutos', 50)
     
-    # Calcular todas las horas
-    horas = []
+    # Calcular horas
     hoy = datetime.now().date()
+    horas = []
     for orden in range(1, num_clases + 1):
-        minutos_desde_inicio = (orden - 1) * duracion
-        hora_inicio_dt = datetime.combine(hoy, hora_inicio) + pd.Timedelta(minutes=minutos_desde_inicio)
-        hora_fin_dt = hora_inicio_dt + pd.Timedelta(minutes=duracion)
-        horas.append(f"{hora_inicio_dt.strftime('%H:%M')} - {hora_fin_dt.strftime('%H:%M')}")
+        minutos = (orden - 1) * duracion
+        inicio = datetime.combine(hoy, hora_inicio) + pd.Timedelta(minutes=minutos)
+        fin = inicio + pd.Timedelta(minutes=duracion)
+        horas.append(f"{inicio.strftime('%H:%M')} - {fin.strftime('%H:%M')}")
     
-    # Obtener horario base del curso
+    # Obtener horario del curso
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
     response_horario = requests.get(url_horario, headers=headers)
     
@@ -394,33 +316,128 @@ def mostrar_horario_curso_tabla(curso, headers):
     
     horarios = response_horario.json()
     
-    # Crear mapa de horario
-    dias_map = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
+    # Días
+    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes"}
     
-    # Crear matriz de horario
+    # Crear matriz
     matriz = {}
-    for dia in dias_laborales:
-        matriz[dias_map[dia]] = {}
+    for dia in dias.values():
+        matriz[dia] = {}
         for hora in horas:
-            matriz[dias_map[dia]][hora] = "—"
+            matriz[dia][hora] = "—"
     
-    # Llenar matriz con datos
+    # Llenar matriz
     for clase in horarios:
-        dia = dias_map.get(clase.get('dia_semana'), "Lunes")
+        dia = dias.get(clase.get('dia_semana'), "Lunes")
         orden = clase.get('orden_clase', 1)
         if 1 <= orden <= len(horas):
             hora = horas[orden - 1]
-            matriz[dia][hora] = f"{clase.get('asignatura', 'Sin asignar')}\n📌 {clase.get('salon', 'N/A')}"
+            matriz[dia][hora] = f"{clase.get('asignatura', '?')}\n📌 {clase.get('salon', '?')}"
     
-    # Crear DataFrame para mostrar
+    # Crear DataFrame
     data = []
     for hora in horas:
         fila = {"Horario": hora}
-        for dia in dias_map.values():
-            if dia in matriz:
-                fila[dia] = matriz[dia].get(hora, "—")
-            else:
-                fila[dia] = "—"
+        for dia in dias.values():
+            fila[dia] = matriz[dia].get(hora, "—")
+        data.append(fila)
+    
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True)
+
+
+def mostrar_horario_docente_tabla(documento_docente, headers):
+    """Muestra el horario personal del docente en formato tabla"""
+    
+    # Obtener cursos del docente
+    url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        st.info("No hay horario asignado")
+        return
+    
+    asignaciones = response.json()
+    cursos_docente = list(set([a.get('curso') for a in asignaciones if a.get('curso')]))
+    
+    if not cursos_docente:
+        st.info("No hay cursos asignados")
+        return
+    
+    # Tomar el primer curso para obtener la configuración de horario
+    primer_curso = cursos_docente[0]
+    
+    # Obtener configuración
+    url_nivel = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{primer_curso}&select=nivel_id&limit=1"
+    response_nivel = requests.get(url_nivel, headers=headers)
+    
+    if response_nivel.status_code != 200 or not response_nivel.json():
+        st.info("No hay configuración de horario")
+        return
+    
+    nivel_id = response_nivel.json()[0].get('nivel_id')
+    
+    url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
+    response_config = requests.get(url_config, headers=headers)
+    
+    if response_config.status_code != 200 or not response_config.json():
+        st.info("No hay configuración de jornada")
+        return
+    
+    config = response_config.json()[0]
+    num_clases = config.get('num_clases_por_dia', 6)
+    hora_inicio = parse_hora(config.get('hora_inicio_jornada', '07:00'))
+    duracion = config.get('duracion_clase_minutos', 50)
+    
+    # Calcular horas
+    hoy = datetime.now().date()
+    horas = []
+    for orden in range(1, num_clases + 1):
+        minutos = (orden - 1) * duracion
+        inicio = datetime.combine(hoy, hora_inicio) + pd.Timedelta(minutes=minutos)
+        fin = inicio + pd.Timedelta(minutes=duracion)
+        horas.append(f"{inicio.strftime('%H:%M')} - {fin.strftime('%H:%M')}")
+    
+    # Obtener todas las clases del docente
+    clases_docente = []
+    for curso in cursos_docente:
+        url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&documento_docente=eq.{documento_docente}"
+        response_horario = requests.get(url_horario, headers=headers)
+        
+        if response_horario.status_code == 200:
+            for clase in response_horario.json():
+                clases_docente.append({
+                    "dia": clase.get('dia_semana'),
+                    "orden": clase.get('orden_clase'),
+                    "asignatura": clase.get('asignatura'),
+                    "curso": curso,
+                    "salon": clase.get('salon', 'N/A')
+                })
+    
+    # Días
+    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes"}
+    
+    # Crear matriz
+    matriz = {}
+    for dia in dias.values():
+        matriz[dia] = {}
+        for hora in horas:
+            matriz[dia][hora] = "—"
+    
+    # Llenar matriz
+    for clase in clases_docente:
+        dia = dias.get(clase['dia'], "Lunes")
+        orden = clase['orden']
+        if 1 <= orden <= len(horas):
+            hora = horas[orden - 1]
+            matriz[dia][hora] = f"{clase['asignatura']} ({clase['curso']})\n📌 {clase['salon']}"
+    
+    # Crear DataFrame
+    data = []
+    for hora in horas:
+        fila = {"Horario": hora}
+        for dia in dias.values():
+            fila[dia] = matriz[dia].get(hora, "—")
         data.append(fila)
     
     df = pd.DataFrame(data)
