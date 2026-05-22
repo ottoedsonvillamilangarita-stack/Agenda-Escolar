@@ -4,6 +4,7 @@ import pandas as pd
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_estudiante
 from modulos.features.asistencia import mostrar_asistencia_estudiante
+from modulos.features.horarios import mostrar_horario_estudiante
 
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
@@ -33,14 +34,14 @@ def mostrar(data):
     
     # Menú principal
     opcion = st.selectbox(
-        "Seleccionar función",
-        [
-            "📖 Mis Notas",
-            "📋 Mi Asistencia",
-            "📅 Mi Horario",
-            "👤 Mi Perfil"
-        ]
-    )
+    "Seleccionar función",
+    [
+        "📖 Mis Notas",
+        "📋 Mi Asistencia",
+        "📅 Mi Horario",  # ← Agrega esta línea
+        "👤 Mi Perfil"
+    ]
+)
     
     st.divider()
     
@@ -55,7 +56,8 @@ def mostrar(data):
     
     elif opcion == "👤 Mi Perfil":
         mostrar_perfil(data)
-
+elif opcion == "📅 Mi Horario":
+    mostrar_horario_estudiante(data)
 
 def mostrar_horario(data):
     st.subheader("📅 Mi Horario")
