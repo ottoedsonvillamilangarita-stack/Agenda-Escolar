@@ -5,13 +5,14 @@ from datetime import datetime
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_estudiante
 from modulos.features.asistencia import mostrar_asistencia_estudiante
-from modulos.features.horarios import mostrar_horario_curso_tabla
-
+from modulos.features.horarios import mostrar_horario_tabla
 
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
     
     documento_estudiante = data.get('documento')
+    st.write(f"Bienvenido, Estudiante")
+    
     headers = get_headers()
     
     # Obtener información del estudiante
@@ -26,10 +27,10 @@ def mostrar(data):
         st.info(f"📚 Curso: {curso}")
         
         # ============================================
-        # HORARIO SEMANAL (siempre visible)
+        # HORARIO SEMANAL (tabla)
         # ============================================
         st.subheader("📅 Mi Horario Semanal")
-        mostrar_horario_curso_tabla(curso, headers)
+        mostrar_horario_tabla(curso, headers)
     
     st.divider()
     st.subheader("📌 Otras funciones")
