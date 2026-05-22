@@ -6,6 +6,8 @@ from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_estudiante
 from modulos.features.asistencia import mostrar_asistencia_estudiante
 from modulos.features.horarios import mostrar_horario_semanal_detallado
+from modulos.features.horarios import mostrar_horario_curso_tabla
+
 
 def mostrar(data):
     st.title("🎓 Panel del Estudiante")
@@ -28,7 +30,7 @@ def mostrar(data):
         # HORARIO SEMANAL (siempre visible)
         # ============================================
         st.subheader("📅 Horario Semanal")
-        mostrar_horario_semanal_detallado(curso, headers)
+        mostrar_horario_curso_tabla(curso, headers)
     
     st.divider()
     st.subheader("📌 Otras funciones")
