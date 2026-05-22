@@ -36,17 +36,17 @@ def mostrar(data):
         for d in direcciones:
             st.info(f"📌 Curso: {d.get('curso')}")
     
-    # ============================================
-    # HORARIO SEMANAL para cada curso que dicta
-    # ============================================
+    # Horario personal del docente
+    st.subheader("📅 Mi Horario Semanal")
+    
     cursos_docente = list(set([a.get('curso') for a in asignaciones if a.get('curso')]))
     
     if cursos_docente:
-        st.subheader("📅 Mi Horario Semanal")
-        
         for curso in cursos_docente:
             with st.expander(f"📖 Curso {curso}"):
                 mostrar_horario_semanal_detallado(curso, headers)
+    else:
+        st.info("No hay horario asignado")
     
     st.divider()
     st.subheader("📌 Funciones disponibles")
@@ -81,6 +81,7 @@ def mostrar(data):
         mostrar_reportes_docente(data)
     else:
         st.info("🚧 Módulo en desarrollo")
+
 
 def mostrar_mis_cursos(asignaciones):
     st.subheader("📚 Mis Cursos")
