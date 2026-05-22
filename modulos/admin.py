@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 from utils import SUPABASE_URL, get_headers
+from modulos.features.horarios import gestion_horarios_admin
 
 def mostrar(data):
     st.title("🛡️ Panel de Administrador")
@@ -30,7 +31,11 @@ def mostrar(data):
         if st.button("⚙️ Sistema", use_container_width=True):
             st.session_state.admin_seccion = "sistema"
             st.rerun()
-    
+    if st.button("📅 Horarios", use_container_width=True,
+             type="primary" if st.session_state.admin_seccion == "horarios" else "secondary"):
+    st.session_state.admin_seccion = "horarios"
+    st.rerun()
+
     st.divider()
     
     if st.session_state.admin_seccion == "dashboard":
@@ -41,7 +46,8 @@ def mostrar(data):
         mostrar_docentes()
     elif st.session_state.admin_seccion == "sistema":
         mostrar_sistema()
-
+elif st.session_state.admin_seccion == "horarios":
+    gestion_horarios_admin(data)
 
 def mostrar_dashboard():
     st.subheader("📊 Dashboard General")
