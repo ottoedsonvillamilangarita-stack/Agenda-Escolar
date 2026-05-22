@@ -29,7 +29,7 @@ def mostrar(data):
         # ============================================
         # HORARIO SEMANAL (siempre visible)
         # ============================================
-        st.subheader("📅 Horario Semanal")
+        st.subheader("📅 Mi Horario Semanal")
         mostrar_horario_curso_tabla(curso, headers)
     
     st.divider()
