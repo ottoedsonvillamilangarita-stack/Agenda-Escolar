@@ -5,13 +5,28 @@ from datetime import datetime, time
 from utils import SUPABASE_URL, get_headers
 
 # ============================================
+# FUNCIONES AUXILIARES
+# ============================================
+
+def parse_hora(hora_str):
+    """Convierte string de hora a objeto time, manejando diferentes formatos"""
+    if isinstance(hora_str, time):
+        return hora_str
+    if isinstance(hora_str, str):
+        # Manejar formatos: '07:00', '07:00:00', '7:00', etc.
+        partes = hora_str.split(':')
+        if len(partes) >= 2:
+            return time(int(partes[0]), int(partes[1]))
+    return time(7, 0)  # valor por defecto
+
+
+# ============================================
 # ADMIN - CONFIGURACIÓN DE NIVELES
 # ============================================
 
 def configurar_niveles(headers):
     st.subheader("📚 Niveles Educativos")
     
-    # Obtener niveles existentes
     response = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     
     if response.status_code == 200:
@@ -35,7 +50,6 @@ def configurar_niveles(headers):
 def configurar_jornada_nivel(headers):
     st.subheader("⏰ Configurar Jornada por Nivel")
     
-    # Obtener niveles
     response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     
     if response_niveles.status_code != 200:
@@ -52,27 +66,20 @@ def configurar_jornada_nivel(headers):
     nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres)
     nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_seleccionado)
     
-    # Obtener configuración actual
     url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
     response_config = requests.get(url_config, headers=headers)
     
     if response_config.status_code == 200 and response_config.json():
         config = response_config.json()[0]
-        hora_inicio_str = config.get('hora_inicio_jornada', '07:00')
-        # Si es string, convertir a objeto time
-        if isinstance(hora_inicio_str, str):
-            hora_inicio_default = datetime.strptime(hora_inicio_str, '%H:%M:%S').time()
-        else:
-            hora_inicio_default = hora_inicio_str
+        hora_inicio_default = parse_hora(config.get('hora_inicio_jornada', '07:00'))
     else:
         config = {
             "dias_laborales": [1,2,3,4,5],
             "num_clases_por_dia": 6,
             "duracion_clase_minutos": 50,
-            "hora_inicio_jornada": "07:00",
             "horario_rotativo": False
         }
-        hora_inicio_default = datetime.strptime('07:00', '%H:%M').time()
+        hora_inicio_default = time(7, 0)
     
     dias_opciones = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
@@ -114,6 +121,7 @@ def configurar_jornada_nivel(headers):
         
         st.success("✅ Configuración guardada")
         st.rerun()
+
 
 def configurar_horario_curso(headers):
     st.subheader("📅 Configurar Horario por Curso")
@@ -268,239 +276,9 @@ def gestion_horarios_admin(data):
 
 
 # ============================================
-# FUNCIONES PARA VISUALIZACIÓN
+# VISUALIZACIÓN DE HORARIO
 # ============================================
 
-def obtener_horario_dia(curso, fecha, headers):
-    """Obtiene el horario para un día específico"""
-    
-    # Verificar festivo
-    url_festivo = f"{SUPABASE_URL}/rest/v1/festivos?fecha=eq.{fecha}"
-    response_festivo = requests.get(url_festivo, headers=headers)
-    
-    if response_festivo.status_code == 200 and response_festivo.json():
-        return [{"festivo": True, "descripcion": response_festivo.json()[0].get('descripcion', 'Festivo')}]
-    
-    # Obtener nivel del curso
-    url_nivel = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&select=nivel_id&limit=1"
-    response_nivel = requests.get(url_nivel, headers=headers)
-    
-    if response_nivel.status_code != 200 or not response_nivel.json():
-        return []
-    
-    nivel_id = response_nivel.json()[0].get('nivel_id')
-    
-    # Obtener configuración del nivel
-    url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
-    response_config = requests.get(url_config, headers=headers)
-    
-    if response_config.status_code != 200 or not response_config.json():
-        return []
-    
-    config = response_config.json()[0]
-    dias_laborales = config.get('dias_laborales', [1,2,3,4,5])
-    
-    dia_semana = fecha.isoweekday()
-    
-    if dia_semana not in dias_laborales:
-        return [{"festivo": False, "mensaje": "No hay clases este día"}]
-    
-    # Obtener horario
-    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&dia_semana=eq.{dia_semana}&order=orden_clase.asc"
-    response_horario = requests.get(url_horario, headers=headers)
-    
-    if response_horario.status_code != 200:
-        return []
-    
-    clases = response_horario.json()
-    
-    # Procesar hora inicio
-    hora_inicio_str = config.get('hora_inicio_jornada', '07:00')
-    if isinstance(hora_inicio_str, str):
-        hora_inicio = datetime.strptime(hora_inicio_str, '%H:%M:%S').time()
-        hora_inicio_dt = datetime.combine(fecha, hora_inicio)
-    else:
-        hora_inicio_dt = datetime.combine(fecha, hora_inicio_str)
-    
-    duracion = config['duracion_clase_minutos']
-    
-    for idx, clase in enumerate(clases):
-        hora_clase = hora_inicio_dt + pd.Timedelta(minutes=idx * duracion)
-        clase['hora_inicio'] = hora_clase.strftime('%H:%M')
-        clase['hora_fin'] = (hora_clase + pd.Timedelta(minutes=duracion)).strftime('%H:%M')
-    
-    return clases
-
-def mostrar_horario_estudiante(data):
-    st.subheader("📅 Mi Horario")
-    
-    documento = data.get('documento')
-    headers = get_headers()
-    
-    # Obtener curso del estudiante
-    url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento}"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code != 200 or not response.json():
-        st.error("No se pudo obtener el curso")
-        return
-    
-    curso = response.json()[0].get('curso')
-    st.success(f"📌 Curso: {curso}")
-    
-    fecha = st.date_input("Ver horario para", datetime.now())
-    
-    horario = obtener_horario_dia(curso, fecha, headers)
-    
-    if not horario:
-        st.info("No hay horario configurado")
-        return
-    
-    if len(horario) == 1 and horario[0].get('festivo'):
-        st.info(f"📆 {horario[0].get('descripcion', 'Festivo')} - No hay clases")
-        return
-    
-    if len(horario) == 1 and horario[0].get('mensaje'):
-        st.info(horario[0]['mensaje'])
-        return
-    
-    for clase in horario:
-        col1, col2, col3 = st.columns([2, 3, 1])
-        with col1:
-            st.write(f"**{clase['hora_inicio']} - {clase['hora_fin']}**")
-        with col2:
-            st.write(clase['asignatura'])
-        with col3:
-            st.write(f"📌 {clase.get('salon', 'N/A')}")
-        st.divider()
-
-
-def mostrar_horario_docente(data):
-    st.subheader("📅 Mi Horario")
-    
-    documento_docente = data.get('documento')
-    headers = get_headers()
-    
-    url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,orden_clase.asc"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code != 200:
-        st.error("Error al cargar horario")
-        return
-    
-    horarios = response.json()
-    
-    if not horarios:
-        st.info("No hay horario asignado")
-        return
-    
-    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
-    
-    for dia_num in range(1, 6):
-        clases_dia = [h for h in horarios if h['dia_semana'] == dia_num]
-        if clases_dia:
-            with st.expander(f"📅 {dias[dia_num]}"):
-                for clase in clases_dia:
-                    col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
-                    with col1:
-                        st.write(f"**{clase['orden_clase']}**")
-                    with col2:
-                        st.write(clase['asignatura'])
-                    with col3:
-                        st.write(f"Curso {clase['curso']}")
-                    with col4:
-                        st.write(f"📌 {clase.get('salon', 'N/A')}")
-
-
-def mostrar_horario_acudiente(data):
-    st.subheader("📅 Horario de mis hijos")
-    
-    documento_acudiente = data.get('documento')
-    headers = get_headers()
-    
-    url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_acudiente=eq.{documento_acudiente}"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code != 200:
-        st.error("Error al cargar datos")
-        return
-    
-    hijos = response.json()
-    if not hijos:
-        st.info("No hay hijos asociados")
-        return
-    
-    for hijo in hijos:
-        doc_hijo = hijo.get('documento_estudiante')
-        nombre_hijo = hijo.get('nombre_estudiante')
-        curso = hijo.get('curso')
-        
-        with st.expander(f"📘 {nombre_hijo} - Curso {curso}"):
-            fecha = st.date_input(f"Fecha", datetime.now(), key=f"fecha_{doc_hijo}")
-            
-            horario = obtener_horario_dia(curso, fecha, headers)
-            
-            if not horario:
-                st.info("No hay horario configurado")
-            elif len(horario) == 1 and horario[0].get('festivo'):
-                st.info(f"📆 {horario[0].get('descripcion', 'Festivo')}")
-            elif len(horario) == 1 and horario[0].get('mensaje'):
-                st.info(horario[0]['mensaje'])
-            else:
-                for clase in horario:
-                    col1, col2, col3 = st.columns([2, 3, 1])
-                    with col1:
-                        st.write(f"{clase['hora_inicio']} - {clase['hora_fin']}")
-                    with col2:
-                        st.write(clase['asignatura'])
-                    with col3:
-                        st.write(f"📌 {clase.get('salon', 'N/A')}")
-
-
-def mostrar_horario_director(data):
-    st.subheader("📅 Horario del Curso")
-    
-    documento_docente = data.get('documento')
-    headers = get_headers()
-    
-    # Obtener curso que dirige
-    url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
-    response_dir = requests.get(url_dir, headers=headers)
-    
-    if response_dir.status_code != 200 or not response_dir.json():
-        st.warning("No eres director de ningún curso")
-        return
-    
-    curso = response_dir.json()[0].get('curso')
-    st.success(f"📌 Curso: {curso}")
-    
-    fecha = st.date_input("Ver horario", datetime.now())
-    
-    horario = obtener_horario_dia(curso, fecha, headers)
-    
-    if not horario:
-        st.info("No hay horario configurado")
-        return
-    
-    if len(horario) == 1 and horario[0].get('festivo'):
-        st.info(f"📆 {horario[0].get('descripcion', 'Festivo')}")
-        return
-    
-    if len(horario) == 1 and horario[0].get('mensaje'):
-        st.info(horario[0]['mensaje'])
-        return
-    
-    for clase in horario:
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-        with col1:
-            st.write(f"**{clase['hora_inicio']} - {clase['hora_fin']}**")
-        with col2:
-            st.write(clase['asignatura'])
-        with col3:
-            st.write(f"👨‍🏫 {clase.get('documento_docente', 'N/A')[:20]}")
-        with col4:
-            st.write(f"📌 {clase.get('salon', 'N/A')}")
-        st.divider()
 def obtener_horario_semanal(curso, headers):
     """Obtiene el horario completo de la semana para un curso"""
     
@@ -525,8 +303,8 @@ def obtener_horario_semanal(curso, headers):
     config = response_config.json()[0]
     dias_laborales = config.get('dias_laborales', [1,2,3,4,5])
     num_clases = config.get('num_clases_por_dia', 6)
-    hora_inicio = datetime.strptime(config['hora_inicio_jornada'], '%H:%M')
-    duracion = config['duracion_clase_minutos']
+    hora_inicio = parse_hora(config.get('hora_inicio_jornada', '07:00'))
+    duracion = config.get('duracion_clase_minutos', 50)
     
     # Obtener todo el horario base del curso
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
@@ -539,76 +317,55 @@ def obtener_horario_semanal(curso, headers):
     
     # Organizar por día
     horario_semanal = {}
+    hoy = datetime.now().date()
+    
     for dia in dias_laborales:
         horario_semanal[dias[dia]] = []
         clases_dia = [h for h in horarios if h['dia_semana'] == dia]
         
+        # Ordenar por orden_clase
+        clases_dia.sort(key=lambda x: x.get('orden_clase', 0))
+        
         for clase in clases_dia:
-            hora_clase = hora_inicio + pd.Timedelta(minutes=(clase['orden_clase'] - 1) * duracion)
+            orden = clase.get('orden_clase', 1)
+            minutos_desde_inicio = (orden - 1) * duracion
+            hora_inicio_dt = datetime.combine(hoy, hora_inicio) + pd.Timedelta(minutes=minutos_desde_inicio)
+            hora_fin_dt = hora_inicio_dt + pd.Timedelta(minutes=duracion)
+            
             horario_semanal[dias[dia]].append({
-                "orden": clase['orden_clase'],
-                "hora_inicio": hora_clase.strftime('%H:%M'),
-                "hora_fin": (hora_clase + pd.Timedelta(minutes=duracion)).strftime('%H:%M'),
-                "asignatura": clase['asignatura'],
-                "salon": clase.get('salon', 'N/A')
+                "orden": orden,
+                "hora_inicio": hora_inicio_dt.strftime('%H:%M'),
+                "hora_fin": hora_fin_dt.strftime('%H:%M'),
+                "asignatura": clase.get('asignatura', 'Sin asignar'),
+                "salon": clase.get('salon', 'N/A'),
+                "docente": clase.get('documento_docente', 'N/A')
             })
     
     return horario_semanal
 
 
-def mostrar_horario_semanal(curso, headers, titulo="📅 Horario Semanal"):
-    """Muestra el horario semanal en formato tabla"""
-    
-    horario_semanal = obtener_horario_semanal(curso, headers)
-    
-    if not horario_semanal:
-        st.info("No hay horario configurado")
-        return
-    
-    # Crear tabla en formato columnas
-    dias = list(horario_semanal.keys())
-    
-    # Encabezados
-    cols = st.columns(len(dias))
-    for idx, dia in enumerate(dias):
-        with cols[idx]:
-            st.markdown(f"**{dia}**")
-    
-    # Encontrar el número máximo de clases por día
-    max_clases = max([len(horario_semanal[dia]) for dia in dias]) if dias else 0
-    
-    # Mostrar filas
-    for fila in range(max_clases):
-        cols = st.columns(len(dias))
-        for idx, dia in enumerate(dias):
-            with cols[idx]:
-                if fila < len(horario_semanal[dia]):
-                    clase = horario_semanal[dia][fila]
-                    st.write(f"**{clase['hora_inicio']}**")
-                    st.write(f"{clase['asignatura']}")
-                    st.caption(f"📌 {clase['salon']}")
-                else:
-                    st.write("")
-
-
 def mostrar_horario_semanal_detallado(curso, headers, titulo="📅 Horario Semanal"):
     """Muestra el horario semanal en formato expandible por día"""
     
-    horario_semanal = obtener_horario_semanal(curso, headers)
-    
-    if not horario_semanal:
-        st.info("No hay horario configurado")
+    try:
+        horario_semanal = obtener_horario_semanal(curso, headers)
+        
+        if not horario_semanal:
+            st.info("No hay horario configurado para este curso")
+            return
+        
+        for dia, clases in horario_semanal.items():
+            if clases:
+                with st.expander(f"📅 {dia}"):
+                    for clase in clases:
+                        col1, col2, col3 = st.columns([2, 3, 1])
+                        with col1:
+                            st.write(f"**{clase['hora_inicio']} - {clase['hora_fin']}**")
+                        with col2:
+                            st.write(clase['asignatura'])
+                        with col3:
+                            st.write(f"📌 {clase['salon']}")
+                    st.divider()
+    except Exception as e:
+        st.info(f"No hay horario configurado para el curso {curso}")
         return
-    
-    for dia, clases in horario_semanal.items():
-        if clases:
-            with st.expander(f"📅 {dia}"):
-                for clase in clases:
-                    col1, col2, col3 = st.columns([2, 3, 1])
-                    with col1:
-                        st.write(f"**{clase['hora_inicio']} - {clase['hora_fin']}**")
-                    with col2:
-                        st.write(clase['asignatura'])
-                    with col3:
-                        st.write(f"📌 {clase['salon']}")
-                st.divider()
