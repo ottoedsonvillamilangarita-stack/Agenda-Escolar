@@ -13,28 +13,43 @@ def mostrar(data):
         st.session_state.admin_seccion = "dashboard"
     
     # Menú simplificado
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        if st.button("📊 Dashboard", use_container_width=True):
-            st.session_state.admin_seccion = "dashboard"
-            st.rerun()
-    with col2:
-        if st.button("👨‍🎓 Alumnos", use_container_width=True):
-            st.session_state.admin_seccion = "alumnos"
-            st.rerun()
-    with col3:
-        if st.button("👨‍🏫 Docentes", use_container_width=True):
-            st.session_state.admin_seccion = "docentes"
-            st.rerun()
-    with col4:
-        if st.button("⚙️ Sistema", use_container_width=True):
-            st.session_state.admin_seccion = "sistema"
-            st.rerun()
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+with col1:
+    if st.button("📊 Dashboard", use_container_width=True,
+                 type="primary" if st.session_state.admin_seccion == "dashboard" else "secondary"):
+        st.session_state.admin_seccion = "dashboard"
+        st.rerun()
+
+with col2:
+    if st.button("👨‍🎓 Alumnos", use_container_width=True,
+                 type="primary" if st.session_state.admin_seccion == "alumnos" else "secondary"):
+        st.session_state.admin_seccion = "alumnos"
+        st.rerun()
+
+with col3:
+    if st.button("👨‍👩‍👧 Acudientes", use_container_width=True,
+                 type="primary" if st.session_state.admin_seccion == "acudientes" else "secondary"):
+        st.session_state.admin_seccion = "acudientes"
+        st.rerun()
+
+with col4:
+    if st.button("👨‍🏫 Docentes", use_container_width=True,
+                 type="primary" if st.session_state.admin_seccion == "docentes" else "secondary"):
+        st.session_state.admin_seccion = "docentes"
+        st.rerun()
+
+with col5:
+    if st.button("📚 Asignación", use_container_width=True,
+                 type="primary" if st.session_state.admin_seccion == "asignacion" else "secondary"):
+        st.session_state.admin_seccion = "asignacion"
+        st.rerun()
+
+with col6:
     if st.button("📅 Horarios", use_container_width=True,
-             type="primary" if st.session_state.admin_seccion == "horarios" else "secondary"):
-    st.session_state.admin_seccion = "horarios"
-    st.rerun()
+                 type="primary" if st.session_state.admin_seccion == "horarios" else "secondary"):
+        st.session_state.admin_seccion = "horarios"
+        st.rerun()
 
     st.divider()
     
@@ -46,7 +61,7 @@ def mostrar(data):
         mostrar_docentes()
     elif st.session_state.admin_seccion == "sistema":
         mostrar_sistema()
-elif st.session_state.admin_seccion == "horarios":
+    elif st.session_state.admin_seccion == "horarios":
     gestion_horarios_admin(data)
 
 def mostrar_dashboard():
