@@ -2,8 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
-from modulos.features.horarios import mostrar_horario_semanal_detallado
-from modulos.features.horarios import mostrar_horario_curso_tabla
+from modulos.features.horarios import mostrar_horario_tabla
 
 def mostrar(data):
     st.title("🔍 Panel de Supervisor")
@@ -96,8 +95,7 @@ def consultar_horarios():
         curso = st.selectbox("Seleccionar curso", cursos)
         
         if st.button("Ver horario", type="primary"):
-            mostrar_horario_semanal_detallado(curso, headers)
-            mostrar_horario_curso_tabla(curso, headers)
+            mostrar_horario_tabla(curso, headers)
     
     else:
         url = f"{SUPABASE_URL}/rest/v1/docentes"
@@ -112,15 +110,25 @@ def consultar_horarios():
                 idx = docentes_opciones.index(docente_seleccionado)
                 documento_docente = docentes[idx]['documento_docente']
                 
-                url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
-                response_asignacion = requests.get(url_asignacion, headers=headers)
+                # Obtener horario del docente directamente
+                url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}"
+                response_horario = requests.get(url_horario, headers=headers)
                 
-                if response_asignacion.status_code == 200:
-                    cursos_docente = list(set([a.get('curso') for a in response_asignacion.json() if a.get('curso')]))
-                    
-                    if cursos_docente:
-                        for curso in cursos_docente:
+                if response_horario.status_code == 200:
+                    horarios = response_horario.json()
+                    if horarios:
+                        # Agrupar por curso
+                        cursos_dict = {}
+                        for h in horarios:
+                            curso = h.get('curso')
+                            if curso not in cursos_dict:
+                                cursos_dict[curso] = []
+                            cursos_dict[curso].append(h)
+                        
+                        for curso, clases in cursos_dict.items():
                             st.write(f"**Curso {curso}**")
-                            mostrar_horario_semanal_detallado(curso, headers)
+                            mostrar_horario_tabla(curso, headers)
                     else:
-                        st.info("Este docente no tiene cursos asignados")
+                        st.info("Este docente no tiene horario asignado")
+                else:
+                    st.info("No se pudo cargar el horario del docente")
