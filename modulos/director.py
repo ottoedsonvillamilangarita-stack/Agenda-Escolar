@@ -5,6 +5,7 @@ from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_curso
 from modulos.features.asistencia import mostrar_asistencia_director
 from modulos.features.horarios import mostrar_horario_semanal_detallado
+from modulos.features.horarios import mostrar_horario_curso_tabla
 
 def mostrar(data):
     st.title("🧭 Director de Grupo")
@@ -30,6 +31,7 @@ def mostrar(data):
     # ============================================
     st.subheader("📅 Horario Semanal del Curso")
     mostrar_horario_semanal_detallado(curso_dirige, headers)
+    mostrar_horario_curso_tabla(curso_dirige, headers)
     
     st.divider()
     
