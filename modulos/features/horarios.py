@@ -36,8 +36,8 @@ def configurar_niveles(headers):
                 st.write(f"- {n['nombre']}")
     
     with st.expander("➕ Agregar nivel"):
-        nuevo_nivel = st.text_input("Nombre del nivel")
-        if st.button("Agregar nivel"):
+        nuevo_nivel = st.text_input("Nombre del nivel", key="nuevo_nivel_input")
+        if st.button("Agregar nivel", key="agregar_nivel_btn"):
             if nuevo_nivel:
                 data = {"nombre": nuevo_nivel, "orden": len(niveles) + 1 if niveles else 1}
                 r = requests.post(f"{SUPABASE_URL}/rest/v1/niveles", headers=headers, json=data)
@@ -48,7 +48,7 @@ def configurar_niveles(headers):
 
 def configurar_horas_nivel(headers):
     st.subheader("⏰ Configurar Horas por Nivel")
-    st.info("Define las franjas horarias (horas de clase) para cada nivel. Serán las mismas para todos los cursos de ese nivel.")
+    st.info("Define las franjas horarias (horas de clase) para cada nivel.")
     
     response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     
@@ -63,7 +63,7 @@ def configurar_horas_nivel(headers):
         return
     
     nivel_nombres = [n['nombre'] for n in niveles]
-    nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres)
+    nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres, key="horas_nivel_select")
     nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_seleccionado)
     
     # Obtener horas actuales del nivel
@@ -85,15 +85,15 @@ def configurar_horas_nivel(headers):
     with st.expander("➕ Agregar hora de clase"):
         col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
         with col1:
-            orden = st.number_input("Orden", min_value=1, max_value=20, value=len(horas) + 1, step=1)
+            orden = st.number_input("Orden", min_value=1, max_value=20, value=len(horas) + 1, step=1, key="nueva_hora_orden")
         with col2:
-            hora_inicio = st.time_input("Hora inicio", value=time(7, 0))
+            hora_inicio = st.time_input("Hora inicio", value=time(7, 0), key="nueva_hora_inicio")
         with col3:
-            hora_fin = st.time_input("Hora fin", value=time(7, 50))
+            hora_fin = st.time_input("Hora fin", value=time(7, 50), key="nueva_hora_fin")
         with col4:
-            descripcion = st.text_input("Descripción", placeholder="Ej: Primera hora")
+            descripcion = st.text_input("Descripción", placeholder="Ej: Primera hora", key="nueva_hora_desc")
         
-        if st.button("➕ Agregar hora"):
+        if st.button("➕ Agregar hora", key="agregar_hora_btn"):
             data_insert = {
                 "nivel_id": nivel_id,
                 "orden": orden,
@@ -121,9 +121,68 @@ def configurar_horas_nivel(headers):
                     st.rerun()
 
 
+def configurar_jornada_nivel(headers):
+    st.subheader("📅 Configurar Días Laborales por Nivel")
+    
+    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
+    
+    if response_niveles.status_code != 200:
+        st.error("Error al cargar niveles")
+        return
+    
+    niveles = response_niveles.json()
+    
+    if not niveles:
+        st.warning("No hay niveles configurados")
+        return
+    
+    nivel_nombres = [n['nombre'] for n in niveles]
+    nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres, key="jornada_nivel_select")
+    nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_seleccionado)
+    
+    url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
+    response_config = requests.get(url_config, headers=headers)
+    
+    if response_config.status_code == 200 and response_config.json():
+        config = response_config.json()[0]
+        dias_laborales_default = config.get('dias_laborales', [1,2,3,4,5])
+        horario_rotativo_default = config.get('horario_rotativo', False)
+    else:
+        dias_laborales_default = [1,2,3,4,5]
+        horario_rotativo_default = False
+    
+    dias_opciones = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
+    
+    dias_seleccionados = st.multiselect(
+        "Días de clase",
+        options=list(dias_opciones.keys()),
+        format_func=lambda x: dias_opciones[x],
+        default=dias_laborales_default,
+        key="dias_laborales_select"
+    )
+    
+    horario_rotativo = st.checkbox("Horario rotativo", value=horario_rotativo_default, key="horario_rotativo_check")
+    
+    if st.button("💾 Guardar configuración", type="primary", key="guardar_jornada_btn"):
+        data_config = {
+            "nivel_id": nivel_id,
+            "dias_laborales": dias_seleccionados,
+            "horario_rotativo": horario_rotativo
+        }
+        
+        if response_config.status_code == 200 and response_config.json():
+            config_id = response_config.json()[0]['id']
+            requests.patch(f"{SUPABASE_URL}/rest/v1/config_horario_nivel?id=eq.{config_id}", 
+                          headers=headers, json=data_config)
+        else:
+            requests.post(f"{SUPABASE_URL}/rest/v1/config_horario_nivel", headers=headers, json=data_config)
+        
+        st.success("✅ Configuración guardada")
+        st.rerun()
+
+
 def configurar_horario_curso(headers):
     st.subheader("📅 Asignar Materias por Curso")
-    st.info("Primero configura las horas del nivel, luego asigna las materias en cada franja horaria.")
     
     cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
     
@@ -134,8 +193,8 @@ def configurar_horario_curso(headers):
         st.warning("No hay niveles configurados")
         return
     
-    curso = st.selectbox("Curso", cursos)
-    nivel_curso = st.selectbox("Nivel del curso", [n['nombre'] for n in niveles], key="nivel_curso")
+    curso = st.selectbox("Curso", cursos, key="curso_select")
+    nivel_curso = st.selectbox("Nivel del curso", [n['nombre'] for n in niveles], key="nivel_curso_select")
     nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_curso)
     
     # Obtener horas del nivel
@@ -144,7 +203,7 @@ def configurar_horario_curso(headers):
     horas = response_horas.json() if response_horas.status_code == 200 else []
     
     if not horas:
-        st.warning(f"No hay horas configuradas para el nivel {nivel_curso}. Ve a 'Configurar Horas por Nivel' primero.")
+        st.warning(f"No hay horas configuradas para el nivel {nivel_curso}. Ve a 'Horas por Nivel' primero.")
         return
     
     # Obtener horario actual del curso
@@ -158,9 +217,8 @@ def configurar_horario_curso(headers):
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     
     # Días
-    dias = {1: "Lunes", 2: "Martes", 3: "Miérças", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
+    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    # Crear matriz de horario
     st.write(f"**Asignación de materias para curso {curso} - Nivel {nivel_curso}**")
     st.info(f"Horas del nivel: {len(horas)} clases por día")
     
@@ -173,7 +231,6 @@ def configurar_horario_curso(headers):
             with cols[idx]:
                 st.write(f"📅 {dia_nombre}")
                 
-                # Buscar si ya existe asignación
                 existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
                 
                 asignatura = st.text_input("Asignatura", value=existente.get('asignatura', '') if existente else '',
@@ -205,79 +262,19 @@ def configurar_horario_curso(headers):
                     else:
                         requests.post(f"{SUPABASE_URL}/rest/v1/horario_base", headers=headers, json=data_horario)
                 elif existente:
-                    # Si no hay asignatura pero existía, eliminar
                     requests.delete(f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}", headers=headers)
         
         st.divider()
     
-    if st.button("💾 Guardar todas las asignaciones", type="primary"):
+    if st.button("💾 Guardar todas las asignaciones", type="primary", key="guardar_asignaciones_btn"):
         st.success("✅ Horario guardado")
-        st.rerun()
-
-
-def configurar_jornada_nivel(headers):
-    st.subheader("📅 Configurar Días Laborales por Nivel")
-    
-    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
-    
-    if response_niveles.status_code != 200:
-        st.error("Error al cargar niveles")
-        return
-    
-    niveles = response_niveles.json()
-    
-    if not niveles:
-        st.warning("No hay niveles configurados")
-        return
-    
-    nivel_nombres = [n['nombre'] for n in niveles]
-    nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres)
-    nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_seleccionado)
-    
-    url_config = f"{SUPABASE_URL}/rest/v1/config_horario_nivel?nivel_id=eq.{nivel_id}"
-    response_config = requests.get(url_config, headers=headers)
-    
-    if response_config.status_code == 200 and response_config.json():
-        config = response_config.json()[0]
-        dias_laborales_default = config.get('dias_laborales', [1,2,3,4,5])
-        horario_rotativo_default = config.get('horario_rotativo', False)
-    else:
-        dias_laborales_default = [1,2,3,4,5]
-        horario_rotativo_default = False
-    
-    dias_opciones = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
-    
-    dias_seleccionados = st.multiselect(
-        "Días de clase",
-        options=list(dias_opciones.keys()),
-        format_func=lambda x: dias_opciones[x],
-        default=dias_laborales_default
-    )
-    
-    horario_rotativo = st.checkbox("Horario rotativo", value=horario_rotativo_default)
-    
-    if st.button("💾 Guardar configuración", type="primary"):
-        data_config = {
-            "nivel_id": nivel_id,
-            "dias_laborales": dias_seleccionados,
-            "horario_rotativo": horario_rotativo
-        }
-        
-        if response_config.status_code == 200 and response_config.json():
-            config_id = response_config.json()[0]['id']
-            requests.patch(f"{SUPABASE_URL}/rest/v1/config_horario_nivel?id=eq.{config_id}", 
-                          headers=headers, json=data_config)
-        else:
-            requests.post(f"{SUPABASE_URL}/rest/v1/config_horario_nivel", headers=headers, json=data_config)
-        
-        st.success("✅ Configuración guardada")
         st.rerun()
 
 
 def gestion_festivos(headers):
     st.subheader("📆 Festivos")
     
-    year = st.selectbox("Año", [2024, 2025, 2026])
+    year = st.selectbox("Año", [2024, 2025, 2026], key="festivos_year")
     
     url_festivos = f"{SUPABASE_URL}/rest/v1/festivos?year=eq.{year}&order=fecha.asc"
     response_festivos = requests.get(url_festivos, headers=headers)
@@ -291,18 +288,18 @@ def gestion_festivos(headers):
                 with col1:
                     st.write(f"{f['fecha']} - {f.get('descripcion', 'Sin descripción')}")
                 with col2:
-                    if st.button("🗑️", key=f"del_{f['id']}"):
+                    if st.button("🗑️", key=f"del_festivo_{f['id']}"):
                         requests.delete(f"{SUPABASE_URL}/rest/v1/festivos?id=eq.{f['id']}", headers=headers)
                         st.rerun()
     
     with st.expander("➕ Agregar festivo"):
         col1, col2 = st.columns(2)
         with col1:
-            fecha = st.date_input("Fecha")
+            fecha = st.date_input("Fecha", key="festivo_fecha")
         with col2:
-            descripcion = st.text_input("Descripción")
+            descripcion = st.text_input("Descripción", key="festivo_desc")
         
-        if st.button("Agregar"):
+        if st.button("Agregar", key="agregar_festivo_btn"):
             data = {"fecha": str(fecha), "descripcion": descripcion, "year": fecha.year}
             requests.post(f"{SUPABASE_URL}/rest/v1/festivos", headers=headers, json=data)
             st.success("✅ Festivo agregado")
@@ -329,13 +326,12 @@ def gestion_horarios_admin(data):
 
 
 # ============================================
-# VISUALIZACIÓN DE HORARIO - PARA TODOS LOS PERFILES
+# VISUALIZACIÓN DE HORARIO
 # ============================================
 
 def mostrar_horario_tabla(curso, headers):
     """Muestra el horario de un curso en formato tabla"""
     
-    # Obtener horario del curso
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
     response_horario = requests.get(url_horario, headers=headers)
     
@@ -349,10 +345,8 @@ def mostrar_horario_tabla(curso, headers):
         st.info("No hay horario configurado para este curso")
         return
     
-    # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    # Organizar por día
     horario_por_dia = {}
     for dia in dias.values():
         horario_por_dia[dia] = []
@@ -366,19 +360,15 @@ def mostrar_horario_tabla(curso, headers):
             "salon": clase.get('salon', 'N/A')
         })
     
-    # Crear tabla
     st.markdown("---")
     
-    # Encabezados
     cols = st.columns(len(dias))
     for idx, dia in enumerate(dias.values()):
         with cols[idx]:
             st.markdown(f"**{dia}**")
     
-    # Encontrar el número máximo de clases por día
     max_clases = max([len(horario_por_dia[dia]) for dia in dias.values()]) if horarios else 0
     
-    # Mostrar filas
     for fila in range(max_clases):
         cols = st.columns(len(dias))
         for idx, dia in enumerate(dias.values()):
@@ -399,7 +389,6 @@ def mostrar_horario_tabla(curso, headers):
 def mostrar_horario_docente_tabla(documento_docente, headers):
     """Muestra el horario personal del docente en formato tabla"""
     
-    # Obtener horario del docente directamente
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,hora_inicio.asc"
     response_horario = requests.get(url_horario, headers=headers)
     
@@ -413,10 +402,8 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horario asignado para este docente")
         return
     
-    # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    # Organizar por día
     horario_por_dia = {}
     for dia in dias.values():
         horario_por_dia[dia] = []
@@ -431,19 +418,15 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             "salon": clase.get('salon', 'N/A')
         })
     
-    # Crear tabla
     st.markdown("---")
     
-    # Encabezados
     cols = st.columns(len(dias))
     for idx, dia in enumerate(dias.values()):
         with cols[idx]:
             st.markdown(f"**{dia}**")
     
-    # Encontrar el número máximo de clases por día
     max_clases = max([len(horario_por_dia[dia]) for dia in dias.values()]) if horarios else 0
     
-    # Mostrar filas
     for fila in range(max_clases):
         cols = st.columns(len(dias))
         for idx, dia in enumerate(dias.values()):
