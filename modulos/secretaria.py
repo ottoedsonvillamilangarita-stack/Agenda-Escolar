@@ -59,12 +59,22 @@ def mostrar_dashboard():
     activos = len([e for e in estudiantes if e.get('activo', True) != False])
     inactivos = total_estudiantes - activos
     
+    # Estadísticas por curso
+    cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
+    estudiantes_por_curso = {}
+    for curso in cursos:
+        estudiantes_por_curso[curso] = len([e for e in estudiantes if e.get('curso') == curso])
+    
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("👨‍🎓 Total Estudiantes", total_estudiantes)
-    col2.metric("✅ Estudiantes Activos", activos)
-    col3.metric("❌ Estudiantes Inactivos", inactivos)
+    col2.metric("✅ Activos", activos)
+    col3.metric("❌ Inactivos", inactivos)
     col4.metric("👨‍🏫 Total Docentes", total_docentes)
     col5.metric("✅ Docentes Activos", total_docentes)
+    
+    with st.expander("📊 Distribución por Curso"):
+        for curso, cantidad in estudiantes_por_curso.items():
+            st.write(f"**Curso {curso}:** {cantidad} estudiantes")
     
     st.info("📌 Panel de gestión administrativa")
 
@@ -77,20 +87,44 @@ def gestion_estudiantes():
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Lista de Estudiantes", "➕ Matricular", "✏️ Editar", "🚫 Dar de Baja"])
     
     with tab1:
+        # Filtros
+        st.write("**🔍 Filtros**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            filtro_curso = st.selectbox("Filtrar por curso", ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"])
+        with col2:
+            filtro_activo = st.selectbox("Estado", ["Todos", "Activos", "Inactivos"])
+        with col3:
+            buscar_nombre = st.text_input("Buscar por nombre", placeholder="Escribe el nombre...")
+        
         response = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers)
         
         if response.status_code == 200:
             estudiantes = response.json()
             if estudiantes:
                 df = pd.DataFrame(estudiantes)
+                
+                # Aplicar filtros
+                if filtro_curso != "Todos":
+                    df = df[df['curso'] == filtro_curso]
+                
+                if filtro_activo == "Activos":
+                    df = df[df['activo'] != False]
+                elif filtro_activo == "Inactivos":
+                    df = df[df['activo'] == False]
+                
+                if buscar_nombre:
+                    df = df[df['nombre_estudiante'].str.contains(buscar_nombre, case=False, na=False)]
+                
                 columnas = ['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante', 'curso', 'nombre_acudiente']
                 columnas_existentes = [col for col in columnas if col in df.columns]
                 st.dataframe(df[columnas_existentes], use_container_width=True)
-                st.caption(f"Total: {len(estudiantes)} estudiantes")
+                st.caption(f"Mostrando {len(df)} de {len(estudiantes)} estudiantes")
             else:
                 st.info("No hay estudiantes registrados")
     
     with tab2:
+        # Matricular (igual que antes)
         st.info("Completa todos los campos obligatorios (*)")
         
         with st.form("form_matricula", clear_on_submit=True):
@@ -174,6 +208,7 @@ def gestion_estudiantes():
                             st.error(f"Error al registrar: {response.status_code}")
     
     with tab3:
+        # Editar (igual que antes)
         documento_buscar = st.text_input("Documento de identidad del estudiante", key="buscar_editar_est")
         
         if documento_buscar:
@@ -252,6 +287,7 @@ def gestion_estudiantes():
                 st.warning("No se encontró un estudiante con ese documento")
     
     with tab4:
+        # Dar de baja (igual que antes)
         documento = st.text_input("Documento de identidad del estudiante", key="buscar_baja_est")
         
         if documento:
@@ -300,14 +336,58 @@ def gestion_docentes():
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Lista de Docentes", "➕ Contratar", "✏️ Editar", "🚫 Retirar"])
     
     with tab1:
-        response = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+        # Filtros
+        st.write("**🔍 Filtros**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            filtro_curso = st.selectbox("Filtrar por curso", ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"])
+        with col2:
+            filtro_activo = st.selectbox("Estado", ["Todos", "Activos", "Inactivos"])
+        with col3:
+            buscar_nombre = st.text_input("Buscar por nombre", placeholder="Escribe el nombre...")
         
-        if response.status_code == 200:
-            docentes = response.json()
+        # Obtener docentes con sus asignaciones
+        response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+        response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
+        
+        if response_docentes.status_code == 200:
+            docentes = response_docentes.json()
+            asignaciones = response_asignaciones.json() if response_asignaciones.status_code == 200 else []
+            
             if docentes:
+                # Crear DataFrame
                 df = pd.DataFrame(docentes)
-                st.dataframe(df, use_container_width=True)
-                st.caption(f"Total: {len(docentes)} docentes")
+                
+                # Agregar columnas de cursos y áreas
+                docentes_cursos = {}
+                docentes_asignaturas = {}
+                for a in asignaciones:
+                    doc = a.get('documento_docente')
+                    if doc:
+                        if doc not in docentes_cursos:
+                            docentes_cursos[doc] = set()
+                            docentes_asignaturas[doc] = set()
+                        docentes_cursos[doc].add(a.get('curso'))
+                        docentes_asignaturas[doc].add(a.get('asignatura'))
+                
+                df['cursos'] = df['documento_docente'].map(lambda x: ", ".join(sorted(docentes_cursos.get(x, set()))) if x in docentes_cursos else "")
+                df['asignaturas'] = df['documento_docente'].map(lambda x: ", ".join(sorted(docentes_asignaturas.get(x, set()))) if x in docentes_asignaturas else "")
+                
+                # Aplicar filtros
+                if filtro_curso != "Todos":
+                    df = df[df['cursos'].str.contains(filtro_curso, na=False)]
+                
+                if filtro_activo == "Activos":
+                    df = df[df['activo'] != False]
+                elif filtro_activo == "Inactivos":
+                    df = df[df['activo'] == False]
+                
+                if buscar_nombre:
+                    df = df[df['nombre_docente'].str.contains(buscar_nombre, case=False, na=False)]
+                
+                columnas = ['nombre_docente', 'apellidos_docente', 'documento_docente', 'cursos', 'asignaturas']
+                st.dataframe(df[columnas], use_container_width=True)
+                st.caption(f"Mostrando {len(df)} de {len(docentes)} docentes")
             else:
                 st.info("No hay docentes registrados")
     
