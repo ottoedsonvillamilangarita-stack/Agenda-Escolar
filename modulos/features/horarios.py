@@ -149,8 +149,9 @@ def configurar_horario_curso(headers):
         st.write("**Horario actual:**")
         df = pd.DataFrame(horarios)
         df['dia'] = df['dia_semana'].map(dias)
-        df['hora_inicio'] = pd.to_datetime(df['hora_inicio']).dt.strftime('%H:%M')
-        df['hora_fin'] = pd.to_datetime(df['hora_fin']).dt.strftime('%H:%M')
+        # Convertir hora a string de forma segura
+        df['hora_inicio'] = df['hora_inicio'].apply(lambda x: str(x)[:5] if x else "")
+        df['hora_fin'] = df['hora_fin'].apply(lambda x: str(x)[:5] if x else "")
         st.dataframe(df[['dia', 'hora_inicio', 'hora_fin', 'asignatura', 'salon']], use_container_width=True)
     
     st.divider()
@@ -160,16 +161,24 @@ def configurar_horario_curso(headers):
     for dia in dias_laborales:
         with st.expander(f"📅 {dias[dia]}"):
             clases_dia = [h for h in horarios if h['dia_semana'] == dia]
-            clases_dia.sort(key=lambda x: x.get('hora_inicio', '00:00'))
+            # Ordenar de forma segura
+            try:
+                clases_dia.sort(key=lambda x: str(x.get('hora_inicio', '00:00')) if x.get('hora_inicio') else '00:00')
+            except:
+                clases_dia.sort(key=lambda x: str(x.get('hora_inicio', '00:00')))
             
             # Mostrar clases existentes
             for idx, clase in enumerate(clases_dia):
+                # Convertir hora de forma segura
+                hora_inicio_val = pd.to_datetime(str(clase['hora_inicio'])).time() if clase.get('hora_inicio') else time(7, 0)
+                hora_fin_val = pd.to_datetime(str(clase['hora_fin'])).time() if clase.get('hora_fin') else time(8, 0)
+                
                 col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1])
                 with col1:
-                    hora_inicio = st.time_input("Hora inicio", value=pd.to_datetime(clase['hora_inicio']).time(), 
+                    nueva_hora_inicio = st.time_input("Hora inicio", value=hora_inicio_val, 
                                                 key=f"inicio_{curso}_{dia}_{clase['id']}")
                 with col2:
-                    hora_fin = st.time_input("Hora fin", value=pd.to_datetime(clase['hora_fin']).time(), 
+                    nueva_hora_fin = st.time_input("Hora fin", value=hora_fin_val, 
                                             key=f"fin_{curso}_{dia}_{clase['id']}")
                 with col3:
                     asignatura = st.text_input("Asignatura", value=clase.get('asignatura', ''),
@@ -184,10 +193,10 @@ def configurar_horario_curso(headers):
                         st.rerun()
                 
                 # Actualizar si hay cambios
-                if hora_inicio and hora_fin and asignatura:
+                if nueva_hora_inicio and nueva_hora_fin and asignatura:
                     data_update = {
-                        "hora_inicio": str(hora_inicio),
-                        "hora_fin": str(hora_fin),
+                        "hora_inicio": str(nueva_hora_inicio),
+                        "hora_fin": str(nueva_hora_fin),
                         "asignatura": asignatura,
                         "documento_docente": docente if docente else None,
                         "salon": clase.get('salon', '')
@@ -231,7 +240,6 @@ def configurar_horario_curso(headers):
     if st.button("💾 Guardar todos los cambios", type="primary"):
         st.success("✅ Horario guardado")
         st.rerun()
-
 
 def gestion_festivos(headers):
     st.subheader("📆 Festivos")
