@@ -59,15 +59,12 @@ def mostrar_dashboard():
     activos = len([e for e in estudiantes if e.get('activo', True) != False])
     inactivos = total_estudiantes - activos
     
-    # Docentes activos (por ahora todos activos)
-    docentes_activos = total_docentes
-    
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("👨‍🎓 Total Estudiantes", total_estudiantes)
     col2.metric("✅ Estudiantes Activos", activos)
     col3.metric("❌ Estudiantes Inactivos", inactivos)
     col4.metric("👨‍🏫 Total Docentes", total_docentes)
-    col5.metric("✅ Docentes Activos", docentes_activos)
+    col5.metric("✅ Docentes Activos", total_docentes)
     
     st.info("📌 Panel de gestión administrativa")
 
@@ -177,7 +174,7 @@ def gestion_estudiantes():
                             st.error(f"Error al registrar: {response.status_code}")
     
     with tab3:
-        documento_buscar = st.text_input("Documento de identidad del estudiante", key="buscar_editar")
+        documento_buscar = st.text_input("Documento de identidad del estudiante", key="buscar_editar_est")
         
         if documento_buscar:
             url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}"
@@ -186,8 +183,8 @@ def gestion_estudiantes():
             if response.status_code == 200 and response.json():
                 estudiante = response.json()[0]
                 
-                with st.form("form_editar", clear_on_submit=False):
-                    st.success(f"Editando: {estudiante.get('nombre_estudiante')} {estudiante.get('apellidos_estudiante')}")
+                with st.form("form_editar_estudiante", clear_on_submit=False):
+                    st.success(f"Editando: {estudiante.get('nombre_estudiante', '')} {estudiante.get('apellidos_estudiante', '')}")
                     
                     col1, col2 = st.columns(2)
                     
@@ -196,8 +193,15 @@ def gestion_estudiantes():
                         nombre = st.text_input("Nombre", value=estudiante.get('nombre_estudiante', ''))
                         apellidos = st.text_input("Apellidos", value=estudiante.get('apellidos_estudiante', ''))
                         st.text_input("Documento", value=estudiante.get('documento_estudiante', ''), disabled=True)
-                        curso = st.selectbox("Curso", ["901", "902", "903", "1001", "1002", "1003", "1101"], 
-                                            index=["901","902","903","1001","1002","1003","1101"].index(estudiante.get('curso', '901')))
+                        
+                        cursos_opciones = ["901", "902", "903", "1001", "1002", "1003", "1101"]
+                        curso_actual = estudiante.get('curso', '901')
+                        try:
+                            idx_curso = cursos_opciones.index(curso_actual)
+                        except ValueError:
+                            idx_curso = 0
+                        curso = st.selectbox("Curso", cursos_opciones, index=idx_curso)
+                        
                         telefono = st.text_input("Teléfono", value=estudiante.get('telefono_estudiante', ''))
                         email = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
                     
@@ -205,15 +209,15 @@ def gestion_estudiantes():
                         st.markdown("**Datos del acudiente**")
                         nombre_acudiente = st.text_input("Nombre del acudiente", value=estudiante.get('nombre_acudiente', ''))
                         documento_acudiente = st.text_input("Documento del acudiente", value=estudiante.get('documento_acudiente', ''))
-                       parentesco_opciones = ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"]
+                        
+                        parentesco_opciones = ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"]
                         parentesco_actual = estudiante.get('parentesco', '')
-                    try:
-                        idx_parentesco = parentesco_opciones.index(parentesco_actual)
-                    except ValueError:
-                        idx_parentesco = 0  # Si no está en la lista, selecciona ""
-
+                        try:
+                            idx_parentesco = parentesco_opciones.index(parentesco_actual)
+                        except ValueError:
+                            idx_parentesco = 0
                         parentesco = st.selectbox("Parentesco", parentesco_opciones, index=idx_parentesco)
-
+                        
                         telefono_acudiente = st.text_input("Teléfono del acudiente", value=estudiante.get('telefono_acudiente', ''))
                         email_acudiente = st.text_input("Email del acudiente", value=estudiante.get('email_acudiente', ''))
                     
@@ -248,7 +252,7 @@ def gestion_estudiantes():
                 st.warning("No se encontró un estudiante con ese documento")
     
     with tab4:
-        documento = st.text_input("Documento de identidad del estudiante", key="buscar_baja")
+        documento = st.text_input("Documento de identidad del estudiante", key="buscar_baja_est")
         
         if documento:
             url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento}"
@@ -256,9 +260,9 @@ def gestion_estudiantes():
             
             if response.status_code == 200 and response.json():
                 estudiante = response.json()[0]
-                nombre = estudiante.get('nombre_estudiante')
-                apellidos = estudiante.get('apellidos_estudiante')
-                curso = estudiante.get('curso')
+                nombre = estudiante.get('nombre_estudiante', '')
+                apellidos = estudiante.get('apellidos_estudiante', '')
+                curso = estudiante.get('curso', '')
                 
                 st.warning(f"⚠️ Estás a punto de dar de baja a: **{nombre} {apellidos}** (Curso: {curso})")
                 
@@ -383,7 +387,7 @@ def gestion_docentes():
                             st.error(f"Error al registrar: {response.status_code}")
     
     with tab3:
-        documento_buscar = st.text_input("Documento de identidad del docente", key="buscar_editar_docente")
+        documento_buscar = st.text_input("Documento de identidad del docente", key="buscar_editar_doc")
         
         if documento_buscar:
             url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento_buscar}"
@@ -393,7 +397,7 @@ def gestion_docentes():
                 docente = response.json()[0]
                 
                 with st.form("form_editar_docente", clear_on_submit=False):
-                    st.success(f"Editando: {docente.get('nombre_docente')} {docente.get('apellidos_docente')}")
+                    st.success(f"Editando: {docente.get('nombre_docente', '')} {docente.get('apellidos_docente', '')}")
                     
                     col1, col2 = st.columns(2)
                     
@@ -410,13 +414,13 @@ def gestion_docentes():
                         st.markdown("**Datos profesionales**")
                         titulo = st.text_input("Título", value=docente.get('titulo', ''))
                         especializacion = st.text_input("Especialización", value=docente.get('especializacion', ''))
+                        
                         contrato_opciones = ["", "Planta", "Contrato", "Cátedra", "Ocasional"]
                         contrato_actual = docente.get('tipo_contrato', '')
-                    try:
-                        idx_contrato = contrato_opciones.index(contrato_actual)
-                    except ValueError:
-                        idx_contrato = 0  # Si no está en la lista, selecciona ""
-
+                        try:
+                            idx_contrato = contrato_opciones.index(contrato_actual)
+                        except ValueError:
+                            idx_contrato = 0
                         tipo_contrato = st.selectbox("Tipo de contrato", contrato_opciones, index=idx_contrato)
                     
                     activo = st.checkbox("Activo", value=docente.get('activo', True))
@@ -448,7 +452,7 @@ def gestion_docentes():
                 st.warning("No se encontró un docente con ese documento")
     
     with tab4:
-        documento = st.text_input("Documento de identidad del docente", key="buscar_retiro")
+        documento = st.text_input("Documento de identidad del docente", key="buscar_retiro_doc")
         
         if documento:
             url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento}"
@@ -456,8 +460,8 @@ def gestion_docentes():
             
             if response.status_code == 200 and response.json():
                 docente = response.json()[0]
-                nombre = docente.get('nombre_docente')
-                apellidos = docente.get('apellidos_docente')
+                nombre = docente.get('nombre_docente', '')
+                apellidos = docente.get('apellidos_docente', '')
                 
                 st.warning(f"⚠️ Estás a punto de retirar a: **{nombre} {apellidos}**")
                 
