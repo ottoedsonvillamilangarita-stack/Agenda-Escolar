@@ -205,8 +205,15 @@ def gestion_estudiantes():
                         st.markdown("**Datos del acudiente**")
                         nombre_acudiente = st.text_input("Nombre del acudiente", value=estudiante.get('nombre_acudiente', ''))
                         documento_acudiente = st.text_input("Documento del acudiente", value=estudiante.get('documento_acudiente', ''))
-                        parentesco = st.selectbox("Parentesco", ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"],
-                                                 index=["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"].index(estudiante.get('parentesco', '')))
+                       parentesco_opciones = ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"]
+                        parentesco_actual = estudiante.get('parentesco', '')
+                    try:
+                        idx_parentesco = parentesco_opciones.index(parentesco_actual)
+                    except ValueError:
+                        idx_parentesco = 0  # Si no está en la lista, selecciona ""
+
+                        parentesco = st.selectbox("Parentesco", parentesco_opciones, index=idx_parentesco)
+
                         telefono_acudiente = st.text_input("Teléfono del acudiente", value=estudiante.get('telefono_acudiente', ''))
                         email_acudiente = st.text_input("Email del acudiente", value=estudiante.get('email_acudiente', ''))
                     
@@ -403,8 +410,14 @@ def gestion_docentes():
                         st.markdown("**Datos profesionales**")
                         titulo = st.text_input("Título", value=docente.get('titulo', ''))
                         especializacion = st.text_input("Especialización", value=docente.get('especializacion', ''))
-                        tipo_contrato = st.selectbox("Tipo de contrato", ["", "Planta", "Contrato", "Cátedra", "Ocasional"],
-                                                    index=["", "Planta", "Contrato", "Cátedra", "Ocasional"].index(docente.get('tipo_contrato', '')))
+                        contrato_opciones = ["", "Planta", "Contrato", "Cátedra", "Ocasional"]
+                        contrato_actual = docente.get('tipo_contrato', '')
+                    try:
+                        idx_contrato = contrato_opciones.index(contrato_actual)
+                    except ValueError:
+                        idx_contrato = 0  # Si no está en la lista, selecciona ""
+
+                        tipo_contrato = st.selectbox("Tipo de contrato", contrato_opciones, index=idx_contrato)
                     
                     activo = st.checkbox("Activo", value=docente.get('activo', True))
                     
