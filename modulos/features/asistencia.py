@@ -283,7 +283,7 @@ def mostrar_asistencia_acudiente(data):
 # ============================================
 
 def mostrar_asistencia_director(data):
-    st.subheader("📋 Reporte de Asistencia del Curso")
+    st.subheader("📋 Asistencia del Curso")
     
     documento_docente = data.get('documento')
     headers = get_headers()
@@ -299,71 +299,72 @@ def mostrar_asistencia_director(data):
     curso = response_dir.json()[0].get('curso')
     st.success(f"📌 Curso: {curso}")
     
-    # Botón para marcar asistencia (director también puede)
-    if st.button("📋 Marcar Asistencia Hoy", use_container_width=True):
+    # Opción: Marcar asistencia o ver reporte
+    modo = st.radio("Seleccionar acción:", ["📋 Marcar Asistencia", "📊 Ver Reporte"], horizontal=True)
+    
+    if modo == "📋 Marcar Asistencia":
+        # Llamar a la función de asistencia del docente
         mostrar_asistencia_docente(data)
-        return
-    
-    st.divider()
-    
-    # Seleccionar período
-    col1, col2 = st.columns(2)
-    with col1:
-        fecha_inicio = st.date_input("Desde")
-    with col2:
-        fecha_fin = st.date_input("Hasta")
-    
-    if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
-        url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
-        response_est = requests.get(url_est, headers=headers)
+    else:
+        # Mostrar reporte
+        st.divider()
         
-        if response_est.status_code != 200:
-            st.error("Error al cargar estudiantes")
-            return
+        col1, col2 = st.columns(2)
+        with col1:
+            fecha_inicio = st.date_input("Desde")
+        with col2:
+            fecha_fin = st.date_input("Hasta")
         
-        estudiantes = response_est.json()
-        
-        reporte = []
-        for estudiante in estudiantes:
-            doc = estudiante.get('documento_estudiante')
-            nombre = estudiante.get('nombre_estudiante')
+        if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
+            url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
+            response_est = requests.get(url_est, headers=headers)
             
-            url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{doc}&fecha=gte.{fecha_inicio}&fecha=lte.{fecha_fin}"
-            response_asist = requests.get(url_asist, headers=headers)
+            if response_est.status_code != 200:
+                st.error("Error al cargar estudiantes")
+                return
             
-            if response_asist.status_code == 200:
-                asistencias = response_asist.json()
-                total = len(asistencias)
-                presentes = len([a for a in asistencias if a['estado'] == 'Presente'])
-                ausentes = len([a for a in asistencias if a['estado'] == 'Ausente'])
-                retardos = len([a for a in asistencias if a.get('retardo') == True])
-                uniforme_malo = len([a for a in asistencias if a.get('uniforme_malo') == True])
-                porcentaje = (presentes / total * 100) if total > 0 else 0
+            estudiantes = response_est.json()
+            
+            reporte = []
+            for estudiante in estudiantes:
+                doc = estudiante.get('documento_estudiante')
+                nombre = estudiante.get('nombre_estudiante')
                 
-                reporte.append({
-                    "Estudiante": nombre,
-                    "Presentes": presentes,
-                    "Ausentes": ausentes,
-                    "Retardos": retardos,
-                    "Uniforme mal": uniforme_malo,
-                    "% Asist.": f"{porcentaje:.0f}"
-                })
-        
-        if reporte:
-            df = pd.DataFrame(reporte)
-            st.dataframe(df, use_container_width=True)
+                url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{doc}&fecha=gte.{fecha_inicio}&fecha=lte.{fecha_fin}"
+                response_asist = requests.get(url_asist, headers=headers)
+                
+                if response_asist.status_code == 200:
+                    asistencias = response_asist.json()
+                    total = len(asistencias)
+                    presentes = len([a for a in asistencias if a['estado'] == 'Presente'])
+                    ausentes = len([a for a in asistencias if a['estado'] == 'Ausente'])
+                    retardos = len([a for a in asistencias if a.get('retardo') == True])
+                    uniforme_malo = len([a for a in asistencias if a.get('uniforme_malo') == True])
+                    porcentaje = (presentes / total * 100) if total > 0 else 0
+                    
+                    reporte.append({
+                        "Estudiante": nombre,
+                        "Presentes": presentes,
+                        "Ausentes": ausentes,
+                        "Retardos": retardos,
+                        "Uniforme mal": uniforme_malo,
+                        "% Asist.": f"{porcentaje:.0f}"
+                    })
             
-            # Resaltar estudiantes con problemas
-            df_alerta = df[(df['Ausentes'] > 3) | (df['Retardos'] > 5) | (df['Uniforme mal'] > 3)]
-            if not df_alerta.empty:
-                st.error("🚨 ESTUDIANTES CON ALERTAS:")
-                st.dataframe(df_alerta[['Estudiante', 'Ausentes', 'Retardos', 'Uniforme mal']], use_container_width=True)
-            
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar reporte", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
-        else:
-            st.info("No hay datos en el período seleccionado")
-
+            if reporte:
+                df = pd.DataFrame(reporte)
+                st.dataframe(df, use_container_width=True)
+                
+                # Resaltar estudiantes con problemas
+                df_alerta = df[(df['Ausentes'] > 3) | (df['Retardos'] > 5) | (df['Uniforme mal'] > 3)]
+                if not df_alerta.empty:
+                    st.error("🚨 ESTUDIANTES CON ALERTAS:")
+                    st.dataframe(df_alerta[['Estudiante', 'Ausentes', 'Retardos', 'Uniforme mal']], use_container_width=True)
+                
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Descargar reporte", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
+            else:
+                st.info("No hay datos en el período seleccionado")
 
 # ============================================
 # REPORTE PARA SECRETARIA/COORDINADOR
