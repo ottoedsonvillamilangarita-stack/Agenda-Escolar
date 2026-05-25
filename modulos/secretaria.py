@@ -89,13 +89,27 @@ def gestion_estudiantes():
     with tab1:
         # Filtros
         st.write("**🔍 Filtros**")
-        col1, col2, col3 = st.columns(3)
+        
+        niveles = ["Todos", "Secundaria", "Media"]
+        cursos_secundaria = ["901", "902", "903"]
+        cursos_media = ["1001", "1002", "1003", "1101"]
+        
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            filtro_curso = st.selectbox("Filtrar por curso", ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"])
+            filtro_nivel = st.selectbox("Nivel", niveles, key="filtro_nivel_est")
+            # Actualizar cursos según nivel seleccionado
+            if filtro_nivel == "Secundaria":
+                opciones_cursos = ["Todos"] + cursos_secundaria
+            elif filtro_nivel == "Media":
+                opciones_cursos = ["Todos"] + cursos_media
+            else:
+                opciones_cursos = ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"]
         with col2:
-            filtro_activo = st.selectbox("Estado", ["Todos", "Activos", "Inactivos"])
+            filtro_curso = st.selectbox("Curso", opciones_cursos, key="filtro_curso_est")
         with col3:
-            buscar_nombre = st.text_input("Buscar por nombre", placeholder="Escribe el nombre...")
+            filtro_activo = st.selectbox("Estado", ["Todos", "Activos", "Inactivos"], key="filtro_activo_est")
+        with col4:
+            buscar_nombre = st.text_input("Buscar", placeholder="Nombre...", key="buscar_nombre_est")
         
         response = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers)
         
@@ -104,27 +118,40 @@ def gestion_estudiantes():
             if estudiantes:
                 df = pd.DataFrame(estudiantes)
                 
+                # Mapeo de curso a nivel
+                nivel_por_curso = {
+                    "901": "Secundaria", "902": "Secundaria", "903": "Secundaria",
+                    "1001": "Media", "1002": "Media", "1003": "Media", "1101": "Media"
+                }
+                df['nivel'] = df['curso'].map(nivel_por_curso)
+                
                 # Aplicar filtros
+                df_filtrada = df.copy()
+                
+                if filtro_nivel != "Todos":
+                    df_filtrada = df_filtrada[df_filtrada['nivel'] == filtro_nivel]
                 if filtro_curso != "Todos":
-                    df = df[df['curso'] == filtro_curso]
-                
+                    df_filtrada = df_filtrada[df_filtrada['curso'] == filtro_curso]
                 if filtro_activo == "Activos":
-                    df = df[df['activo'] != False]
+                    df_filtrada = df_filtrada[df_filtrada['activo'] != False]
                 elif filtro_activo == "Inactivos":
-                    df = df[df['activo'] == False]
-                
+                    df_filtrada = df_filtrada[df_filtrada['activo'] == False]
                 if buscar_nombre:
-                    df = df[df['nombre_estudiante'].str.contains(buscar_nombre, case=False, na=False)]
+                    df_filtrada = df_filtrada[df_filtrada['nombre_estudiante'].str.contains(buscar_nombre, case=False, na=False)]
                 
-                columnas = ['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante', 'curso', 'nombre_acudiente']
-                columnas_existentes = [col for col in columnas if col in df.columns]
-                st.dataframe(df[columnas_existentes], use_container_width=True)
-                st.caption(f"Mostrando {len(df)} de {len(estudiantes)} estudiantes")
+                columnas = ['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante', 'curso', 'nivel', 'nombre_acudiente']
+                columnas_existentes = [col for col in columnas if col in df_filtrada.columns]
+                st.dataframe(df_filtrada[columnas_existentes], use_container_width=True)
+                st.caption(f"Mostrando {len(df_filtrada)} de {len(estudiantes)} estudiantes")
+                
+                # Botón para exportar
+                if st.button("📥 Exportar a CSV", key="exportar_estudiantes"):
+                    csv = df_filtrada[columnas_existentes].to_csv(index=False).encode('utf-8')
+                    st.download_button("Descargar CSV", data=csv, file_name="estudiantes_filtrados.csv", mime="text/csv")
             else:
                 st.info("No hay estudiantes registrados")
     
     with tab2:
-        # Matricular (igual que antes)
         st.info("Completa todos los campos obligatorios (*)")
         
         with st.form("form_matricula", clear_on_submit=True):
@@ -208,7 +235,6 @@ def gestion_estudiantes():
                             st.error(f"Error al registrar: {response.status_code}")
     
     with tab3:
-        # Editar (igual que antes)
         documento_buscar = st.text_input("Documento de identidad del estudiante", key="buscar_editar_est")
         
         if documento_buscar:
@@ -287,7 +313,6 @@ def gestion_estudiantes():
                 st.warning("No se encontró un estudiante con ese documento")
     
     with tab4:
-        # Dar de baja (igual que antes)
         documento = st.text_input("Documento de identidad del estudiante", key="buscar_baja_est")
         
         if documento:
@@ -338,15 +363,26 @@ def gestion_docentes():
     with tab1:
         # Filtros
         st.write("**🔍 Filtros**")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            filtro_curso = st.selectbox("Filtrar por curso", ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"])
-        with col2:
-            filtro_activo = st.selectbox("Estado", ["Todos", "Activos", "Inactivos"])
-        with col3:
-            buscar_nombre = st.text_input("Buscar por nombre", placeholder="Escribe el nombre...")
         
-        # Obtener docentes con sus asignaciones
+        # Definir áreas
+        areas = ["Todas", "Ciencias Básicas", "Humanidades", "Ciencias Sociales", "Idiomas", "Artes", "Educación Física", "Técnica"]
+        
+        # Niveles
+        niveles = ["Todos", "Secundaria", "Media"]
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            filtro_curso = st.selectbox("Curso", ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"], key="filtro_curso_doc")
+        with col2:
+            filtro_area = st.selectbox("Área", areas, key="filtro_area_doc")
+        with col3:
+            filtro_nivel = st.selectbox("Nivel", niveles, key="filtro_nivel_doc")
+        with col4:
+            filtro_activo = st.selectbox("Estado", ["Todos", "Activos", "Inactivos"], key="filtro_activo_doc")
+        with col5:
+            buscar_nombre = st.text_input("Buscar", placeholder="Nombre...", key="buscar_nombre_doc")
+        
+        # Obtener datos
         response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
         response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
         
@@ -355,39 +391,103 @@ def gestion_docentes():
             asignaciones = response_asignaciones.json() if response_asignaciones.status_code == 200 else []
             
             if docentes:
-                # Crear DataFrame
                 df = pd.DataFrame(docentes)
                 
-                # Agregar columnas de cursos y áreas
+                # Mapeo de cursos a niveles
+                nivel_por_curso = {
+                    "901": "Secundaria", "902": "Secundaria", "903": "Secundaria",
+                    "1001": "Media", "1002": "Media", "1003": "Media", "1101": "Media"
+                }
+                
+                # Mapeo de asignaturas a áreas
+                area_por_asignatura = {
+                    "Matemáticas": "Ciencias Básicas",
+                    "Trigonometría": "Ciencias Básicas",
+                    "Cálculo": "Ciencias Básicas",
+                    "Física": "Ciencias Básicas",
+                    "Química": "Ciencias Básicas",
+                    "Biología": "Ciencias Básicas",
+                    "Español": "Humanidades",
+                    "Literatura": "Humanidades",
+                    "Inglés": "Idiomas",
+                    "Francés": "Idiomas",
+                    "Sociales": "Ciencias Sociales",
+                    "Historia": "Ciencias Sociales",
+                    "Geografía": "Ciencias Sociales",
+                    "Filosofía": "Humanidades",
+                    "Ética": "Humanidades",
+                    "Artes": "Artes",
+                    "Música": "Artes",
+                    "Educación Física": "Educación Física",
+                    "Deportes": "Educación Física",
+                    "Tecnología": "Técnica",
+                    "Informática": "Técnica",
+                    "Administración": "Técnica",
+                    "Proyecto": "Técnica"
+                }
+                
+                # Procesar asignaciones
                 docentes_cursos = {}
                 docentes_asignaturas = {}
+                docentes_niveles = {}
+                docentes_areas = {}
+                
                 for a in asignaciones:
                     doc = a.get('documento_docente')
                     if doc:
                         if doc not in docentes_cursos:
                             docentes_cursos[doc] = set()
                             docentes_asignaturas[doc] = set()
-                        docentes_cursos[doc].add(a.get('curso'))
-                        docentes_asignaturas[doc].add(a.get('asignatura'))
+                            docentes_niveles[doc] = set()
+                            docentes_areas[doc] = set()
+                        
+                        curso = a.get('curso')
+                        asignatura = a.get('asignatura')
+                        
+                        if curso:
+                            docentes_cursos[doc].add(curso)
+                            nivel = nivel_por_curso.get(curso, "Secundaria")
+                            docentes_niveles[doc].add(nivel)
+                        
+                        if asignatura:
+                            docentes_asignaturas[doc].add(asignatura)
+                            area = area_por_asignatura.get(asignatura, "Otras")
+                            docentes_areas[doc].add(area)
                 
                 df['cursos'] = df['documento_docente'].map(lambda x: ", ".join(sorted(docentes_cursos.get(x, set()))) if x in docentes_cursos else "")
                 df['asignaturas'] = df['documento_docente'].map(lambda x: ", ".join(sorted(docentes_asignaturas.get(x, set()))) if x in docentes_asignaturas else "")
+                df['niveles'] = df['documento_docente'].map(lambda x: ", ".join(sorted(docentes_niveles.get(x, set()))) if x in docentes_niveles else "")
+                df['areas'] = df['documento_docente'].map(lambda x: ", ".join(sorted(docentes_areas.get(x, set()))) if x in docentes_areas else "")
                 
                 # Aplicar filtros
+                df_filtrada = df.copy()
+                
                 if filtro_curso != "Todos":
-                    df = df[df['cursos'].str.contains(filtro_curso, na=False)]
+                    df_filtrada = df_filtrada[df_filtrada['cursos'].str.contains(filtro_curso, na=False)]
+                
+                if filtro_area != "Todas":
+                    df_filtrada = df_filtrada[df_filtrada['areas'].str.contains(filtro_area, na=False)]
+                
+                if filtro_nivel != "Todos":
+                    df_filtrada = df_filtrada[df_filtrada['niveles'].str.contains(filtro_nivel, na=False)]
                 
                 if filtro_activo == "Activos":
-                    df = df[df['activo'] != False]
+                    df_filtrada = df_filtrada[df_filtrada['activo'] != False]
                 elif filtro_activo == "Inactivos":
-                    df = df[df['activo'] == False]
+                    df_filtrada = df_filtrada[df_filtrada['activo'] == False]
                 
                 if buscar_nombre:
-                    df = df[df['nombre_docente'].str.contains(buscar_nombre, case=False, na=False)]
+                    df_filtrada = df_filtrada[df_filtrada['nombre_docente'].str.contains(buscar_nombre, case=False, na=False)]
                 
-                columnas = ['nombre_docente', 'apellidos_docente', 'documento_docente', 'cursos', 'asignaturas']
-                st.dataframe(df[columnas], use_container_width=True)
-                st.caption(f"Mostrando {len(df)} de {len(docentes)} docentes")
+                # Mostrar resultados
+                columnas = ['nombre_docente', 'apellidos_docente', 'documento_docente', 'cursos', 'asignaturas', 'niveles', 'areas']
+                st.dataframe(df_filtrada[columnas], use_container_width=True)
+                st.caption(f"Mostrando {len(df_filtrada)} de {len(docentes)} docentes")
+                
+                # Botón para exportar
+                if st.button("📥 Exportar a CSV", key="exportar_docentes"):
+                    csv = df_filtrada[columnas].to_csv(index=False).encode('utf-8')
+                    st.download_button("Descargar CSV", data=csv, file_name="docentes_filtrados.csv", mime="text/csv")
             else:
                 st.info("No hay docentes registrados")
     
@@ -601,41 +701,3 @@ def consultar_horarios():
     
     if tipo == "Curso":
         cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
-        curso = st.selectbox("Seleccionar curso", cursos, key="horario_curso")
-        
-        if st.button("Ver horario", type="primary", key="ver_horario_curso"):
-            mostrar_horario_tabla(curso, headers)
-    
-    else:
-        url = f"{SUPABASE_URL}/rest/v1/docentes"
-        response = requests.get(url, headers=headers)
-        
-        if response.status_code == 200:
-            docentes = response.json()
-            docentes_opciones = [f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes]
-            docente_seleccionado = st.selectbox("Seleccionar docente", docentes_opciones, key="horario_docente")
-            
-            if st.button("Ver horario", type="primary", key="ver_horario_docente"):
-                idx = docentes_opciones.index(docente_seleccionado)
-                documento_docente = docentes[idx]['documento_docente']
-                
-                url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}"
-                response_horario = requests.get(url_horario, headers=headers)
-                
-                if response_horario.status_code == 200:
-                    horarios = response_horario.json()
-                    if horarios:
-                        cursos_dict = {}
-                        for h in horarios:
-                            curso = h.get('curso')
-                            if curso not in cursos_dict:
-                                cursos_dict[curso] = []
-                            cursos_dict[curso].append(h)
-                        
-                        for curso, clases in cursos_dict.items():
-                            st.write(f"**Curso {curso}**")
-                            mostrar_horario_tabla(curso, headers)
-                    else:
-                        st.info("Este docente no tiene horario asignado")
-                else:
-                    st.info("No se pudo cargar el horario del docente")
