@@ -409,6 +409,7 @@ def mostrar_asistencia_director(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
+    # Obtener curso que dirige
     url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
     response_dir = requests.get(url_dir, headers=headers)
     
@@ -417,18 +418,16 @@ def mostrar_asistencia_director(data):
         return
     
     curso = response_dir.json()[0].get('curso')
-    st.success(f"📌 Curso: {curso}")
+    st.success(f"📌 Eres director del curso: **{curso}**")
     
-    # DIAGNÓSTICO: Verificar si hay datos en la tabla asistencia
-    url_test = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&limit=5"
-    response_test = requests.get(url_test, headers=headers)
-    st.write(f"🔍 Registros encontrados para curso {curso}: {len(response_test.json()) if response_test.status_code == 200 else 0}")
-    
-    if response_test.status_code == 200 and response_test.json():
-        st.write("Ejemplo del primer registro:", response_test.json()[0])
-    
+    # Botón para marcar asistencia (solo para su curso)
     if st.button("📋 Marcar Asistencia Hoy", use_container_width=True):
-        mostrar_asistencia_docente(data)
+        # Crear un data temporal para pasar a mostrar_asistencia_docente
+        data_temp = data.copy() if hasattr(data, 'copy') else dict(data)
+        # No es necesario modificar data_temp, la función ya tiene su propio selector de curso
+        # Pero podemos mostrar solo su curso
+        from modulos.features.asistencia import mostrar_asistencia_docente_para_director
+        mostrar_asistencia_docente_para_director(data, curso)
         return
     
     st.divider()
@@ -440,8 +439,8 @@ def mostrar_asistencia_director(data):
         fecha_fin = st.date_input("Hasta")
     
     if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
+        from modulos.features.asistencia import mostrar_reporte_asistencia
         mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, f"Reporte de Asistencia - Curso {curso}")
-
 # ============================================
 # SECRETARIA/COORDINADOR - REPORTE GENERAL
 # ============================================
