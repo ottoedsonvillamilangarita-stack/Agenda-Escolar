@@ -98,7 +98,7 @@ def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="
             st.write(f"{uniforme_malo}")
         with col7:
             if observaciones_lista:
-                st.write(f"📝 {len(observaciones_lista)} observaciones")
+                st.write(f"📝 {len(observaciones_lista)} obs")
             else:
                 st.write("—")
         
@@ -122,19 +122,19 @@ def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="
     if not df_ausencias.empty:
         st.error("📌 ESTUDIANTES CON MÁS DE 3 AUSENCIAS SIN JUSTIFICAR:")
         for _, row in df_ausencias.iterrows():
-            st.write(f"• {row['Estudiante']}: {row['Aus. No Justif.']} ausencias sin justificar")
+            st.write(f"• {row['Estudiante']}: {row['Aus. No Justif.']}")
     
     df_retardos = df[df['Retardos'] > 5]
     if not df_retardos.empty:
         st.warning("⏰ ESTUDIANTES CON MÁS DE 5 RETARDOS:")
         for _, row in df_retardos.iterrows():
-            st.write(f"• {row['Estudiante']}: {row['Retardos']} retardos")
+            st.write(f"• {row['Estudiante']}: {row['Retardos']}")
     
     df_uniforme = df[df['Uniforme mal'] > 3]
     if not df_uniforme.empty:
         st.info("🎽 ESTUDIANTES CON PROBLEMAS DE UNIFORME:")
         for _, row in df_uniforme.iterrows():
-            st.write(f"• {row['Estudiante']}: {row['Uniforme mal']} veces")
+            st.write(f"• {row['Estudiante']}: {row['Uniforme mal']}")
     
     if df_ausencias.empty and df_retardos.empty and df_uniforme.empty:
         st.success("✅ No hay estudiantes con alertas")
@@ -146,7 +146,7 @@ def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="
 
 
 # ============================================
-# DOCENTE Y DIRECTOR - MARCAR ASISTENCIA
+# DOCENTE - MARCAR ASISTENCIA
 # ============================================
 
 def mostrar_asistencia_docente(data):
@@ -155,7 +155,6 @@ def mostrar_asistencia_docente(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
-    # Obtener cursos del docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
     response = requests.get(url, headers=headers)
     
@@ -170,14 +169,12 @@ def mostrar_asistencia_docente(data):
         st.warning("No tienes cursos asignados")
         return
     
-    # Seleccionar curso y fecha
     col1, col2 = st.columns(2)
     with col1:
         curso = st.selectbox("Curso", cursos_unicos)
     with col2:
         fecha = st.date_input("Fecha", datetime.now())
     
-    # Obtener estudiantes
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
     response_est = requests.get(url_est, headers=headers)
     
@@ -186,11 +183,10 @@ def mostrar_asistencia_docente(data):
         return
     
     estudiantes = response_est.json()
-    if not estudiantes:
+    if not estudantes:
         st.warning(f"No hay estudiantes en el curso {curso}")
         return
     
-    # Obtener asistencias existentes
     asistencias_existentes = {}
     url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&fecha=eq.{fecha}"
     response_asist = requests.get(url_asist, headers=headers)
@@ -202,9 +198,7 @@ def mostrar_asistencia_docente(data):
     st.markdown(f"**{curso} - {fecha.strftime('%d/%m/%Y')}**")
     st.markdown("---")
     
-    # Formulario
     with st.form(key=f"form_asistencia_{curso}_{fecha}"):
-        # Cabecera
         col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
         with col1:
             st.markdown("**Estudiante**")
@@ -237,7 +231,6 @@ def mostrar_asistencia_docente(data):
             
             with col1:
                 st.write(f"**{nombre}**")
-            
             with col2:
                 estado = st.selectbox(
                     "",
@@ -246,25 +239,20 @@ def mostrar_asistencia_docente(data):
                     key=f"estado_{idx}_{doc}",
                     label_visibility="collapsed"
                 )
-            
             with col3:
                 if estado == "Presente":
                     retardo = st.checkbox("", value=retardo_actual, key=f"retardo_{idx}_{doc}")
                 else:
                     retardo = False
                     st.write("—")
-            
             with col4:
                 uniforme = st.checkbox("", value=uniforme_actual, key=f"uniforme_{idx}_{doc}")
-            
             with col5:
-                # JUSTIFICADO: se habilita si está Ausente o tiene Retardo
                 if estado == "Ausente" or retardo:
                     justificado = st.checkbox("", value=justificado_actual, key=f"justificado_{idx}_{doc}")
                 else:
                     justificado = False
                     st.write("—")
-            
             with col6:
                 observaciones = st.text_input("", value=observaciones_actual, key=f"obs_{idx}_{doc}",
                                              label_visibility="collapsed", placeholder="Observación...")
@@ -307,7 +295,180 @@ def mostrar_asistencia_docente(data):
             
             st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
             st.balloons()
-            st.rerun()
+
+
+# ============================================
+# DIRECTOR - MARCAR ASISTENCIA (solo su curso)
+# ============================================
+
+def mostrar_asistencia_docente_para_director(data, curso_fijo):
+    """Versión para director - solo marca asistencia en su curso"""
+    st.subheader(f"📋 Marcar Asistencia - Curso {curso_fijo}")
+    
+    documento_docente = data.get('documento')
+    headers = get_headers()
+    fecha = st.date_input("Fecha", datetime.now())
+    
+    url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso_fijo}"
+    response_est = requests.get(url_est, headers=headers)
+    
+    if response_est.status_code != 200:
+        st.error("Error al cargar estudiantes")
+        return
+    
+    estudiantes = response_est.json()
+    if not estudiantes:
+        st.warning(f"No hay estudiantes en el curso {curso_fijo}")
+        return
+    
+    asistencias_existentes = {}
+    url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso_fijo}&fecha=eq.{fecha}"
+    response_asist = requests.get(url_asist, headers=headers)
+    
+    if response_asist.status_code == 200:
+        for a in response_asist.json():
+            asistencias_existentes[a.get('documento_estudiante')] = a
+    
+    st.markdown(f"**{curso_fijo} - {fecha.strftime('%d/%m/%Y')}**")
+    st.markdown("---")
+    
+    with st.form(key=f"form_asistencia_director_{curso_fijo}_{fecha}"):
+        col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
+        with col1:
+            st.markdown("**Estudiante**")
+        with col2:
+            st.markdown("**Estado**")
+        with col3:
+            st.markdown("**Retardo**")
+        with col4:
+            st.markdown("**Uniforme**")
+        with col5:
+            st.markdown("**Justif.**")
+        with col6:
+            st.markdown("**Observación**")
+        st.markdown("---")
+        
+        datos_asistencia = []
+        
+        for idx, estudiante in enumerate(estudiantes):
+            doc = estudiante.get('documento_estudiante')
+            nombre = estudiante.get('nombre_estudiante')[:25]
+            existente = asistencias_existentes.get(doc, {})
+            
+            estado_actual = existente.get('estado', "Presente")
+            retardo_actual = existente.get('retardo', False)
+            uniforme_actual = existente.get('uniforme_malo', False)
+            justificado_actual = existente.get('justificado', False)
+            observaciones_actual = existente.get('observaciones', "")
+            
+            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
+            
+            with col1:
+                st.write(f"**{nombre}**")
+            with col2:
+                estado = st.selectbox(
+                    "",
+                    ["Presente", "Ausente"],
+                    index=["Presente", "Ausente"].index(estado_actual),
+                    key=f"estado_dir_{idx}_{doc}",
+                    label_visibility="collapsed"
+                )
+            with col3:
+                if estado == "Presente":
+                    retardo = st.checkbox("", value=retardo_actual, key=f"retardo_dir_{idx}_{doc}")
+                else:
+                    retardo = False
+                    st.write("—")
+            with col4:
+                uniforme = st.checkbox("", value=uniforme_actual, key=f"uniforme_dir_{idx}_{doc}")
+            with col5:
+                if estado == "Ausente" or retardo:
+                    justificado = st.checkbox("", value=justificado_actual, key=f"justificado_dir_{idx}_{doc}")
+                else:
+                    justificado = False
+                    st.write("—")
+            with col6:
+                observaciones = st.text_input("", value=observaciones_actual, key=f"obs_dir_{idx}_{doc}",
+                                             label_visibility="collapsed", placeholder="Observación...")
+            
+            datos_asistencia.append({
+                "documento_estudiante": doc,
+                "curso": curso_fijo,
+                "fecha": str(fecha),
+                "estado": estado,
+                "retardo": retardo if estado == "Presente" else False,
+                "uniforme_malo": uniforme,
+                "justificado": justificado if (estado == "Ausente" or retardo) else False,
+                "observaciones": observaciones,
+                "documento_docente": documento_docente
+            })
+            
+            st.markdown("---")
+        
+        submitted = st.form_submit_button("💾 Guardar Asistencia", type="primary", use_container_width=True)
+        
+        if submitted:
+            guardados = 0
+            for registro in datos_asistencia:
+                check_url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{registro['documento_estudiante']}&fecha=eq.{registro['fecha']}"
+                check = requests.get(check_url, headers=headers)
+                
+                if check.status_code == 200 and check.json():
+                    id_asist = check.json()[0].get('id')
+                    requests.patch(f"{SUPABASE_URL}/rest/v1/asistencia?id=eq.{id_asist}", 
+                                  headers=headers, json={
+                                      "estado": registro['estado'],
+                                      "retardo": registro['retardo'],
+                                      "uniforme_malo": registro['uniforme_malo'],
+                                      "justificado": registro['justificado'],
+                                      "observaciones": registro['observaciones']
+                                  })
+                else:
+                    requests.post(f"{SUPABASE_URL}/rest/v1/asistencia", headers=headers, json=registro)
+                guardados += 1
+            
+            st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
+            st.balloons()
+    
+    if st.button("🔙 Volver al Reporte", use_container_width=True):
+        st.rerun()
+
+
+# ============================================
+# DIRECTOR - REPORTE DE ASISTENCIA
+# ============================================
+
+def mostrar_asistencia_director(data):
+    st.subheader("📋 Asistencia del Curso")
+    
+    documento_docente = data.get('documento')
+    headers = get_headers()
+    
+    url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
+    response_dir = requests.get(url_dir, headers=headers)
+    
+    if response_dir.status_code != 200 or not response_dir.json():
+        st.warning("No eres director de ningún curso")
+        return
+    
+    curso = response_dir.json()[0].get('curso')
+    st.success(f"📌 Eres director del curso: **{curso}**")
+    
+    if st.button("📋 Marcar Asistencia Hoy", use_container_width=True):
+        mostrar_asistencia_docente_para_director(data, curso)
+        return
+    
+    st.divider()
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        fecha_inicio = st.date_input("Desde")
+    with col2:
+        fecha_fin = st.date_input("Hasta")
+    
+    if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
+        mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, f"Reporte de Asistencia - Curso {curso}")
+
 
 # ============================================
 # ESTUDIANTE - VER ASISTENCIA
@@ -399,48 +560,6 @@ def mostrar_asistencia_acudiente(data):
                     st.info("Sin registros")
 
 
-# ============================================
-# DIRECTOR - REPORTE DE ASISTENCIA DEL CURSO
-# ============================================
-
-def mostrar_asistencia_director(data):
-    st.subheader("📋 Asistencia del Curso")
-    
-    documento_docente = data.get('documento')
-    headers = get_headers()
-    
-    # Obtener curso que dirige
-    url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
-    response_dir = requests.get(url_dir, headers=headers)
-    
-    if response_dir.status_code != 200 or not response_dir.json():
-        st.warning("No eres director de ningún curso")
-        return
-    
-    curso = response_dir.json()[0].get('curso')
-    st.success(f"📌 Eres director del curso: **{curso}**")
-    
-    # Botón para marcar asistencia (solo para su curso)
-    if st.button("📋 Marcar Asistencia Hoy", use_container_width=True):
-        # Crear un data temporal para pasar a mostrar_asistencia_docente
-        data_temp = data.copy() if hasattr(data, 'copy') else dict(data)
-        # No es necesario modificar data_temp, la función ya tiene su propio selector de curso
-        # Pero podemos mostrar solo su curso
-        from modulos.features.asistencia import mostrar_asistencia_docente_para_director
-        mostrar_asistencia_docente_para_director(data, curso)
-        return
-    
-    st.divider()
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        fecha_inicio = st.date_input("Desde")
-    with col2:
-        fecha_fin = st.date_input("Hasta")
-    
-    if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
-        from modulos.features.asistencia import mostrar_reporte_asistencia
-        mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, f"Reporte de Asistencia - Curso {curso}")
 # ============================================
 # SECRETARIA/COORDINADOR - REPORTE GENERAL
 # ============================================
