@@ -29,7 +29,7 @@ def mostrar_asistencia_docente(data):
         st.warning("No tienes cursos asignados")
         return
     
-    # Seleccionar curso y fecha
+    # Seleccionar curso y fecha (FUERA del formulario)
     col1, col2 = st.columns(2)
     with col1:
         curso = st.selectbox("Curso", cursos_unicos)
@@ -61,118 +61,113 @@ def mostrar_asistencia_docente(data):
     st.markdown(f"**{curso} - {fecha.strftime('%d/%m/%Y')}**")
     st.markdown("---")
     
-    # Cabecera
-    col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
-    with col1:
-        st.markdown("**Estudiante**")
-    with col2:
-        st.markdown("**Estado**")
-    with col3:
-        st.markdown("**Retardo**")
-    with col4:
-        st.markdown("**Uniforme**")
-    with col5:
-        st.markdown("**Justif.**")
-    with col6:
-        st.markdown("**Observación**")
-    st.markdown("---")
-    
-    # Almacenar datos temporalmente
-    datos_asistencia = []
-    
-    # Mostrar cada estudiante
-    for idx, estudiante in enumerate(estudiantes):
-        doc = estudiante.get('documento_estudiante')
-        nombre = estudiante.get('nombre_estudiante')[:25]
-        existente = asistencias_existentes.get(doc, {})
-        
-        estado_actual = existente.get('estado', "Presente")
-        retardo_actual = existente.get('retardo', False)
-        uniforme_actual = existente.get('uniforme_malo', False)
-        justificado_actual = existente.get('justificado', False)
-        observaciones_actual = existente.get('observaciones', "")
-        
-        # Keys únicas
-        estado_key = f"estado_{idx}_{doc}"
-        retardo_key = f"retardo_{idx}_{doc}"
-        uniforme_key = f"uniforme_{idx}_{doc}"
-        justificado_key = f"justificado_{idx}_{doc}"
-        obs_key = f"obs_{idx}_{doc}"
-        
+    # ============================================
+    # FORMULARIO
+    # ============================================
+    with st.form(key=f"form_asistencia_{curso}_{fecha}"):
+        # Cabecera
         col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
-        
         with col1:
-            st.write(f"**{nombre}**")
-        
+            st.markdown("**Estudiante**")
         with col2:
-            estado = st.selectbox(
-                "",
-                ["Presente", "Ausente"],
-                index=["Presente", "Ausente"].index(estado_actual),
-                key=estado_key,
-                label_visibility="collapsed"
-            )
-        
+            st.markdown("**Estado**")
         with col3:
-            if estado == "Presente":
-                retardo = st.checkbox("", value=retardo_actual, key=retardo_key)
-            else:
-                retardo = False
-                st.write("—")
-        
+            st.markdown("**Retardo**")
         with col4:
-            uniforme = st.checkbox("", value=uniforme_actual, key=uniforme_key)
-        
+            st.markdown("**Uniforme**")
         with col5:
-            if estado == "Ausente" or retardo:
-                justificado = st.checkbox("", value=justificado_actual, key=justificado_key)
-            else:
-                justificado = False
-                st.write("—")
-        
+            st.markdown("**Justif.**")
         with col6:
-            observaciones = st.text_input("", value=observaciones_actual, key=obs_key,
-                                         label_visibility="collapsed", placeholder="Observación...")
-        
-        datos_asistencia.append({
-            "documento_estudiante": doc,
-            "curso": curso,
-            "fecha": str(fecha),
-            "estado": estado,
-            "retardo": retardo if estado == "Presente" else False,
-            "uniforme_malo": uniforme,
-            "justificado": justificado if (estado == "Ausente" or retardo) else False,
-            "observaciones": observaciones,
-            "documento_docente": documento_docente
-        })
-        
+            st.markdown("**Observación**")
         st.markdown("---")
-    
-    # Botón de guardar
-    if st.button("💾 Guardar Asistencia", type="primary", use_container_width=True):
-        guardados = 0
-        for registro in datos_asistencia:
-            check_url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{registro['documento_estudiante']}&fecha=eq.{registro['fecha']}"
-            check = requests.get(check_url, headers=headers)
-            
-            if check.status_code == 200 and check.json():
-                id_asist = check.json()[0].get('id')
-                update_data = {
-                    "estado": registro['estado'],
-                    "retardo": registro['retardo'],
-                    "uniforme_malo": registro['uniforme_malo'],
-                    "justificado": registro['justificado'],
-                    "observaciones": registro['observaciones']
-                }
-                requests.patch(f"{SUPABASE_URL}/rest/v1/asistencia?id=eq.{id_asist}", 
-                              headers=headers, json=update_data)
-            else:
-                requests.post(f"{SUPABASE_URL}/rest/v1/asistencia", headers=headers, json=registro)
-            guardados += 1
         
-        st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
-        st.balloons()
-        st.rerun()
+        datos_asistencia = []
+        
+        for idx, estudiante in enumerate(estudiantes):
+            doc = estudiante.get('documento_estudiante')
+            nombre = estudiante.get('nombre_estudiante')[:25]
+            existente = asistencias_existentes.get(doc, {})
+            
+            estado_actual = existente.get('estado', "Presente")
+            retardo_actual = existente.get('retardo', False)
+            uniforme_actual = existente.get('uniforme_malo', False)
+            justificado_actual = existente.get('justificado', False)
+            observaciones_actual = existente.get('observaciones', "")
+            
+            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
+            
+            with col1:
+                st.write(f"**{nombre}**")
+            
+            with col2:
+                estado = st.selectbox(
+                    "",
+                    ["Presente", "Ausente"],
+                    index=["Presente", "Ausente"].index(estado_actual),
+                    key=f"estado_{idx}_{doc}",
+                    label_visibility="collapsed"
+                )
+            
+            with col3:
+                if estado == "Presente":
+                    retardo = st.checkbox("", value=retardo_actual, key=f"retardo_{idx}_{doc}")
+                else:
+                    retardo = False
+                    st.write("—")
+            
+            with col4:
+                uniforme = st.checkbox("", value=uniforme_actual, key=f"uniforme_{idx}_{doc}")
+            
+            with col5:
+                if estado == "Ausente" or retardo:
+                    justificado = st.checkbox("", value=justificado_actual, key=f"justificado_{idx}_{doc}")
+                else:
+                    justificado = False
+                    st.write("—")
+            
+            with col6:
+                observaciones = st.text_input("", value=observaciones_actual, key=f"obs_{idx}_{doc}",
+                                             label_visibility="collapsed", placeholder="Observación...")
+            
+            datos_asistencia.append({
+                "documento_estudiante": doc,
+                "curso": curso,
+                "fecha": str(fecha),
+                "estado": estado,
+                "retardo": retardo if estado == "Presente" else False,
+                "uniforme_malo": uniforme,
+                "justificado": justificado if (estado == "Ausente" or retardo) else False,
+                "observaciones": observaciones,
+                "documento_docente": documento_docente
+            })
+            
+            st.markdown("---")
+        
+        submitted = st.form_submit_button("💾 Guardar Asistencia", type="primary", use_container_width=True)
+        
+        if submitted:
+            guardados = 0
+            for registro in datos_asistencia:
+                check_url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{registro['documento_estudiante']}&fecha=eq.{registro['fecha']}"
+                check = requests.get(check_url, headers=headers)
+                
+                if check.status_code == 200 and check.json():
+                    id_asist = check.json()[0].get('id')
+                    requests.patch(f"{SUPABASE_URL}/rest/v1/asistencia?id=eq.{id_asist}", 
+                                  headers=headers, json={
+                                      "estado": registro['estado'],
+                                      "retardo": registro['retardo'],
+                                      "uniforme_malo": registro['uniforme_malo'],
+                                      "justificado": registro['justificado'],
+                                      "observaciones": registro['observaciones']
+                                  })
+                else:
+                    requests.post(f"{SUPABASE_URL}/rest/v1/asistencia", headers=headers, json=registro)
+                guardados += 1
+            
+            st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
+            st.balloons()
+            st.rerun()
 # ============================================
 # ESTUDIANTE - VER ASISTENCIA
 # ============================================
