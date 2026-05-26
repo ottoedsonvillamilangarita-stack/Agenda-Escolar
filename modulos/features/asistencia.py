@@ -62,7 +62,7 @@ def mostrar_asistencia_docente(data):
     st.markdown("---")
     
     # Formulario
-    with st.form(key="form_asistencia"):
+    with st.form(key=f"form_asistencia_{curso}_{fecha}"):
         col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
         with col1:
             st.markdown("**Estudiante**")
@@ -80,7 +80,7 @@ def mostrar_asistencia_docente(data):
         
         datos_asistencia = []
         
-        for estudiante in estudiantes:
+        for idx, estudiante in enumerate(estudiantes):
             doc = estudiante.get('documento_estudiante')
             nombre = estudiante.get('nombre_estudiante')[:25]
             existente = asistencias_existentes.get(doc, {})
@@ -90,6 +90,13 @@ def mostrar_asistencia_docente(data):
             uniforme_actual = existente.get('uniforme_malo', False)
             justificado_actual = existente.get('justificado', False)
             observaciones_actual = existente.get('observaciones', "")
+            
+            # Keys únicas usando idx
+            estado_key = f"estado_{doc}_{idx}"
+            retardo_key = f"retardo_{doc}_{idx}"
+            uniforme_key = f"uniforme_{doc}_{idx}"
+            justificado_key = f"justificado_{doc}_{idx}"
+            obs_key = f"obs_{doc}_{idx}"
             
             col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
             
@@ -101,30 +108,30 @@ def mostrar_asistencia_docente(data):
                     "",
                     ["Presente", "Ausente"],
                     index=["Presente", "Ausente"].index(estado_actual),
-                    key=f"estado_{doc}",
+                    key=estado_key,
                     label_visibility="collapsed"
                 )
             
             with col3:
                 if estado == "Presente":
-                    retardo = st.checkbox("", value=retardo_actual, key=f"retardo_{doc}")
+                    retardo = st.checkbox("", value=retardo_actual, key=retardo_key)
                 else:
                     retardo = False
                     st.write("—")
             
             with col4:
-                uniforme = st.checkbox("", value=uniforme_actual, key=f"uniforme_{doc}")
+                uniforme = st.checkbox("", value=uniforme_actual, key=uniforme_key)
             
             with col5:
                 # JUSTIFICADO: disponible para Ausente O Retardo
                 if estado == "Ausente" or retardo:
-                    justificado = st.checkbox("", value=justificado_actual, key=f"justificado_{doc}")
+                    justificado = st.checkbox("", value=justificado_actual, key=justificado_key)
                 else:
                     justificado = False
                     st.write("—")
             
             with col6:
-                observaciones = st.text_input("", value=observaciones_actual, key=f"obs_{doc}",
+                observaciones = st.text_input("", value=observaciones_actual, key=obs_key,
                                              label_visibility="collapsed", placeholder="Observación...")
             
             datos_asistencia.append({
