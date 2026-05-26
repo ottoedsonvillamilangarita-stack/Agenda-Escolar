@@ -153,11 +153,11 @@ def mostrar_asistencia_docente(data):
 
 
 # ============================================
-# DIRECTOR - MARCAR ASISTENCIA
+# DIRECTOR - MARCAR ASISTENCIA (JUSTIFICACIÓN ANTES DE GUARDAR)
 # ============================================
 
 def mostrar_asistencia_director(data):
-    st.subheader("📋 Marcar Asistencia - Director")
+    st.subheader("📋 Marcar Asistencia")
     
     documento_docente = data.get('documento')
     headers = get_headers()
@@ -171,7 +171,7 @@ def mostrar_asistencia_director(data):
         return
     
     curso = response_dir.json()[0].get('curso')
-    st.success(f"📌 Director del curso: **{curso}**")
+    st.success(f"📌 Curso: {curso}")
     
     fecha = st.date_input("Fecha", datetime.now())
     
@@ -262,7 +262,7 @@ def mostrar_asistencia_director(data):
                 "justificado": justificado
             })
         
-        if st.form_submit_button("💾 Guardar", type="primary", use_container_width=True):
+        if st.form_submit_button("💾 Guardar Asistencia", type="primary", use_container_width=True):
             guardados = 0
             for d in datos:
                 check_url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{d['doc']}&fecha=eq.{fecha}"
@@ -288,8 +288,141 @@ def mostrar_asistencia_director(data):
                     requests.post(f"{SUPABASE_URL}/rest/v1/asistencia", headers=headers, json=data_reg)
                 guardados += 1
             
-            st.success(f"✅ Guardados {guardados} registros")
+            st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
             st.balloons()
+
+
+# ============================================
+# DIRECTOR - REPORTE DE ASISTENCIA
+# ============================================
+
+def mostrar_reporte_asistencia_director(data):
+    st.subheader("📊 Reporte de Asistencia")
+    
+    documento_docente = data.get('documento')
+    headers = get_headers()
+    
+    # Obtener curso que dirige
+    url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
+    response_dir = requests.get(url_dir, headers=headers)
+    
+    if response_dir.status_code != 200 or not response_dir.json():
+        st.warning("No eres director de ningún curso")
+        return
+    
+    curso = response_dir.json()[0].get('curso')
+    st.success(f"📌 Curso: {curso}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        fecha_inicio = st.date_input("Desde", datetime.now().replace(day=1))
+    with col2:
+        fecha_fin = st.date_input("Hasta", datetime.now())
+    
+    if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
+        # Obtener estudiantes
+        url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
+        response_est = requests.get(url_est, headers=headers)
+        
+        if response_est.status_code == 200:
+            estudiantes = {e['documento_estudiante']: e['nombre_estudiante'] for e in response_est.json()}
+            
+            # Obtener asistencias
+            url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&fecha=gte.{fecha_inicio}&fecha=lte.{fecha_fin}"
+            response_asist = requests.get(url_asist, headers=headers)
+            
+            if response_asist.status_code == 200:
+                asistencias = response_asist.json()
+                
+                # Procesar por estudiante
+                resumen = {}
+                for doc, nombre in estudiantes.items():
+                    resumen[doc] = {
+                        "nombre": nombre,
+                        "presentes": 0,
+                        "ausentes": 0,
+                        "justificados": 0,
+                        "retardos": 0,
+                        "uniformes": 0
+                    }
+                
+                for a in asistencias:
+                    doc = a.get('documento_estudiante')
+                    if doc in resumen:
+                        if a.get('estado') == 'Presente' and not a.get('retardo'):
+                            resumen[doc]["presentes"] += 1
+                        elif a.get('estado') == 'Ausente':
+                            resumen[doc]["ausentes"] += 1
+                            if a.get('justificado'):
+                                resumen[doc]["justificados"] += 1
+                        if a.get('retardo'):
+                            resumen[doc]["retardos"] += 1
+                        if a.get('uniforme_malo'):
+                            resumen[doc]["uniformes"] += 1
+                
+                # Mostrar tabla
+                st.markdown("---")
+                col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 1, 1, 1, 1])
+                with col1:
+                    st.markdown("**Estudiante**")
+                with col2:
+                    st.markdown("**Presentes**")
+                with col3:
+                    st.markdown("**Ausentes**")
+                with col4:
+                    st.markdown("**Justif.**")
+                with col5:
+                    st.markdown("**Retardos**")
+                with col6:
+                    st.markdown("**Uniforme**")
+                st.markdown("---")
+                
+                for doc, vals in resumen.items():
+                    col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 1, 1, 1, 1])
+                    with col1:
+                        st.write(f"**{vals['nombre'][:25]}**")
+                    with col2:
+                        st.write(f"{vals['presentes']}")
+                    with col3:
+                        st.write(f"{vals['ausentes']}")
+                    with col4:
+                        st.write(f"{vals['justificados']}")
+                    with col5:
+                        st.write(f"{vals['retardos']}")
+                    with col6:
+                        st.write(f"{vals['uniformes']}")
+                
+                st.markdown("---")
+                
+                # Alertas
+                st.subheader("🚨 Alertas")
+                hay_alertas = False
+                for doc, vals in resumen.items():
+                    no_justif = vals["ausentes"] - vals["justificados"]
+                    if no_justif > 3:
+                        st.warning(f"• {vals['nombre']}: {no_justif} ausencias sin justificar")
+                        hay_alertas = True
+                    if vals['retardos'] > 5:
+                        st.warning(f"• {vals['nombre']}: {vals['retardos']} retardos")
+                        hay_alertas = True
+                    if vals['uniformes'] > 3:
+                        st.warning(f"• {vals['nombre']}: {vals['uniformes']} llamados por uniforme")
+                        hay_alertas = True
+                
+                if not hay_alertas:
+                    st.success("✅ No hay estudiantes con alertas")
+                
+                # Descargar
+                df = pd.DataFrame([{
+                    "Estudiante": vals['nombre'],
+                    "Presentes": vals['presentes'],
+                    "Ausentes": vals['ausentes'],
+                    "Justificados": vals['justificados'],
+                    "Retardos": vals['retardos'],
+                    "Uniforme": vals['uniformes']
+                } for doc, vals in resumen.items()])
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Descargar CSV", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
 
 
 # ============================================
