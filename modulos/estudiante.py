@@ -26,9 +26,7 @@ def mostrar(data):
         st.success(f"✅ Bienvenido, {nombre}")
         st.info(f"📚 Curso: {curso}")
         
-        # ============================================
-        # HORARIO SEMANAL (tabla)
-        # ============================================
+        # Horario semanal
         st.subheader("📅 Mi Horario Semanal")
         mostrar_horario_tabla(curso, headers)
     
