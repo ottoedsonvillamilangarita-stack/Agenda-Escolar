@@ -444,6 +444,7 @@ def mostrar_asistencia_director(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
+    # Obtener curso que dirige
     url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
     response_dir = requests.get(url_dir, headers=headers)
     
@@ -452,23 +453,196 @@ def mostrar_asistencia_director(data):
         return
     
     curso = response_dir.json()[0].get('curso')
-    st.success(f"📌 Eres director del curso: **{curso}**")
+    st.success(f"📌 Director del curso: **{curso}**")
     
-    if st.button("📋 Marcar Asistencia Hoy", use_container_width=True):
-        mostrar_asistencia_docente_para_director(data, curso)
-        return
+    # ============================================
+    # MARCAR ASISTENCIA (dentro de la misma función)
+    # ============================================
+    with st.expander("📋 Marcar Asistencia", expanded=False):
+        fecha = st.date_input("Fecha", datetime.now())
+        
+        # Obtener estudiantes del curso
+        url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
+        response_est = requests.get(url_est, headers=headers)
+        
+        if response_est.status_code == 200:
+            estudiantes = response_est.json()
+            
+            if estudiantes:
+                # Obtener asistencias existentes
+                asistencias_existentes = {}
+                url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&fecha=eq.{fecha}"
+                response_asist = requests.get(url_asist, headers=headers)
+                
+                if response_asist.status_code == 200:
+                    for a in response_asist.json():
+                        asistencias_existentes[a.get('documento_estudiante')] = a
+                
+                with st.form(key=f"form_asistencia_{curso}_{fecha}"):
+                    st.markdown(f"**Curso {curso} - {fecha.strftime('%d/%m/%Y')}**")
+                    st.markdown("---")
+                    
+                    # Cabecera simplificada
+                    col1, col2, col3, col4 = st.columns([2, 2, 2, 3])
+                    with col1:
+                        st.markdown("**Estudiante**")
+                    with col2:
+                        st.markdown("**Estado**")
+                    with col3:
+                        st.markdown("**Novedad**")
+                    with col4:
+                        st.markdown("**Observación**")
+                    st.markdown("---")
+                    
+                    datos_asistencia = []
+                    
+                    for estudiante in estudiantes:
+                        doc = estudiante.get('documento_estudiante')
+                        nombre = estudiante.get('nombre_estudiante')[:25]
+                        existente = asistencias_existentes.get(doc, {})
+                        
+                        estado_actual = existente.get('estado', "Presente")
+                        novedad_actual = "Retardo" if existente.get('retardo') else ("Uniforme" if existente.get('uniforme_malo') else "Ninguna")
+                        observaciones_actual = existente.get('observaciones', "")
+                        
+                        col1, col2, col3, col4 = st.columns([2, 2, 2, 3])
+                        
+                        with col1:
+                            st.write(f"**{nombre}**")
+                        with col2:
+                            estado = st.selectbox(
+                                "",
+                                ["Presente", "Ausente"],
+                                index=["Presente", "Ausente"].index(estado_actual),
+                                key=f"estado_{doc}_{fecha}",
+                                label_visibility="collapsed"
+                            )
+                        with col3:
+                            if estado == "Presente":
+                                novedad = st.selectbox(
+                                    "",
+                                    ["Ninguna", "Retardo", "Uniforme"],
+                                    index=["Ninguna", "Retardo", "Uniforme"].index(novedad_actual),
+                                    key=f"novedad_{doc}_{fecha}",
+                                    label_visibility="collapsed"
+                                )
+                            else:
+                                novedad = "Ninguna"
+                                st.write("—")
+                        with col4:
+                            observaciones = st.text_input("", value=observaciones_actual, key=f"obs_{doc}_{fecha}",
+                                                         label_visibility="collapsed", placeholder="Observación...")
+                        
+                        datos_asistencia.append({
+                            "documento_estudiante": doc,
+                            "curso": curso,
+                            "fecha": str(fecha),
+                            "estado": estado,
+                            "retardo": novedad == "Retardo",
+                            "uniforme_malo": novedad == "Uniforme",
+                            "justificado": False,
+                            "observaciones": observaciones,
+                            "documento_docente": documento_docente
+                        })
+                        
+                        st.markdown("---")
+                    
+                    submitted = st.form_submit_button("💾 Guardar Asistencia", type="primary", use_container_width=True)
+                    
+                    if submitted:
+                        guardados = 0
+                        for registro in datos_asistencia:
+                            check_url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{registro['documento_estudiante']}&fecha=eq.{registro['fecha']}"
+                            check = requests.get(check_url, headers=headers)
+                            
+                            if check.status_code == 200 and check.json():
+                                id_asist = check.json()[0].get('id')
+                                requests.patch(f"{SUPABASE_URL}/rest/v1/asistencia?id=eq.{id_asist}", 
+                                              headers=headers, json={
+                                                  "estado": registro['estado'],
+                                                  "retardo": registro['retardo'],
+                                                  "uniforme_malo": registro['uniforme_malo'],
+                                                  "observaciones": registro['observaciones']
+                                              })
+                            else:
+                                requests.post(f"{SUPABASE_URL}/rest/v1/asistencia", headers=headers, json=registro)
+                            guardados += 1
+                        
+                        st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
+                        st.balloons()
+            else:
+                st.info("No hay estudiantes en este curso")
     
+    # ============================================
+    # REPORTE DE ASISTENCIA
+    # ============================================
     st.divider()
+    st.subheader("📊 Reporte de Asistencia")
     
     col1, col2 = st.columns(2)
     with col1:
-        fecha_inicio = st.date_input("Desde")
+        fecha_inicio = st.date_input("Desde", key="reporte_desde")
     with col2:
-        fecha_fin = st.date_input("Hasta")
+        fecha_fin = st.date_input("Hasta", key="reporte_hasta")
     
     if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
-        mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, f"Reporte de Asistencia - Curso {curso}")
-
+        url_datos = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&fecha=gte.{fecha_inicio}&fecha=lte.{fecha_fin}"
+        response_datos = requests.get(url_datos, headers=headers)
+        
+        if response_datos.status_code == 200:
+            datos = response_datos.json()
+            if datos:
+                df = pd.DataFrame(datos)
+                
+                # Mostrar resumen por estudiante
+                st.markdown("---")
+                col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+                with col1:
+                    st.markdown("**Estudiante**")
+                with col2:
+                    st.markdown("**Presentes**")
+                with col3:
+                    st.markdown("**Ausentes**")
+                with col4:
+                    st.markdown("**Retardos**")
+                with col5:
+                    st.markdown("**Uniforme**")
+                st.markdown("---")
+                
+                estudiantes_unicos = set([d.get('documento_estudiante') for d in datos])
+                
+                for doc_est in estudiantes_unicos:
+                    # Obtener nombre del estudiante
+                    url_nombre = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{doc_est}"
+                    resp_nombre = requests.get(url_nombre, headers=headers)
+                    nombre = resp_nombre.json()[0].get('nombre_estudiante') if resp_nombre.status_code == 200 and resp_nombre.json() else doc_est
+                    
+                    registros_est = [d for d in datos if d.get('documento_estudiante') == doc_est]
+                    presentes = len([r for r in registros_est if r.get('estado') == 'Presente' and not r.get('retardo')])
+                    ausentes = len([r for r in registros_est if r.get('estado') == 'Ausente'])
+                    retardos = len([r for r in registros_est if r.get('retardo') == True])
+                    uniformes = len([r for r in registros_est if r.get('uniforme_malo') == True])
+                    
+                    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+                    with col1:
+                        st.write(f"**{nombre[:25]}**")
+                    with col2:
+                        st.write(f"{presentes}")
+                    with col3:
+                        st.write(f"{ausentes}")
+                    with col4:
+                        st.write(f"{retardos}")
+                    with col5:
+                        st.write(f"{uniformes}")
+                
+                st.markdown("---")
+                st.success(f"Total registros: {len(datos)}")
+                
+                # Descargar
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Descargar reporte", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
+            else:
+                st.info("No hay registros en el período seleccionado")
 
 # ============================================
 # ESTUDIANTE - VER ASISTENCIA
