@@ -9,23 +9,8 @@ from utils import SUPABASE_URL, get_headers
 # ============================================
 
 def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="Reporte de Asistencia"):
-     """Función ÚNICA para generar reportes de asistencia"""
+    """Función ÚNICA para generar reportes de asistencia"""
     
-    # DIAGNÓSTICO
-    st.write(f"🔍 Curso: {curso}")
-    st.write(f"📅 Fechas: {fecha_inicio} - {fecha_fin}")
-    
-    # Verificar si hay registros en la tabla asistencia
-    url_test = f"{SUPABASE_URL}/rest/v1/asistencia?limit=1"
-    response_test = requests.get(url_test, headers=headers)
-    st.write(f"📊 Registros en asistencia: {len(response_test.json()) if response_test.status_code == 200 else 0}")
-    
-    # Verificar registros del curso específico
-    url_curso = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&limit=5"
-    response_curso = requests.get(url_curso, headers=headers)
-    st.write(f"📊 Registros para curso {curso}: {len(response_curso.json()) if response_curso.status_code == 200 else 0}")
-    
-    # Obtener estudiantes del curso
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
     response_est = requests.get(url_est, headers=headers)
     
@@ -42,7 +27,6 @@ def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="
     st.markdown(f"**{titulo}**")
     st.markdown("---")
     
-    # Cabecera
     col1, col2, col3, col4, col5, col6, col7 = st.columns([2, 1, 1, 1, 1, 1, 2])
     with col1:
         st.markdown("**Estudiante**")
@@ -107,25 +91,14 @@ def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="
         with col3:
             st.write(f"{ausentes_total}")
         with col4:
-            if ausentes_justificados > 0:
-                st.write(f"✅ {ausentes_justificados}")
-            else:
-                st.write("0")
+            st.write(f"{ausentes_justificados}")
         with col5:
-            if retardos_total > 0:
-                st.warning(f"⚠️ {retardos_total}")
-            else:
-                st.write("0")
+            st.write(f"{retardos_total}")
         with col6:
-            if uniforme_malo > 0:
-                st.warning(f"🎽 {uniforme_malo}")
-            else:
-                st.write("0")
+            st.write(f"{uniforme_malo}")
         with col7:
             if observaciones_lista:
-                with st.expander(f"📝 Ver ({len(observaciones_lista)})"):
-                    for obs in observaciones_lista[:3]:
-                        st.caption(obs)
+                st.write(f"📝 {len(observaciones_lista)} observaciones")
             else:
                 st.write("—")
         
@@ -142,10 +115,9 @@ def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="
     
     st.markdown("---")
     
-    # Alertas
-    st.subheader("🚨 Alertas")
     df = pd.DataFrame(reporte)
     
+    st.subheader("🚨 Alertas")
     df_ausencias = df[df['Aus. No Justif.'] > 3]
     if not df_ausencias.empty:
         st.error("📌 ESTUDIANTES CON MÁS DE 3 AUSENCIAS SIN JUSTIFICAR:")
@@ -167,15 +139,6 @@ def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="
     if df_ausencias.empty and df_retardos.empty and df_uniforme.empty:
         st.success("✅ No hay estudiantes con alertas")
     
-    # Resumen
-    st.subheader("📊 Resumen del Curso")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📋 Total Presentes", df['Presentes'].sum())
-    col2.metric("❌ Total Ausentes", df['Ausentes'].sum())
-    col3.metric("⏰ Total Retardos", df['Retardos'].sum())
-    col4.metric("🎽 Total Uniforme", df['Uniforme mal'].sum())
-    
-    # Descargar
     csv = df.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Descargar reporte", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
     
@@ -192,7 +155,6 @@ def mostrar_asistencia_docente(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
-    # Obtener cursos del docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
     response = requests.get(url, headers=headers)
     
@@ -207,14 +169,12 @@ def mostrar_asistencia_docente(data):
         st.warning("No tienes cursos asignados")
         return
     
-    # Seleccionar curso y fecha
     col1, col2 = st.columns(2)
     with col1:
         curso = st.selectbox("Curso", cursos_unicos)
     with col2:
         fecha = st.date_input("Fecha", datetime.now())
     
-    # Obtener estudiantes
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
     response_est = requests.get(url_est, headers=headers)
     
@@ -227,7 +187,6 @@ def mostrar_asistencia_docente(data):
         st.warning(f"No hay estudiantes en el curso {curso}")
         return
     
-    # Obtener asistencias existentes
     asistencias_existentes = {}
     url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&fecha=eq.{fecha}"
     response_asist = requests.get(url_asist, headers=headers)
@@ -239,9 +198,7 @@ def mostrar_asistencia_docente(data):
     st.markdown(f"**{curso} - {fecha.strftime('%d/%m/%Y')}**")
     st.markdown("---")
     
-    # Formulario
     with st.form(key=f"form_asistencia_{curso}_{fecha}"):
-        # Cabecera
         col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
         with col1:
             st.markdown("**Estudiante**")
@@ -274,7 +231,6 @@ def mostrar_asistencia_docente(data):
             
             with col1:
                 st.write(f"**{nombre}**")
-            
             with col2:
                 estado = st.selectbox(
                     "",
@@ -283,24 +239,20 @@ def mostrar_asistencia_docente(data):
                     key=f"estado_{idx}_{doc}",
                     label_visibility="collapsed"
                 )
-            
             with col3:
                 if estado == "Presente":
                     retardo = st.checkbox("", value=retardo_actual, key=f"retardo_{idx}_{doc}")
                 else:
                     retardo = False
                     st.write("—")
-            
             with col4:
                 uniforme = st.checkbox("", value=uniforme_actual, key=f"uniforme_{idx}_{doc}")
-            
             with col5:
                 if estado == "Ausente" or retardo:
                     justificado = st.checkbox("", value=justificado_actual, key=f"justificado_{idx}_{doc}")
                 else:
                     justificado = False
                     st.write("—")
-            
             with col6:
                 observaciones = st.text_input("", value=observaciones_actual, key=f"obs_{idx}_{doc}",
                                              label_visibility="collapsed", placeholder="Observación...")
@@ -389,39 +341,10 @@ def mostrar_asistencia_estudiante(data):
     col5.metric("🎽 Uniforme mal", uniforme_malo)
     
     st.divider()
-    
-    st.write("**📋 Detalle de ausencias:**")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(f"❌ Ausencias totales: {ausentes_total}")
-        st.write(f"✅ Justificadas: {ausentes_justificados}")
-    with col2:
-        if ausentes_no_justificados > 0:
-            st.warning(f"⚠️ No justificadas: {ausentes_no_justificados}")
-        else:
-            st.success(f"✅ No justificadas: {ausentes_no_justificados}")
-    
-    st.divider()
-    
     st.write("**Detalle de asistencia:**")
     df_mostrar = df[['fecha', 'estado', 'retardo', 'justificado', 'uniforme_malo', 'observaciones']].sort_values('fecha', ascending=False)
     df_mostrar['fecha'] = df_mostrar['fecha'].dt.strftime('%d/%m/%Y')
-    df_mostrar = df_mostrar.rename(columns={
-        'fecha': 'Fecha',
-        'estado': 'Estado',
-        'retardo': 'Retardo',
-        'justificado': 'Justif.',
-        'uniforme_malo': 'Uniforme mal',
-        'observaciones': 'Observaciones'
-    })
     st.dataframe(df_mostrar, use_container_width=True)
-    
-    if ausentes_no_justificados > 3:
-        st.error(f"🚨 ALERTA: Tienes {ausentes_no_justificados} ausencias sin justificar")
-    if retardos_total > 5:
-        st.warning(f"⏰ ALERTA: Tienes {retardos_total} retardos")
-    if uniforme_malo > 3:
-        st.info(f"🎽 ALERTA: Tienes {uniforme_malo} llamados por uniforme")
 
 
 # ============================================
@@ -458,37 +381,8 @@ def mostrar_asistencia_acudiente(data):
                 asistencias = response_asist.json()
                 if asistencias:
                     df = pd.DataFrame(asistencias)
-                    
-                    total = len(df)
-                    presentes = len(df[df['estado'] == 'Presente'])
-                    ausentes_total = len(df[df['estado'] == 'Ausente'])
-                    ausentes_justificados = len(df[(df['estado'] == 'Ausente') & (df['justificado'] == True)])
-                    ausentes_no_justificados = ausentes_total - ausentes_justificados
-                    retardos_total = len(df[df['retardo'] == True])
-                    uniforme_malo = len(df[df['uniforme_malo'] == True])
-                    porcentaje = (presentes / total * 100) if total > 0 else 0
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("✅ Presentes", presentes)
-                    col2.metric("📊 %", f"{porcentaje:.0f}%")
-                    col3.metric("⏰ Retardos", retardos_total)
-                    col4.metric("🎽 Uniforme mal", uniforme_malo)
-                    
-                    st.progress(porcentaje / 100)
-                    
-                    if ausentes_no_justificados > 0:
-                        st.warning(f"⚠️ Ausencias sin justificar: {ausentes_no_justificados}")
-                    
                     df_mostrar = df[['fecha', 'estado', 'retardo', 'justificado', 'uniforme_malo', 'observaciones']].sort_values('fecha', ascending=False)
                     df_mostrar['fecha'] = pd.to_datetime(df_mostrar['fecha']).dt.strftime('%d/%m')
-                    df_mostrar = df_mostrar.rename(columns={
-                        'fecha': 'Fecha',
-                        'estado': 'Estado',
-                        'retardo': 'Retardo',
-                        'justificado': 'Justif.',
-                        'uniforme_malo': 'Uniforme',
-                        'observaciones': 'Observaciones'
-                    })
                     st.dataframe(df_mostrar, use_container_width=True)
                 else:
                     st.info("Sin registros")
@@ -504,7 +398,6 @@ def mostrar_asistencia_director(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
-    # Obtener curso que dirige
     url_dir = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.Dirección de Curso"
     response_dir = requests.get(url_dir, headers=headers)
     
@@ -515,7 +408,6 @@ def mostrar_asistencia_director(data):
     curso = response_dir.json()[0].get('curso')
     st.success(f"📌 Curso: {curso}")
     
-    # Botón para marcar asistencia
     if st.button("📋 Marcar Asistencia Hoy", use_container_width=True):
         mostrar_asistencia_docente(data)
         return
