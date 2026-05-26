@@ -539,13 +539,13 @@ def mostrar_reporte_asistencia_general(data):
     headers = get_headers()
     
     cursos = ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"]
-    curso = st.selectbox("Curso", cursos)
+    curso = st.selectbox("Seleccionar curso", cursos)
     
     col1, col2 = st.columns(2)
     with col1:
-        fecha_inicio = st.date_input("Fecha inicio")
+        fecha_inicio = st.date_input("Desde")
     with col2:
-        fecha_fin = st.date_input("Fecha fin")
+        fecha_fin = st.date_input("Hasta")
     
     if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
         if curso == "Todos":
@@ -560,6 +560,27 @@ def mostrar_reporte_asistencia_general(data):
         
         estudiantes = response_est.json()
         
+        if not estudiantes:
+            st.warning("No hay estudiantes")
+            return
+        
+        # Cabecera del reporte
+        st.markdown("---")
+        col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 1, 1, 1, 1])
+        with col1:
+            st.markdown("**Estudiante**")
+        with col2:
+            st.markdown("**Ausencias**")
+        with col3:
+            st.markdown("**Justif.**")
+        with col4:
+            st.markdown("**No Justif.**")
+        with col5:
+            st.markdown("**Retardos**")
+        with col6:
+            st.markdown("**Uniforme**")
+        st.markdown("---")
+        
         reporte = []
         for estudiante in estudiantes:
             doc = estudiante.get('documento_estudiante')
@@ -569,44 +590,104 @@ def mostrar_reporte_asistencia_general(data):
             url_asist = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{doc}&fecha=gte.{fecha_inicio}&fecha=lte.{fecha_fin}"
             response_asist = requests.get(url_asist, headers=headers)
             
+            ausentes_total = 0
+            ausentes_justificados = 0
+            retardos_total = 0
+            uniforme_malo = 0
+            
             if response_asist.status_code == 200:
                 asistencias = response_asist.json()
-                total = len(asistencias)
-                presentes = len([a for a in asistencias if a['estado'] == 'Presente'])
-                ausentes_total = len([a for a in asistencias if a['estado'] == 'Ausente'])
-                ausentes_justificados = len([a for a in asistencias if a['estado'] == 'Ausente' and a.get('justificado') == True])
-                ausentes_no_justificados = ausentes_total - ausentes_justificados
-                retardos_total = len([a for a in asistencias if a.get('retardo') == True])
-                uniforme_malo = len([a for a in asistencias if a.get('uniforme_malo') == True])
-                porcentaje = (presentes / total * 100) if total > 0 else 0
-                
-                reporte.append({
-                    "Curso": curso_est,
-                    "Estudiante": nombre,
-                    "Presentes": presentes,
-                    "Ausentes": ausentes_total,
-                    "Aus. Justif.": ausentes_justificados,
-                    "Aus. No Justif.": ausentes_no_justificados,
-                    "Retardos": retardos_total,
-                    "Uniforme mal": uniforme_malo,
-                    "% Asist.": f"{porcentaje:.0f}"
-                })
+                if asistencias:
+                    for a in asistencias:
+                        if a.get('estado') == 'Ausente':
+                            ausentes_total += 1
+                            if a.get('justificado') == True:
+                                ausentes_justificados += 1
+                        
+                        if a.get('retardo') == True:
+                            retardos_total += 1
+                        
+                        if a.get('uniforme_malo') == True:
+                            uniforme_malo += 1
+            
+            ausentes_no_justificados = ausentes_total - ausentes_justificados
+            
+            col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 1, 1, 1, 1])
+            with col1:
+                st.write(f"**{nombre}**")
+            with col2:
+                st.write(f"{ausentes_total}")
+            with col3:
+                if ausentes_justificados > 0:
+                    st.write(f"✅ {ausentes_justificados}")
+                else:
+                    st.write("—")
+            with col4:
+                if ausentes_no_justificados > 0:
+                    st.warning(f"⚠️ {ausentes_no_justificados}")
+                else:
+                    st.write("—")
+            with col5:
+                if retardos_total > 0:
+                    st.warning(f"⏰ {retardos_total}")
+                else:
+                    st.write("—")
+            with col6:
+                if uniforme_malo > 0:
+                    st.warning(f"🎽 {uniforme_malo}")
+                else:
+                    st.write("—")
+            
+            reporte.append({
+                "Curso": curso_est,
+                "Estudiante": nombre,
+                "Ausencias": ausentes_total,
+                "Justificadas": ausentes_justificados,
+                "No Justificadas": ausentes_no_justificados,
+                "Retardos": retardos_total,
+                "Uniforme mal": uniforme_malo
+            })
         
         if reporte:
+            st.markdown("---")
             df = pd.DataFrame(reporte)
-            st.dataframe(df, use_container_width=True)
             
+            # Alertas
+            st.subheader("🚨 Alertas")
+            
+            df_ausencias = df[df['No Justificadas'] > 3]
+            if not df_ausencias.empty:
+                st.error("📌 ESTUDIANTES CON MÁS DE 3 AUSENCIAS SIN JUSTIFICAR:")
+                for _, row in df_ausencias.iterrows():
+                    st.write(f"• {row['Estudiante']}: {row['No Justificadas']} ausencias sin justificar")
+            
+            df_retardos = df[df['Retardos'] > 5]
+            if not df_retardos.empty:
+                st.warning("⏰ ESTUDIANTES CON MÁS DE 5 RETARDOS:")
+                for _, row in df_retardos.iterrows():
+                    st.write(f"• {row['Estudiante']}: {row['Retardos']} retardos")
+            
+            df_uniforme = df[df['Uniforme mal'] > 3]
+            if not df_uniforme.empty:
+                st.info("🎽 ESTUDIANTES CON PROBLEMAS DE UNIFORME:")
+                for _, row in df_uniforme.iterrows():
+                    st.write(f"• {row['Estudiante']}: {row['Uniforme mal']} veces")
+            
+            if df_ausencias.empty and df_retardos.empty and df_uniforme.empty:
+                st.success("✅ No hay estudiantes con alertas")
+            
+            # Resumen por curso
             st.subheader("📊 Resumen por Curso")
             resumen_curso = df.groupby('Curso').agg({
-                'Presentes': 'sum',
-                'Ausentes': 'sum',
-                'Aus. Justif.': 'sum',
-                'Aus. No Justif.': 'sum',
+                'Ausencias': 'sum',
+                'Justificadas': 'sum',
+                'No Justificadas': 'sum',
                 'Retardos': 'sum',
                 'Uniforme mal': 'sum'
             }).reset_index()
             st.dataframe(resumen_curso, use_container_width=True)
             
+            # Descargar
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Descargar reporte", data=csv, file_name="reporte_asistencia_general.csv", mime="text/csv")
         else:
