@@ -14,7 +14,7 @@ def mostrar_asistencia_docente(data):
     documento_docente = data.get('documento')
     headers = get_headers()
     
-    # Obtener cursos del docente (incluye dirección de curso)
+    # Obtener cursos del docente
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
     response = requests.get(url, headers=headers)
     
@@ -63,7 +63,7 @@ def mostrar_asistencia_docente(data):
     st.markdown("---")
     
     # Columnas
-    col1, col2, col3, col4, col5 = st.columns([2, 2, 1, 1, 3])
+    col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
     with col1:
         st.markdown("**Estudiante**")
     with col2:
@@ -73,6 +73,8 @@ def mostrar_asistencia_docente(data):
     with col4:
         st.markdown("**Uniforme**")
     with col5:
+        st.markdown("**Justif.**")
+    with col6:
         st.markdown("**Observación**")
     st.markdown("---")
     
@@ -87,9 +89,10 @@ def mostrar_asistencia_docente(data):
         estado_actual = existente.get('estado', "Presente")
         retardo_actual = existente.get('retardo', False)
         uniforme_actual = existente.get('uniforme_malo', False)
+        justificado_actual = existente.get('justificado', False)
         observaciones_actual = existente.get('observaciones', "")
         
-        col1, col2, col3, col4, col5 = st.columns([2, 2, 1, 1, 3])
+        col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
         
         with col1:
             st.write(f"**{nombre}**")
@@ -104,12 +107,23 @@ def mostrar_asistencia_docente(data):
             )
         
         with col3:
-            retardo = st.checkbox("", value=retardo_actual, key=f"retardo_{doc}_{fecha}")
+            if estado == "Presente":
+                retardo = st.checkbox("", value=retardo_actual, key=f"retardo_{doc}_{fecha}")
+            else:
+                retardo = False
+                st.write("—")
         
         with col4:
             uniforme = st.checkbox("", value=uniforme_actual, key=f"uniforme_{doc}_{fecha}")
         
         with col5:
+            if estado == "Ausente" or retardo:
+                justificado = st.checkbox("", value=justificado_actual, key=f"justificado_{doc}_{fecha}")
+            else:
+                justificado = False
+                st.write("—")
+        
+        with col6:
             observaciones = st.text_input("", value=observaciones_actual, key=f"obs_{doc}_{fecha}",
                                          label_visibility="collapsed", placeholder="Observación...")
         
@@ -118,8 +132,9 @@ def mostrar_asistencia_docente(data):
             "curso": curso,
             "fecha": str(fecha),
             "estado": estado,
-            "retardo": retardo,
+            "retardo": retardo if estado == "Presente" else False,
             "uniforme_malo": uniforme,
+            "justificado": justificado if (estado == "Ausente" or retardo) else False,
             "observaciones": observaciones,
             "documento_docente": documento_docente
         })
@@ -139,6 +154,7 @@ def mostrar_asistencia_docente(data):
                     "estado": registro['estado'],
                     "retardo": registro['retardo'],
                     "uniforme_malo": registro['uniforme_malo'],
+                    "justificado": registro['justificado'],
                     "observaciones": registro['observaciones']
                 }
                 response = requests.patch(f"{SUPABASE_URL}/rest/v1/asistencia?id=eq.{id_asist}", 
@@ -182,35 +198,70 @@ def mostrar_asistencia_estudiante(data):
     # Estadísticas
     total = len(df)
     presentes = len(df[df['estado'] == 'Presente'])
-    ausentes = len(df[df['estado'] == 'Ausente'])
-    retardos = len(df[df['retardo'] == True])
+    
+    ausentes_total = len(df[df['estado'] == 'Ausente'])
+    ausentes_justificados = len(df[(df['estado'] == 'Ausente') & (df['justificado'] == True)])
+    ausentes_no_justificados = ausentes_total - ausentes_justificados
+    
+    retardos_total = len(df[df['retardo'] == True])
+    retardos_justificados = len(df[(df['retardo'] == True) & (df['justificado'] == True)])
+    retardos_no_justificados = retardos_total - retardos_justificados
+    
     uniforme_malo = len(df[df['uniforme_malo'] == True])
     porcentaje = (presentes / total * 100) if total > 0 else 0
     
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Total días", total)
     col2.metric("✅ Presentes", presentes)
-    col3.metric("❌ Ausentes", ausentes)
-    col4.metric("⏰ Retardos", retardos)
-    col5.metric("🎽 Uniforme mal", uniforme_malo)
+    col3.metric("📈 % Asistencia", f"{porcentaje:.0f}%")
+    col4.metric("🎽 Uniforme mal", uniforme_malo)
     
-    st.progress(porcentaje / 100)
-    st.caption(f"📈 Porcentaje de asistencia: {porcentaje:.1f}%")
+    st.divider()
+    
+    # Detalle de ausencias
+    st.write("**📋 Detalle de ausencias:**")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"❌ Ausencias totales: {ausentes_total}")
+        st.write(f"✅ Justificadas: {ausentes_justificados}")
+    with col2:
+        if ausentes_no_justificados > 0:
+            st.warning(f"⚠️ No justificadas: {ausentes_no_justificados}")
+        else:
+            st.success(f"✅ No justificadas: {ausentes_no_justificados}")
+    
+    st.divider()
+    
+    # Detalle de retardos
+    st.write("**⏰ Detalle de retardos:**")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"⏰ Retardos totales: {retardos_total}")
+        st.write(f"✅ Justificados: {retardos_justificados}")
+    with col2:
+        if retardos_no_justificados > 0:
+            st.warning(f"⚠️ No justificados: {retardos_no_justificados}")
+        else:
+            st.success(f"✅ No justificados: {retardos_no_justificados}")
     
     st.divider()
     
     # Tabla detallada
     st.write("**Detalle de asistencia:**")
-    df_mostrar = df[['fecha', 'estado', 'retardo', 'uniforme_malo', 'observaciones']].sort_values('fecha', ascending=False)
+    df_mostrar = df[['fecha', 'estado', 'retardo', 'justificado', 'uniforme_malo', 'observaciones']].sort_values('fecha', ascending=False)
     df_mostrar['fecha'] = df_mostrar['fecha'].dt.strftime('%d/%m/%Y')
     df_mostrar = df_mostrar.rename(columns={
         'fecha': 'Fecha',
         'estado': 'Estado',
         'retardo': 'Retardo',
+        'justificado': 'Justif.',
         'uniforme_malo': 'Uniforme mal',
         'observaciones': 'Observaciones'
     })
     st.dataframe(df_mostrar, use_container_width=True)
+    
+    if ausentes_no_justificados > 3:
+        st.error(f"🚨 ALERTA: Tienes {ausentes_no_justificados} ausencias sin justificar")
 
 
 # ============================================
@@ -250,26 +301,39 @@ def mostrar_asistencia_acudiente(data):
                     
                     total = len(df)
                     presentes = len(df[df['estado'] == 'Presente'])
-                    ausentes = len(df[df['estado'] == 'Ausente'])
-                    retardos = len(df[df['retardo'] == True])
+                    
+                    ausentes_total = len(df[df['estado'] == 'Ausente'])
+                    ausentes_justificados = len(df[(df['estado'] == 'Ausente') & (df['justificado'] == True)])
+                    ausentes_no_justificados = ausentes_total - ausentes_justificados
+                    
+                    retardos_total = len(df[df['retardo'] == True])
+                    retardos_justificados = len(df[(df['retardo'] == True) & (df['justificado'] == True)])
+                    retardos_no_justificados = retardos_total - retardos_justificados
+                    
                     uniforme_malo = len(df[df['uniforme_malo'] == True])
                     porcentaje = (presentes / total * 100) if total > 0 else 0
                     
                     col1, col2, col3, col4 = st.columns(4)
                     col1.metric("✅ Presentes", presentes)
                     col2.metric("📊 %", f"{porcentaje:.0f}%")
-                    col3.metric("⏰ Retardos", retardos)
+                    col3.metric("❌ Ausencias", ausentes_total)
                     col4.metric("🎽 Uniforme mal", uniforme_malo)
                     
                     st.progress(porcentaje / 100)
                     
+                    if ausentes_no_justificados > 0:
+                        st.warning(f"⚠️ Ausencias sin justificar: {ausentes_no_justificados}")
+                    if retardos_no_justificados > 0:
+                        st.warning(f"⚠️ Retardos sin justificar: {retardos_no_justificados}")
+                    
                     st.write("**Detalle:**")
-                    df_mostrar = df[['fecha', 'estado', 'retardo', 'uniforme_malo', 'observaciones']].sort_values('fecha', ascending=False)
+                    df_mostrar = df[['fecha', 'estado', 'retardo', 'justificado', 'uniforme_malo', 'observaciones']].sort_values('fecha', ascending=False)
                     df_mostrar['fecha'] = pd.to_datetime(df_mostrar['fecha']).dt.strftime('%d/%m')
                     df_mostrar = df_mostrar.rename(columns={
                         'fecha': 'Fecha',
                         'estado': 'Estado',
                         'retardo': 'Retardo',
+                        'justificado': 'Justif.',
                         'uniforme_malo': 'Uniforme',
                         'observaciones': 'Observaciones'
                     })
@@ -283,7 +347,7 @@ def mostrar_asistencia_acudiente(data):
 # ============================================
 
 def mostrar_asistencia_director(data):
-    st.subheader("📋 Asistencia del Curso")
+    st.subheader("📋 Reporte de Asistencia del Curso")
     
     documento_docente = data.get('documento')
     headers = get_headers()
@@ -303,10 +367,8 @@ def mostrar_asistencia_director(data):
     modo = st.radio("Seleccionar acción:", ["📋 Marcar Asistencia", "📊 Ver Reporte"], horizontal=True)
     
     if modo == "📋 Marcar Asistencia":
-        # Llamar a la función de asistencia del docente
         mostrar_asistencia_docente(data)
     else:
-        # Mostrar reporte
         st.divider()
         
         col1, col2 = st.columns(2)
@@ -337,16 +399,27 @@ def mostrar_asistencia_director(data):
                     asistencias = response_asist.json()
                     total = len(asistencias)
                     presentes = len([a for a in asistencias if a['estado'] == 'Presente'])
-                    ausentes = len([a for a in asistencias if a['estado'] == 'Ausente'])
-                    retardos = len([a for a in asistencias if a.get('retardo') == True])
+                    
+                    ausentes_total = len([a for a in asistencias if a['estado'] == 'Ausente'])
+                    ausentes_justificados = len([a for a in asistencias if a['estado'] == 'Ausente' and a.get('justificado') == True])
+                    ausentes_no_justificados = ausentes_total - ausentes_justificados
+                    
+                    retardos_total = len([a for a in asistencias if a.get('retardo') == True])
+                    retardos_justificados = len([a for a in asistencias if a.get('retardo') == True and a.get('justificado') == True])
+                    retardos_no_justificados = retardos_total - retardos_justificados
+                    
                     uniforme_malo = len([a for a in asistencias if a.get('uniforme_malo') == True])
                     porcentaje = (presentes / total * 100) if total > 0 else 0
                     
                     reporte.append({
                         "Estudiante": nombre,
                         "Presentes": presentes,
-                        "Ausentes": ausentes,
-                        "Retardos": retardos,
+                        "Ausentes": ausentes_total,
+                        "Aus. Justif.": ausentes_justificados,
+                        "Aus. No Justif.": ausentes_no_justificados,
+                        "Retardos": retardos_total,
+                        "Ret. Justif.": retardos_justificados,
+                        "Ret. No Justif.": retardos_no_justificados,
                         "Uniforme mal": uniforme_malo,
                         "% Asist.": f"{porcentaje:.0f}"
                     })
@@ -356,18 +429,19 @@ def mostrar_asistencia_director(data):
                 st.dataframe(df, use_container_width=True)
                 
                 # Resaltar estudiantes con problemas
-                df_alerta = df[(df['Ausentes'] > 3) | (df['Retardos'] > 5) | (df['Uniforme mal'] > 3)]
+                df_alerta = df[(df['Aus. No Justif.'] > 3) | (df['Ret. No Justif.'] > 5) | (df['Uniforme mal'] > 3)]
                 if not df_alerta.empty:
                     st.error("🚨 ESTUDIANTES CON ALERTAS:")
-                    st.dataframe(df_alerta[['Estudiante', 'Ausentes', 'Retardos', 'Uniforme mal']], use_container_width=True)
+                    st.dataframe(df_alerta[['Estudiante', 'Aus. No Justif.', 'Ret. No Justif.', 'Uniforme mal']], use_container_width=True)
                 
                 csv = df.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Descargar reporte", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
             else:
                 st.info("No hay datos en el período seleccionado")
 
+
 # ============================================
-# REPORTE PARA SECRETARIA/COORDINADOR
+# SECRETARIA/COORDINADOR - REPORTE GENERAL
 # ============================================
 
 def mostrar_reporte_asistencia_general(data):
@@ -375,11 +449,9 @@ def mostrar_reporte_asistencia_general(data):
     
     headers = get_headers()
     
-    # Seleccionar curso
     cursos = ["Todos", "901", "902", "903", "1001", "1002", "1003", "1101"]
     curso = st.selectbox("Curso", cursos)
     
-    # Seleccionar período
     col1, col2 = st.columns(2)
     with col1:
         fecha_inicio = st.date_input("Fecha inicio")
@@ -387,7 +459,6 @@ def mostrar_reporte_asistencia_general(data):
         fecha_fin = st.date_input("Fecha fin")
     
     if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
-        # Obtener estudiantes
         if curso == "Todos":
             url_est = f"{SUPABASE_URL}/rest/v1/estudiantes"
         else:
@@ -413,8 +484,15 @@ def mostrar_reporte_asistencia_general(data):
                 asistencias = response_asist.json()
                 total = len(asistencias)
                 presentes = len([a for a in asistencias if a['estado'] == 'Presente'])
-                ausentes = len([a for a in asistencias if a['estado'] == 'Ausente'])
-                retardos = len([a for a in asistencias if a.get('retardo') == True])
+                
+                ausentes_total = len([a for a in asistencias if a['estado'] == 'Ausente'])
+                ausentes_justificados = len([a for a in asistencias if a['estado'] == 'Ausente' and a.get('justificado') == True])
+                ausentes_no_justificados = ausentes_total - ausentes_justificados
+                
+                retardos_total = len([a for a in asistencias if a.get('retardo') == True])
+                retardos_justificados = len([a for a in asistencias if a.get('retardo') == True and a.get('justificado') == True])
+                retardos_no_justificados = retardos_total - retardos_justificados
+                
                 uniforme_malo = len([a for a in asistencias if a.get('uniforme_malo') == True])
                 porcentaje = (presentes / total * 100) if total > 0 else 0
                 
@@ -422,8 +500,12 @@ def mostrar_reporte_asistencia_general(data):
                     "Curso": curso_est,
                     "Estudiante": nombre,
                     "Presentes": presentes,
-                    "Ausentes": ausentes,
-                    "Retardos": retardos,
+                    "Ausentes": ausentes_total,
+                    "Aus. Justif.": ausentes_justificados,
+                    "Aus. No Justif.": ausentes_no_justificados,
+                    "Retardos": retardos_total,
+                    "Ret. Justif.": retardos_justificados,
+                    "Ret. No Justif.": retardos_no_justificados,
                     "Uniforme mal": uniforme_malo,
                     "% Asist.": f"{porcentaje:.0f}"
                 })
@@ -437,7 +519,11 @@ def mostrar_reporte_asistencia_general(data):
             resumen_curso = df.groupby('Curso').agg({
                 'Presentes': 'sum',
                 'Ausentes': 'sum',
+                'Aus. Justif.': 'sum',
+                'Aus. No Justif.': 'sum',
                 'Retardos': 'sum',
+                'Ret. Justif.': 'sum',
+                'Ret. No Justif.': 'sum',
                 'Uniforme mal': 'sum'
             }).reset_index()
             st.dataframe(resumen_curso, use_container_width=True)
