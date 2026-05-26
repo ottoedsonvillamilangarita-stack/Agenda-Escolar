@@ -9,7 +9,21 @@ from utils import SUPABASE_URL, get_headers
 # ============================================
 
 def mostrar_reporte_asistencia(curso, fecha_inicio, fecha_fin, headers, titulo="Reporte de Asistencia"):
-    """Función ÚNICA para generar reportes de asistencia (reutilizable por todos los perfiles)"""
+     """Función ÚNICA para generar reportes de asistencia"""
+    
+    # DIAGNÓSTICO
+    st.write(f"🔍 Curso: {curso}")
+    st.write(f"📅 Fechas: {fecha_inicio} - {fecha_fin}")
+    
+    # Verificar si hay registros en la tabla asistencia
+    url_test = f"{SUPABASE_URL}/rest/v1/asistencia?limit=1"
+    response_test = requests.get(url_test, headers=headers)
+    st.write(f"📊 Registros en asistencia: {len(response_test.json()) if response_test.status_code == 200 else 0}")
+    
+    # Verificar registros del curso específico
+    url_curso = f"{SUPABASE_URL}/rest/v1/asistencia?curso=eq.{curso}&limit=5"
+    response_curso = requests.get(url_curso, headers=headers)
+    st.write(f"📊 Registros para curso {curso}: {len(response_curso.json()) if response_curso.status_code == 200 else 0}")
     
     # Obtener estudiantes del curso
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
