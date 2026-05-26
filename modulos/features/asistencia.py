@@ -108,11 +108,8 @@ def mostrar_asistencia_docente(data):
             with col4:
                 uniforme = st.checkbox("", value=uniforme_val, key=f"uniforme_doc_{idx}_{doc}")
             with col5:
-                if estado == "Ausente" or retardo or uniforme:
-                    justificado = st.checkbox("", value=justificado_val, key=f"justi_doc_{idx}_{doc}")
-                else:
-                    justificado = False
-                    st.write("—")
+                # JUSTIFICADO: SIEMPRE visible
+                justificado = st.checkbox("", value=justificado_val, key=f"justi_doc_{idx}_{doc}")
             
             datos.append({
                 "doc": doc,
@@ -153,7 +150,7 @@ def mostrar_asistencia_docente(data):
 
 
 # ============================================
-# DIRECTOR - MARCAR ASISTENCIA (JUSTIFICACIÓN ANTES DE GUARDAR)
+# DIRECTOR - MARCAR ASISTENCIA
 # ============================================
 
 def mostrar_asistencia_director(data):
@@ -248,11 +245,8 @@ def mostrar_asistencia_director(data):
             with col4:
                 uniforme = st.checkbox("", value=uniforme_val, key=f"uniforme_dir_{idx}_{doc}")
             with col5:
-                if estado == "Ausente" or retardo or uniforme:
-                    justificado = st.checkbox("", value=justificado_val, key=f"justi_dir_{idx}_{doc}")
-                else:
-                    justificado = False
-                    st.write("—")
+                # JUSTIFICADO: SIEMPRE visible
+                justificado = st.checkbox("", value=justificado_val, key=f"justi_dir_{idx}_{doc}")
             
             datos.append({
                 "doc": doc,
