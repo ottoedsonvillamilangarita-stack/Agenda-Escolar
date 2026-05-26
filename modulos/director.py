@@ -31,7 +31,7 @@ def mostrar(data):
     st.success(f"🎓 Director del curso: **{curso_dirige}**")
     
     # Pestañas
-    tab1, tab2, tab3, tab4 = st.tabs(["📋 Estudiantes", "📖 Notas del Curso", "📋 Asistencia", "📊 Reportes"])
+    tab1, tab2, tab3 = st.tabs(["📋 Estudiantes", "📖 Notas del Curso", "📋 Asistencia"])
     
     with tab1:
         st.subheader(f"📋 Estudiantes del Curso {curso_dirige}")
