@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_curso
-from modulos.features.asistencia import mostrar_asistencia_director
+from modulos.features.asistencia import mostrar_asistencia_director, mostrar_reporte_asistencia_director
 
 def mostrar(data):
     st.title("🧭 Director de Grupo")
@@ -30,8 +30,8 @@ def mostrar(data):
     curso_dirige = direccion[0].get('curso')
     st.success(f"🎓 Director del curso: **{curso_dirige}**")
     
-    # Pestañas (solo 3)
-    tab1, tab2, tab3 = st.tabs(["📋 Estudiantes", "📖 Notas del Curso", "📋 Asistencia"])
+    # Pestañas
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Estudiantes", "📖 Notas del Curso", "📋 Asistencia", "📊 Reportes"])
     
     with tab1:
         st.subheader(f"📋 Estudiantes del Curso {curso_dirige}")
@@ -53,3 +53,6 @@ def mostrar(data):
     
     with tab3:
         mostrar_asistencia_director(data)
+    
+    with tab4:
+        mostrar_reporte_asistencia_director(data)
