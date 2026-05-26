@@ -36,6 +36,10 @@ def mostrar_asistencia_docente(data):
     with col2:
         fecha = st.date_input("Fecha", datetime.now())
     
+    # Botón para cargar/refrescar
+    if st.button("🔄 Cargar estudiantes", key="cargar_estudiantes"):
+        st.rerun()
+    
     # Obtener estudiantes
     url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
     response_est = requests.get(url_est, headers=headers)
@@ -61,119 +65,135 @@ def mostrar_asistencia_docente(data):
     st.markdown(f"**{curso} - {fecha.strftime('%d/%m/%Y')}**")
     st.markdown("---")
     
-    # Formulario
-    with st.form(key=f"form_asistencia_{curso}_{fecha}"):
+    # Cabecera
+    col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
+    with col1:
+        st.markdown("**Estudiante**")
+    with col2:
+        st.markdown("**Estado**")
+    with col3:
+        st.markdown("**Retardo**")
+    with col4:
+        st.markdown("**Uniforme**")
+    with col5:
+        st.markdown("**Justif.**")
+    with col6:
+        st.markdown("**Observación**")
+    st.markdown("---")
+    
+    # Variables para almacenar cambios
+    datos_asistencia = []
+    
+    # Mostrar cada estudiante
+    for idx, estudiante in enumerate(estudiantes):
+        doc = estudiante.get('documento_estudiante')
+        nombre = estudiante.get('nombre_estudiante')[:25]
+        existente = asistencias_existentes.get(doc, {})
+        
+        estado_actual = existente.get('estado', "Presente")
+        retardo_actual = existente.get('retardo', False)
+        uniforme_actual = existente.get('uniforme_malo', False)
+        justificado_actual = existente.get('justificado', False)
+        observaciones_actual = existente.get('observaciones', "")
+        
+        # Usar session_state para almacenar valores temporales
+        estado_key = f"estado_{doc}_{fecha}"
+        retardo_key = f"retardo_{doc}_{fecha}"
+        uniforme_key = f"uniforme_{doc}_{fecha}"
+        justificado_key = f"justificado_{doc}_{fecha}"
+        obs_key = f"obs_{doc}_{fecha}"
+        
+        # Inicializar session_state si no existe
+        if estado_key not in st.session_state:
+            st.session_state[estado_key] = estado_actual
+        if retardo_key not in st.session_state:
+            st.session_state[retardo_key] = retardo_actual
+        if uniforme_key not in st.session_state:
+            st.session_state[uniforme_key] = uniforme_actual
+        if justificado_key not in st.session_state:
+            st.session_state[justificado_key] = justificado_actual
+        if obs_key not in st.session_state:
+            st.session_state[obs_key] = observaciones_actual
+        
         col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
+        
         with col1:
-            st.markdown("**Estudiante**")
+            st.write(f"**{nombre}**")
+        
         with col2:
-            st.markdown("**Estado**")
+            estado = st.selectbox(
+                "",
+                ["Presente", "Ausente"],
+                index=["Presente", "Ausente"].index(st.session_state[estado_key]),
+                key=estado_key,
+                label_visibility="collapsed"
+            )
+            st.session_state[estado_key] = estado
+        
         with col3:
-            st.markdown("**Retardo**")
+            if estado == "Presente":
+                retardo = st.checkbox("", value=st.session_state[retardo_key], key=retardo_key)
+                st.session_state[retardo_key] = retardo
+            else:
+                retardo = False
+                st.write("—")
+        
         with col4:
-            st.markdown("**Uniforme**")
+            uniforme = st.checkbox("", value=st.session_state[uniforme_key], key=uniforme_key)
+            st.session_state[uniforme_key] = uniforme
+        
         with col5:
-            st.markdown("**Justif.**")
+            if estado == "Ausente" or retardo:
+                justificado = st.checkbox("", value=st.session_state[justificado_key], key=justificado_key)
+                st.session_state[justificado_key] = justificado
+            else:
+                justificado = False
+                st.write("—")
+        
         with col6:
-            st.markdown("**Observación**")
+            observaciones = st.text_input("", value=st.session_state[obs_key], key=obs_key,
+                                         label_visibility="collapsed", placeholder="Observación...")
+            st.session_state[obs_key] = observaciones
+        
+        datos_asistencia.append({
+            "documento_estudiante": doc,
+            "curso": curso,
+            "fecha": str(fecha),
+            "estado": estado,
+            "retardo": retardo if estado == "Presente" else False,
+            "uniforme_malo": uniforme,
+            "justificado": justificado if (estado == "Ausente" or retardo) else False,
+            "observaciones": observaciones,
+            "documento_docente": documento_docente
+        })
+        
         st.markdown("---")
+    
+    # Botón de guardar fuera del bucle
+    if st.button("💾 Guardar Asistencia", type="primary", use_container_width=True, key=f"guardar_{curso}_{fecha}"):
+        guardados = 0
+        for registro in datos_asistencia:
+            check_url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{registro['documento_estudiante']}&fecha=eq.{registro['fecha']}"
+            check = requests.get(check_url, headers=headers)
+            
+            if check.status_code == 200 and check.json():
+                id_asist = check.json()[0].get('id')
+                update_data = {
+                    "estado": registro['estado'],
+                    "retardo": registro['retardo'],
+                    "uniforme_malo": registro['uniforme_malo'],
+                    "justificado": registro['justificado'],
+                    "observaciones": registro['observaciones']
+                }
+                requests.patch(f"{SUPABASE_URL}/rest/v1/asistencia?id=eq.{id_asist}", 
+                              headers=headers, json=update_data)
+            else:
+                requests.post(f"{SUPABASE_URL}/rest/v1/asistencia", headers=headers, json=registro)
+            guardados += 1
         
-        datos_asistencia = []
-        
-        for idx, estudiante in enumerate(estudiantes):
-            doc = estudiante.get('documento_estudiante')
-            nombre = estudiante.get('nombre_estudiante')[:25]
-            existente = asistencias_existentes.get(doc, {})
-            
-            estado_actual = existente.get('estado', "Presente")
-            retardo_actual = existente.get('retardo', False)
-            uniforme_actual = existente.get('uniforme_malo', False)
-            justificado_actual = existente.get('justificado', False)
-            observaciones_actual = existente.get('observaciones', "")
-            
-            # Keys únicas usando idx
-            estado_key = f"estado_{doc}_{idx}"
-            retardo_key = f"retardo_{doc}_{idx}"
-            uniforme_key = f"uniforme_{doc}_{idx}"
-            justificado_key = f"justificado_{doc}_{idx}"
-            obs_key = f"obs_{doc}_{idx}"
-            
-            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1, 1, 1, 2])
-            
-            with col1:
-                st.write(f"**{nombre}**")
-            
-            with col2:
-                estado = st.selectbox(
-                    "",
-                    ["Presente", "Ausente"],
-                    index=["Presente", "Ausente"].index(estado_actual),
-                    key=estado_key,
-                    label_visibility="collapsed"
-                )
-            
-            with col3:
-                if estado == "Presente":
-                    retardo = st.checkbox("", value=retardo_actual, key=retardo_key)
-                else:
-                    retardo = False
-                    st.write("—")
-            
-            with col4:
-                uniforme = st.checkbox("", value=uniforme_actual, key=uniforme_key)
-            
-            with col5:
-                # JUSTIFICADO: disponible para Ausente O Retardo
-                if estado == "Ausente" or retardo:
-                    justificado = st.checkbox("", value=justificado_actual, key=justificado_key)
-                else:
-                    justificado = False
-                    st.write("—")
-            
-            with col6:
-                observaciones = st.text_input("", value=observaciones_actual, key=obs_key,
-                                             label_visibility="collapsed", placeholder="Observación...")
-            
-            datos_asistencia.append({
-                "documento_estudiante": doc,
-                "curso": curso,
-                "fecha": str(fecha),
-                "estado": estado,
-                "retardo": retardo if estado == "Presente" else False,
-                "uniforme_malo": uniforme,
-                "justificado": justificado if (estado == "Ausente" or retardo) else False,
-                "observaciones": observaciones,
-                "documento_docente": documento_docente
-            })
-            
-            st.markdown("---")
-        
-        submitted = st.form_submit_button("💾 Guardar Asistencia", type="primary", use_container_width=True)
-        
-        if submitted:
-            guardados = 0
-            for registro in datos_asistencia:
-                check_url = f"{SUPABASE_URL}/rest/v1/asistencia?documento_estudiante=eq.{registro['documento_estudiante']}&fecha=eq.{registro['fecha']}"
-                check = requests.get(check_url, headers=headers)
-                
-                if check.status_code == 200 and check.json():
-                    id_asist = check.json()[0].get('id')
-                    update_data = {
-                        "estado": registro['estado'],
-                        "retardo": registro['retardo'],
-                        "uniforme_malo": registro['uniforme_malo'],
-                        "justificado": registro['justificado'],
-                        "observaciones": registro['observaciones']
-                    }
-                    requests.patch(f"{SUPABASE_URL}/rest/v1/asistencia?id=eq.{id_asist}", 
-                                  headers=headers, json=update_data)
-                else:
-                    requests.post(f"{SUPABASE_URL}/rest/v1/asistencia", headers=headers, json=registro)
-                guardados += 1
-            
-            st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
-            st.balloons()
-
+        st.success(f"✅ Asistencia guardada para {guardados} estudiantes")
+        st.balloons()
+        st.rerun()
 # ============================================
 # ESTUDIANTE - VER ASISTENCIA
 # ============================================
