@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
 from modulos.features.horarios import mostrar_horario_tabla
+from modulos.features.asistencia import mostrar_reporte_asistencia_general
 
 def mostrar(data):
     st.title("📋 Panel de Coordinador")
