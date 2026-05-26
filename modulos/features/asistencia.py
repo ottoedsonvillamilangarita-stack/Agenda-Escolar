@@ -390,7 +390,6 @@ def mostrar_asistencia_director(data):
     
     if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
         # ... resto del código de reporte ...
-
 # ============================================
 # SECRETARIA/COORDINADOR - REPORTE GENERAL
 # ============================================
