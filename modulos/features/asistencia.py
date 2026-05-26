@@ -350,14 +350,6 @@ def mostrar_asistencia_director(data):
         fecha_fin = st.date_input("Hasta")
     
     if st.button("📊 Generar Reporte", type="primary", use_container_width=True):
-        # Primero, verificar si hay datos en la tabla asistencia
-        url_verificar = f"{SUPABASE_URL}/rest/v1/asistencia?select=count"
-        response_verificar = requests.get(url_verificar, headers=headers)
-        
-        if response_verificar.status_code == 200:
-            total_registros = len(response_verificar.json()) if response_verificar.json() else 0
-            st.info(f"📊 Total registros en tabla asistencia: {total_registros}")
-        
         # Obtener estudiantes del curso
         url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{curso}"
         response_est = requests.get(url_est, headers=headers)
@@ -406,6 +398,7 @@ def mostrar_asistencia_director(data):
             retardos_total = 0
             uniforme_malo = 0
             observaciones_lista = []
+            detalles = []
             
             if response_asist.status_code == 200:
                 asistencias = response_asist.json()
@@ -413,26 +406,35 @@ def mostrar_asistencia_director(data):
                 if asistencias:
                     for a in asistencias:
                         estado = a.get('estado', '')
+                        retardo = a.get('retardo', False)
+                        uniforme = a.get('uniforme_malo', False)
+                        justificado = a.get('justificado', False)
+                        obs = a.get('observaciones', '')
+                        fecha_reg = a.get('fecha', '')[:10]
+                        
                         if estado == 'Presente':
                             presentes += 1
+                            if retardo:
+                                retardos_total += 1
+                                detalles.append(f"{fecha_reg}: Retardo")
                         elif estado == 'Ausente':
                             ausentes_total += 1
-                            if a.get('justificado') == True:
+                            if justificado:
                                 ausentes_justificados += 1
+                                detalles.append(f"{fecha_reg}: Ausencia justificada")
+                            else:
+                                detalles.append(f"{fecha_reg}: Ausencia sin justificar")
                         
-                        if a.get('retardo') == True:
-                            retardos_total += 1
-                        if a.get('uniforme_malo') == True:
+                        if uniforme:
                             uniforme_malo += 1
+                            detalles.append(f"{fecha_reg}: Uniforme incorrecto")
                         
-                        obs = a.get('observaciones', '')
                         if obs and obs.strip():
-                            observaciones_lista.append(obs)
+                            observaciones_lista.append(f"{fecha_reg}: {obs}")
             
             ausentes_no_justificados = ausentes_total - ausentes_justificados
             total_dias = presentes + ausentes_total
             
-            # DEBUG: Mostrar información para verificar
             if total_dias > 0:
                 porcentaje = (presentes / total_dias * 100)
             else:
@@ -461,10 +463,12 @@ def mostrar_asistencia_director(data):
                 else:
                     st.write("0")
             with col7:
-                if observaciones_lista:
-                    with st.expander(f"📝 Ver ({len(observaciones_lista)})"):
-                        for obs in observaciones_lista[:3]:
-                            st.caption(obs)
+                if detalles or observaciones_lista:
+                    with st.expander(f"📝 Ver detalles"):
+                        for d in detalles[:5]:
+                            st.caption(d)
+                        for o in observaciones_lista[:3]:
+                            st.caption(o)
                 else:
                     st.write("—")
             
@@ -507,7 +511,7 @@ def mostrar_asistencia_director(data):
             if df_ausencias.empty and df_retardos.empty and df_uniforme.empty:
                 st.success("✅ No hay estudiantes con alertas")
             
-            # Mostrar un resumen de estadísticas
+            # Resumen del curso
             st.subheader("📊 Resumen del Curso")
             total_presentes = df['Presentes'].sum()
             total_ausentes = df['Ausentes'].sum()
@@ -525,7 +529,6 @@ def mostrar_asistencia_director(data):
             st.download_button("📥 Descargar reporte completo", data=csv, file_name=f"asistencia_{curso}.csv", mime="text/csv")
         else:
             st.info("No hay datos en el período seleccionado")
-
 # ============================================
 # SECRETARIA/COORDINADOR - REPORTE GENERAL
 # ============================================
