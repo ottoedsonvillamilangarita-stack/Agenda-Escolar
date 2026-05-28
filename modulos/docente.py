@@ -99,4 +99,8 @@ def mostrar_mis_cursos(asignaciones):
         with st.expander(f"📖 Curso {curso}"):
             for materia in materias_lista:
                 st.write(f"- {materia}")
-mensajeria.mostrar(datos)
+def mostrar(datos):
+
+    st.title("Panel")
+
+    mensajeria.mostrar(datos)
