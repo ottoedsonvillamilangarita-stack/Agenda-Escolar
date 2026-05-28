@@ -35,7 +35,7 @@ def mostrar(data):
         st.success("🎓 Eres Director de Curso")
         for d in direcciones:
             st.info(f"📌 Curso: {d.get('curso')}")
-            mensajeria.mostrar(datos)
+        
     
     # ============================================
     # HORARIO PERSONAL DEL DOCENTE (tabla)
@@ -99,3 +99,4 @@ def mostrar_mis_cursos(asignaciones):
         with st.expander(f"📖 Curso {curso}"):
             for materia in materias_lista:
                 st.write(f"- {materia}")
+mensajeria.mostrar(datos)
