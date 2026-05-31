@@ -99,29 +99,17 @@ def mostrar_dashboard():
     except:
         total_docentes = 0
     
-    # Contar acudientes únicos
-    try:
-        response_acud = requests.get(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers)
-        if response_acud.status_code == 200:
-            acudientes = response_acud.json()
-            acudientes_unicos = set([a.get('documento_acudiente') for a in acudientes if a.get('documento_acudiente')])
-            total_acudientes = len(acudientes_unicos)
-        else:
-            total_acudientes = 0
-    except:
-        total_acudientes = 0
-    
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("👨‍🎓 Estudiantes", total_estudiantes)
     col2.metric("👨‍🏫 Docentes", total_docentes)
-    col3.metric("👨‍👩‍👧 Acudientes", total_acudientes)
-    col4.metric("📚 Cursos", "7")
+    col3.metric("📚 Cursos", "7")
+    col4.metric("📅 Año Lectivo", "2024")
     
     st.info("🔐 Panel de control del Administrador")
 
 
 # ============================================
-# GESTIÓN DE ESTUDIANTES (CON MÚLTIPLES ACUDIENTES)
+# GESTIÓN DE ESTUDIANTES
 # ============================================
 
 def gestion_estudiantes():
@@ -137,17 +125,8 @@ def gestion_estudiantes():
             if response.status_code == 200:
                 estudiantes = response.json()
                 if estudiantes:
-                    # Obtener acudientes para cada estudiante
-                    for est in estudiantes:
-                        doc_est = est.get('documento_estudiante')
-                        response_acud = requests.get(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{doc_est}", headers=headers)
-                        if response_acud.status_code == 200:
-                            acudientes = response_acud.json()
-                            nombres_acud = [a.get('nombre_acudiente') for a in acudientes]
-                            est['acudientes'] = ", ".join(nombres_acud) if nombres_acud else "Sin acudiente"
-                    
                     df = pd.DataFrame(estudiantes)
-                    columnas = ['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante', 'curso', 'acudientes']
+                    columnas = ['nombre_estudiante', 'apellidos_estudiante', 'documento_estudiante', 'curso']
                     columnas_existentes = [col for col in columnas if col in df.columns]
                     st.dataframe(df[columnas_existentes], use_container_width=True)
                     st.caption(f"Total: {len(estudiantes)} estudiantes")
@@ -158,7 +137,6 @@ def gestion_estudiantes():
     
     with tab2:
         st.write("**Registrar nuevo estudiante**")
-        st.info("Puedes agregar hasta 3 acudientes por estudiante")
         
         with st.form("nuevo_estudiante", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -168,50 +146,27 @@ def gestion_estudiantes():
                 apellidos = st.text_input("Apellidos *")
                 documento = st.text_input("Documento de identidad *")
                 curso = st.selectbox("Curso *", ["901", "902", "903", "1001", "1002", "1003", "1101"])
-                telefono = st.text_input("Teléfono del estudiante")
-                email = st.text_input("Email del estudiante")
+                telefono = st.text_input("Teléfono")
+                email = st.text_input("Email")
             
             with col2:
-                st.markdown("**Acudiente Principal**")
-                nombre_acudiente1 = st.text_input("Nombre del acudiente principal *")
-                documento_acudiente1 = st.text_input("Documento del acudiente principal *")
-                parentesco1 = st.selectbox("Parentesco", ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"], key="parentesco1")
-                telefono_acudiente1 = st.text_input("Teléfono del acudiente principal")
-                email_acudiente1 = st.text_input("Email del acudiente principal")
-            
-            st.markdown("**Acudiente Secundario (opcional)**")
-            col3, col4 = st.columns(2)
-            with col3:
-                nombre_acudiente2 = st.text_input("Nombre del acudiente secundario")
-                documento_acudiente2 = st.text_input("Documento del acudiente secundario")
-                parentesco2 = st.selectbox("Parentesco", ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"], key="parentesco2")
-            with col4:
-                telefono_acudiente2 = st.text_input("Teléfono del acudiente secundario")
-                email_acudiente2 = st.text_input("Email del acudiente secundario")
-            
-            st.markdown("**Acudiente Terciario (opcional)**")
-            col5, col6 = st.columns(2)
-            with col5:
-                nombre_acudiente3 = st.text_input("Nombre del acudiente terciario")
-                documento_acudiente3 = st.text_input("Documento del acudiente terciario")
-                parentesco3 = st.selectbox("Parentesco", ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"], key="parentesco3")
-            with col6:
-                telefono_acudiente3 = st.text_input("Teléfono del acudiente terciario")
-                email_acudiente3 = st.text_input("Email del acudiente terciario")
+                nombre_acudiente = st.text_input("Nombre del acudiente *")
+                documento_acudiente = st.text_input("Documento del acudiente *")
+                parentesco = st.selectbox("Parentesco", ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"])
+                telefono_acudiente = st.text_input("Teléfono del acudiente")
+                email_acudiente = st.text_input("Email del acudiente")
             
             if st.form_submit_button("💾 Registrar Estudiante", type="primary"):
-                if not all([nombre, apellidos, documento, curso, nombre_acudiente1, documento_acudiente1]):
+                if not all([nombre, apellidos, documento, curso, nombre_acudiente, documento_acudiente]):
                     st.error("❌ Completa todos los campos obligatorios (*)")
                 else:
-                    # Verificar si ya existe
                     check_url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento}"
                     check_response = requests.get(check_url, headers=headers)
                     
                     if check_response.status_code == 200 and check_response.json():
                         st.error(f"❌ Ya existe un estudiante con el documento {documento}")
                     else:
-                        # Insertar estudiante
-                        data_estudiante = {
+                        data = {
                             "nombre_estudiante": nombre,
                             "apellidos_estudiante": apellidos,
                             "documento_estudiante": documento,
@@ -219,81 +174,62 @@ def gestion_estudiantes():
                             "telefono_estudiante": telefono,
                             "email_estudiante": email
                         }
-                        response = requests.post(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers, json=data_estudiante)
+                        response = requests.post(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers, json=data)
                         
                         if response.status_code == 201:
-                            # Insertar acudientes
-                            acudientes_data = [
-                                (nombre_acudiente1, documento_acudiente1, parentesco1, telefono_acudiente1, email_acudiente1, True),
-                                (nombre_acudiente2, documento_acudiente2, parentesco2, telefono_acudiente2, email_acudiente2, False),
-                                (nombre_acudiente3, documento_acudiente3, parentesco3, telefono_acudiente3, email_acudiente3, False)
-                            ]
-                            
-                            for nombre_acud, doc_acud, parent, tel, mail, es_principal in acudientes_data:
-                                if nombre_acud and doc_acud:
-                                    data_acudiente = {
-                                        "documento_estudiante": documento,
-                                        "documento_acudiente": doc_acud,
-                                        "nombre_acudiente": nombre_acud,
-                                        "parentesco": parent,
-                                        "telefono_acudiente": tel,
-                                        "email_acudiente": mail,
-                                        "es_principal": es_principal
-                                    }
-                                    requests.post(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers, json=data_acudiente)
-                                    
-                                    # Crear usuario para el acudiente si no existe
-                                    user_check = requests.get(f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{doc_acud}", headers=headers)
-                                    if user_check.status_code == 200 and not user_check.json():
-                                        user_data = {
-                                            "username": doc_acud,
-                                            "password_hash": "demo2026",
-                                            "rol": "acudiente",
-                                            "documento": doc_acud,
-                                            "roles": ["acudiente"]
-                                        }
-                                        requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_data)
-                            
                             # Crear usuario para el estudiante
-                            user_estudiante = {
+                            user_data = {
                                 "username": documento,
                                 "password_hash": "demo2026",
                                 "rol": "estudiante",
                                 "documento": documento,
                                 "roles": ["estudiante"]
                             }
-                            requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_estudiante)
+                            requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_data)
+                            
+                            # Crear acudiente
+                            acud_data = {
+                                "documento_estudiante": documento,
+                                "documento_acudiente": documento_acudiente,
+                                "nombre_acudiente": nombre_acudiente,
+                                "parentesco": parentesco,
+                                "telefono_acudiente": telefono_acudiente,
+                                "email_acudiente": email_acudiente,
+                                "es_principal": True
+                            }
+                            requests.post(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers, json=acud_data)
+                            
+                            # Crear usuario para el acudiente
+                            user_acud = {
+                                "username": documento_acudiente,
+                                "password_hash": "demo2026",
+                                "rol": "acudiente",
+                                "documento": documento_acudiente,
+                                "roles": ["acudiente"]
+                            }
+                            requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_acud)
                             
                             st.success(f"✅ Estudiante {nombre} {apellidos} registrado")
                             st.balloons()
                         else:
                             st.error(f"Error al registrar: {response.status_code}")
     
-        with tab3:
+    with tab3:
         st.write("**Editar estudiante existente**")
         
         documento_buscar = st.text_input("Documento de identidad del estudiante", key="buscar_estudiante_editar")
         
         if documento_buscar:
             with st.spinner("Buscando estudiante..."):
-                # Buscar estudiante
                 url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}"
                 response = requests.get(url, headers=headers)
                 
                 if response.status_code == 200 and response.json():
                     estudiante = response.json()[0]
                     
-                    # Buscar acudientes (con timeout)
-                    try:
-                        response_acud = requests.get(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, timeout=10)
-                        acudientes = response_acud.json() if response_acud.status_code == 200 else []
-                    except:
-                        acudientes = []
-                    
                     with st.form("editar_estudiante_form"):
                         st.success(f"Editando: {estudiante.get('nombre_estudiante', '')} {estudiante.get('apellidos_estudiante', '')}")
                         
-                        # Datos básicos del estudiante
                         col1, col2 = st.columns(2)
                         with col1:
                             nombre = st.text_input("Nombre", value=estudiante.get('nombre_estudiante', ''))
@@ -304,50 +240,7 @@ def gestion_estudiantes():
                             telefono = st.text_input("Teléfono", value=estudiante.get('telefono_estudiante', ''))
                             email = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
                         
-                        st.divider()
-                        st.write("**Acudientes**")
-                        
-                        # Mostrar acudientes existentes (simplificado)
-                        if acudientes:
-                            for idx, acud in enumerate(acudientes):
-                                with st.container():
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        nombre_acud = st.text_input("Nombre", value=acud.get('nombre_acudiente', ''), key=f"nombre_acud_{idx}")
-                                        doc_acud = st.text_input("Documento", value=acud.get('documento_acudiente', ''), key=f"doc_acud_{idx}")
-                                    with col2:
-                                        telefono_acud = st.text_input("Teléfono", value=acud.get('telefono_acudiente', ''), key=f"tel_acud_{idx}")
-                                        email_acud = st.text_input("Email", value=acud.get('email_acudiente', ''), key=f"email_acud_{idx}")
-                                    st.divider()
-                        else:
-                            st.info("No hay acudientes registrados")
-                        
-                        # Agregar nuevo acudiente
-                        with st.expander("➕ Agregar nuevo acudiente"):
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                nuevo_nombre = st.text_input("Nombre", key="nuevo_nombre")
-                                nuevo_doc = st.text_input("Documento", key="nuevo_doc")
-                            with col2:
-                                nuevo_telefono = st.text_input("Teléfono", key="nuevo_telefono")
-                                nuevo_email = st.text_input("Email", key="nuevo_email")
-                            
-                            if st.button("Agregar acudiente"):
-                                if nuevo_nombre and nuevo_doc:
-                                    # Insertar nuevo acudiente
-                                    new_acud_data = {
-                                        "documento_estudiante": documento_buscar,
-                                        "documento_acudiente": nuevo_doc,
-                                        "nombre_acudiente": nuevo_nombre,
-                                        "telefono_acudiente": nuevo_telefono,
-                                        "email_acudiente": nuevo_email
-                                    }
-                                    requests.post(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers, json=new_acud_data)
-                                    st.success("Acudiente agregado")
-                                    st.rerun()
-                        
                         if st.form_submit_button("💾 Guardar Cambios", type="primary"):
-                            # Actualizar datos del estudiante
                             data_update = {
                                 "nombre_estudiante": nombre,
                                 "apellidos_estudiante": apellidos,
@@ -356,30 +249,17 @@ def gestion_estudiantes():
                                 "email_estudiante": email
                             }
                             update_url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}"
-                            requests.patch(update_url, headers=headers, json=data_update)
+                            response_update = requests.patch(update_url, headers=headers, json=data_update)
                             
-                            # Actualizar acudientes existentes
-                            for idx, acud in enumerate(acudientes):
-                                nombre_acud = st.session_state.get(f"nombre_acud_{idx}", acud.get('nombre_acudiente', ''))
-                                doc_acud = st.session_state.get(f"doc_acud_{idx}", acud.get('documento_acudiente', ''))
-                                tel_acud = st.session_state.get(f"tel_acud_{idx}", acud.get('telefono_acudiente', ''))
-                                email_acud = st.session_state.get(f"email_acud_{idx}", acud.get('email_acudiente', ''))
-                                
-                                if nombre_acud and doc_acud:
-                                    update_acud_url = f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud['id']}"
-                                    acud_data = {
-                                        "nombre_acudiente": nombre_acud,
-                                        "documento_acudiente": doc_acud,
-                                        "telefono_acudiente": tel_acud,
-                                        "email_acudiente": email_acud
-                                    }
-                                    requests.patch(update_acud_url, headers=headers, json=acud_data)
-                            
-                            st.success("✅ Estudiante actualizado exitosamente")
-                            st.balloons()
-                            st.rerun()
+                            if response_update.status_code == 200:
+                                st.success("✅ Estudiante actualizado exitosamente")
+                                st.rerun()
+                            else:
+                                st.error(f"Error al actualizar: {response_update.status_code}")
                 elif response.status_code == 200:
                     st.warning("No se encontró un estudiante con ese documento")
+
+
 # ============================================
 # GESTIÓN DE ACUDIENTES
 # ============================================
@@ -409,7 +289,6 @@ def gestion_acudientes():
                             "hijos": []
                         }
                     if doc_acud:
-                        # Obtener nombre del hijo
                         hijo_url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{rel.get('documento_estudiante')}"
                         hijo_resp = requests.get(hijo_url, headers=headers)
                         if hijo_resp.status_code == 200 and hijo_resp.json():
@@ -484,7 +363,6 @@ def gestion_docentes():
                 if not all([nombre, apellidos, documento]):
                     st.error("❌ Completa todos los campos obligatorios (*)")
                 else:
-                    # Verificar si ya existe
                     check_url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento}"
                     check_response = requests.get(check_url, headers=headers)
                     
@@ -505,7 +383,6 @@ def gestion_docentes():
                         response = requests.post(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers, json=data)
                         
                         if response.status_code == 201:
-                            # Crear usuario para login
                             username = nombre.lower().replace(" ", "_")
                             user_data = {
                                 "username": username,
