@@ -702,7 +702,7 @@ def configurar_horas_nivel(headers):
     
     st.divider()
     
-    # 3. Agregar nueva hora (VERSIÓN SIMPLIFICADA)
+    # 3. Agregar nueva hora (CORREGIDO: usa "time" en lugar de "datetime.time")
     st.write("**Agregar nueva hora**")
     
     with st.container():
@@ -711,9 +711,9 @@ def configurar_horas_nivel(headers):
         with col1:
             nuevo_orden = st.number_input("Orden", min_value=1, value=len(horas) + 1, step=1, key="nuevo_orden")
         with col2:
-            nueva_hora_inicio = st.time_input("Inicio", value=datetime.time(6, 50), key="nueva_inicio")
+            nueva_hora_inicio = st.time_input("Inicio", value=time(6, 50), key="nueva_inicio")
         with col3:
-            nueva_hora_fin = st.time_input("Fin", value=datetime.time(7, 20), key="nueva_fin")
+            nueva_hora_fin = st.time_input("Fin", value=time(7, 20), key="nueva_fin")
         with col4:
             nueva_desc = st.text_input("Descripción", key="nueva_desc")
         
@@ -774,6 +774,7 @@ def configurar_horas_nivel(headers):
                         st.rerun()
                     else:
                         st.error(f"Error: {r.status_code}")
+
 def configurar_jornada_nivel(headers):
     st.write("**📅 Configurar Días Laborales por Nivel**")
     
