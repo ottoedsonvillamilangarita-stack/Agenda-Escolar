@@ -660,12 +660,14 @@ def configurar_niveles(headers):
 
 def configurar_horas_nivel(headers):
     st.write("**⏰ Configurar Horas por Nivel**")
-    st.info("Define las franjas horarias (horas de clase) para cada nivel.")
+    st.info("Define las franjas horarias para cada nivel.")
     
+    # 1. Cargar niveles
     response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     
     if response_niveles.status_code != 200:
-        st.error("Error al cargar niveles")
+        st.error(f"Error al cargar niveles: {response_niveles.status_code}")
+        st.code(response_niveles.text)
         return
     
     niveles = response_niveles.json()
@@ -678,74 +680,100 @@ def configurar_horas_nivel(headers):
     nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres, key="horas_nivel_select")
     nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_seleccionado)
     
-    # Obtener horas actuales del nivel
+    st.info(f"Nivel ID: {nivel_id}")
+    
+    # 2. Obtener horas actuales
     url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}&order=orden.asc"
     response_horas = requests.get(url_horas, headers=headers)
-    horas = response_horas.json() if response_horas.status_code == 200 else []
     
-    st.write(f"**Horas configuradas para {nivel_seleccionado}:** {len(horas)} horas")
+    if response_horas.status_code != 200:
+        st.error(f"Error al cargar horas: {response_horas.status_code}")
+        return
+    
+    horas = response_horas.json()
+    
+    st.write(f"**Horas configuradas:** {len(horas)}")
     
     if horas:
-        df = pd.DataFrame(horas)
-        df['hora_inicio'] = pd.to_datetime(df['hora_inicio']).dt.strftime('%H:%M')
-        df['hora_fin'] = pd.to_datetime(df['hora_fin']).dt.strftime('%H:%M')
-        st.dataframe(df[['orden', 'hora_inicio', 'hora_fin', 'descripcion']], use_container_width=True)
+        for h in horas:
+            st.write(f"- {h['orden']}: {h['hora_inicio'][:5]} - {h['hora_fin'][:5]} ({h.get('descripcion', '')})")
+    else:
+        st.info("No hay horas configuradas para este nivel.")
     
     st.divider()
     
-    # Agregar nueva hora - Usando un formulario para evitar el parpadeo
-    with st.expander("➕ Agregar hora de clase", expanded=True):
-        with st.form(key="agregar_hora_form"):
-            col1, col2, col3, col4 = st.columns([1, 2, 2, 2])
-            with col1:
-                orden = st.number_input("Orden", min_value=1, max_value=20, value=len(horas) + 1, step=1, key="nueva_hora_orden")
-            with col2:
-                hora_inicio = st.time_input("Hora inicio", value=datetime.time(6, 50), key="nueva_hora_inicio")
-            with col3:
-                hora_fin = st.time_input("Hora fin", value=datetime.time(7, 20), key="nueva_hora_fin")
-            with col4:
-                descripcion = st.text_input("Descripción", placeholder="Ej: Primera hora", key="nueva_hora_desc")
+    # 3. Agregar nueva hora (VERSIÓN SIMPLIFICADA)
+    st.write("**Agregar nueva hora**")
+    
+    with st.container():
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            nuevo_orden = st.number_input("Orden", min_value=1, value=len(horas) + 1, step=1, key="nuevo_orden")
+        with col2:
+            nueva_hora_inicio = st.time_input("Inicio", value=datetime.time(6, 50), key="nueva_inicio")
+        with col3:
+            nueva_hora_fin = st.time_input("Fin", value=datetime.time(7, 20), key="nueva_fin")
+        with col4:
+            nueva_desc = st.text_input("Descripción", key="nueva_desc")
+        
+        # Botón fuera del formulario para simplificar
+        if st.button("➕ Agregar hora", type="primary", key="btn_agregar_hora_simple"):
+            st.write("📤 Enviando solicitud...")
             
-            # Botón dentro del formulario
-            submitted = st.form_submit_button("➕ Agregar hora", type="primary")
-            
-            if submitted:
-                # Validar que la hora fin sea después de la hora inicio
-                if hora_fin <= hora_inicio:
-                    st.error("❌ La hora de fin debe ser después de la hora de inicio")
-                else:
-                    data_insert = {
-                        "nivel_id": nivel_id,
-                        "orden": orden,
-                        "hora_inicio": str(hora_inicio),
-                        "hora_fin": str(hora_fin),
-                        "descripcion": descripcion
-                    }
-                    r = requests.post(f"{SUPABASE_URL}/rest/v1/horas_nivel", headers=headers, json=data_insert)
+            # Validar
+            if nueva_hora_fin <= nueva_hora_inicio:
+                st.error("❌ La hora de fin debe ser después de la hora de inicio")
+            else:
+                data_insert = {
+                    "nivel_id": nivel_id,
+                    "orden": int(nuevo_orden),
+                    "hora_inicio": str(nueva_hora_inicio),
+                    "hora_fin": str(nueva_hora_fin),
+                    "descripcion": nueva_desc
+                }
+                
+                st.write("Datos a enviar:", data_insert)
+                
+                try:
+                    r = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/horas_nivel",
+                        headers=headers,
+                        json=data_insert
+                    )
+                    
+                    st.write(f"Status code: {r.status_code}")
+                    st.write(f"Respuesta: {r.text}")
+                    
                     if r.status_code == 201:
-                        st.success(f"✅ Hora {orden} agregada correctamente")
+                        st.success("✅ Hora agregada correctamente")
                         st.rerun()
                     else:
-                        st.error(f"❌ Error al agregar: {r.status_code} - {r.text}")
+                        st.error(f"❌ Error: {r.status_code}")
+                        st.code(r.text)
+                except Exception as e:
+                    st.error(f"❌ Excepción: {str(e)}")
     
-    # Eliminar horas
+    # 4. Eliminar horas
     if horas:
         st.divider()
-        st.write("**🗑️ Eliminar hora de clase:**")
+        st.write("**🗑️ Eliminar horas existentes:**")
         
         for hora in horas:
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.write(f"Hora {hora['orden']}: {str(hora['hora_inicio'])[:5]} - {str(hora['hora_fin'])[:5]} - {hora.get('descripcion', '')}")
+                st.write(f"Hora {hora['orden']}: {hora['hora_inicio'][:5]} - {hora['hora_fin'][:5]}")
             with col2:
-                if st.button("🗑️ Eliminar", key=f"del_hora_{hora['id']}"):
-                    r = requests.delete(f"{SUPABASE_URL}/rest/v1/horas_nivel?id=eq.{hora['id']}", headers=headers)
+                if st.button("🗑️", key=f"del_hora_{hora['id']}"):
+                    r = requests.delete(
+                        f"{SUPABASE_URL}/rest/v1/horas_nivel?id=eq.{hora['id']}",
+                        headers=headers
+                    )
                     if r.status_code == 204:
-                        st.success(f"✅ Hora {hora['orden']} eliminada")
+                        st.success("✅ Eliminada")
                         st.rerun()
                     else:
-                        st.error(f"❌ Error al eliminar: {r.status_code}")
-
+                        st.error(f"Error: {r.status_code}")
 def configurar_jornada_nivel(headers):
     st.write("**📅 Configurar Días Laborales por Nivel**")
     
