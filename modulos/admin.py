@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, time  # ← Agrega ", time" aquí
 from utils import SUPABASE_URL, get_headers
 
 def mostrar(data):
