@@ -838,7 +838,7 @@ def configurar_jornada_nivel(headers):
 def configurar_horario_curso(headers):
     st.write("**📖 Asignar Materias por Curso**")
     
-    # Lista de cursos (puedes agregar más)
+    # Lista de cursos
     cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
     
     response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
@@ -850,9 +850,9 @@ def configurar_horario_curso(headers):
     
     col1, col2 = st.columns(2)
     with col1:
-        curso = st.selectbox("Curso", cursos, key="curso_select")
+        curso = st.selectbox("Curso", cursos, key="curso_select_asignacion")
     with col2:
-        nivel_curso = st.selectbox("Nivel del curso", [n['nombre'] for n in niveles], key="nivel_curso_select")
+        nivel_curso = st.selectbox("Nivel del curso", [n['nombre'] for n in niveles], key="nivel_curso_select_asignacion")
         nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_curso)
     
     # Obtener horas del nivel
@@ -873,6 +873,7 @@ def configurar_horario_curso(headers):
     response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     docentes = response_docentes.json() if response_docentes.status_code == 200 else []
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
+    lista_docentes = list(docentes_dict.keys())
     
     # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
@@ -880,13 +881,13 @@ def configurar_horario_curso(headers):
     st.info(f"Horas del nivel: {len(horas)} clases por día")
     
     # Botón para guardar todo de una vez
-    if st.button("💾 Guardar todas las asignaciones", type="primary", key="guardar_todo_btn"):
+    if st.button("💾 Guardar todas las asignaciones", type="primary", key="guardar_todo_asignacion"):
         st.success("✅ Horario guardado correctamente")
         st.rerun()
     
     st.divider()
     
-    # Mostrar tabla de asignación
+    # Mostrar tabla de asignación - USANDO UN SOLO BUCLE CON CLAVES ÚNICAS
     for hora in horas:
         st.write(f"**Hora {hora['orden']}: {str(hora['hora_inicio'])[:5]} - {str(hora['hora_fin'])[:5]}**")
         
@@ -895,18 +896,44 @@ def configurar_horario_curso(headers):
             with cols[idx]:
                 st.write(f"📅 {dia_nombre}")
                 
+                # Buscar si existe horario para esta celda
                 existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
                 
-                asignatura = st.text_input("Asignatura", value=existente.get('asignatura', '') if existente else '',
-                                          key=f"asig_{curso}_{dia_num}_{hora['orden']}")
+                # Generar clave ÚNICA para cada widget
+                key_base = f"{curso}_{dia_num}_{hora['orden']}_{idx}"
                 
-                docente = st.selectbox("Docente", options=[""] + list(docentes_dict.keys()),
-                                      format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
-                                      key=f"doc_{curso}_{dia_num}_{hora['orden']}")
+                # Asignatura
+                default_asignatura = existente.get('asignatura', '') if existente else ''
+                asignatura = st.text_input(
+                    "Asignatura",
+                    value=default_asignatura,
+                    key=f"asig_{key_base}"
+                )
                 
-                salon = st.text_input("Salón", value=existente.get('salon', '') if existente else '',
-                                     key=f"salon_{curso}_{dia_num}_{hora['orden']}")
+                # Docente - con opción vacía al inicio
+                default_docente = existente.get('documento_docente', '') if existente else ''
+                default_idx = 0
+                if default_docente and default_docente in lista_docentes:
+                    default_idx = lista_docentes.index(default_docente) + 1
                 
+                opciones_docentes = [""] + lista_docentes
+                docente = st.selectbox(
+                    "Docente",
+                    options=opciones_docentes,
+                    index=default_idx,
+                    format_func=lambda x: docentes_dict.get(x, "Ninguno") if x else "Seleccionar",
+                    key=f"doc_{key_base}"
+                )
+                
+                # Salón
+                default_salon = existente.get('salon', '') if existente else ''
+                salon = st.text_input(
+                    "Salón",
+                    value=default_salon,
+                    key=f"salon_{key_base}"
+                )
+                
+                # Guardar automáticamente al cambiar
                 if asignatura:
                     data_horario = {
                         "curso": curso,
@@ -920,19 +947,34 @@ def configurar_horario_curso(headers):
                         "salon": salon
                     }
                     
-                    if existente:
-                        # Actualizar existente
-                        requests.patch(f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}", 
-                                      headers=headers, json=data_horario)
-                    else:
-                        # Crear nuevo
-                        requests.post(f"{SUPABASE_URL}/rest/v1/horario_base", headers=headers, json=data_horario)
+                    try:
+                        if existente:
+                            # Actualizar existente
+                            requests.patch(
+                                f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}", 
+                                headers=headers,
+                                json=data_horario
+                            )
+                        else:
+                            # Crear nuevo
+                            requests.post(
+                                f"{SUPABASE_URL}/rest/v1/horario_base",
+                                headers=headers,
+                                json=data_horario
+                            )
+                    except Exception as e:
+                        st.error(f"Error al guardar: {str(e)}")
                 elif existente:
                     # Eliminar si estaba y ahora está vacío
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}", headers=headers)
+                    try:
+                        requests.delete(
+                            f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}",
+                            headers=headers
+                        )
+                    except Exception as e:
+                        st.error(f"Error al eliminar: {str(e)}")
         
         st.divider()
-
 
 def gestion_festivos(headers):
     st.write("**📆 Festivos**")
