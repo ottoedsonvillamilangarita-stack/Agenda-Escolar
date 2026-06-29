@@ -1140,7 +1140,10 @@ def gestionar_asignaturas(headers):
                             st.success(f"✅ Asignatura '{a['nombre']}' eliminada")
                             st.rerun()
                         else:
-                            st.error(f"❌ Error al eliminar: {r.status_code}")def mostrar_sistema():
+                            st.error(f"❌ Error al eliminar: {r.status_code}")
+
+
+def mostrar_sistema():
     st.subheader("⚙️ Configuración del Sistema")
     
     col1, col2 = st.columns(2)
