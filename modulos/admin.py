@@ -879,10 +879,28 @@ def configurar_horario_curso(headers):
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     lista_docentes = list(docentes_dict.keys())
     
+    # =============================================
+    # NUEVO: Obtener materias disponibles
+    # =============================================
+    url_materias = f"{SUPABASE_URL}/rest/v1/materias?nivel_id=eq.{nivel_id}&order=nombre.asc"
+    response_materias = requests.get(url_materias, headers=headers)
+    
+    if response_materias.status_code != 200:
+        st.warning("No se pudieron cargar las materias. Verifica que la tabla 'materias' exista.")
+        materias = []
+    else:
+        materias = response_materias.json()
+    
+    # Crear lista de opciones para el selector
+    opciones_materias = [""] + [m['nombre'] for m in materias]
+    
     # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    st.info(f"Horas del nivel: {len(horas)} clases por día")
+    st.info(f"Horas del nivel: {len(horas)} clases por día | Materias disponibles: {len(materias)}")
+    
+    if not materias:
+        st.warning("⚠️ No hay materias registradas para este nivel. Ve a 'Gestionar Asignaturas' para agregarlas.")
     
     # Botón para guardar todo de una vez
     if st.button("💾 Guardar todas las asignaciones", type="primary", key="guardar_todo_asignacion"):
@@ -891,7 +909,7 @@ def configurar_horario_curso(headers):
     
     st.divider()
     
-    # Mostrar tabla de asignación - USANDO UN SOLO BUCLE CON CLAVES ÚNICAS
+    # Mostrar tabla de asignación
     for hora in horas:
         st.write(f"**Hora {hora['orden']}: {str(hora['hora_inicio'])[:5]} - {str(hora['hora_fin'])[:5]}**")
         
@@ -906,26 +924,40 @@ def configurar_horario_curso(headers):
                 # Generar clave ÚNICA para cada widget
                 key_base = f"{curso}_{dia_num}_{hora['orden']}_{idx}"
                 
-                # Asignatura
+                # =============================================
+                # NUEVO: Selector de materias (en lugar de text_input)
+                # =============================================
                 default_asignatura = existente.get('asignatura', '') if existente else ''
-                asignatura = st.text_input(
-                    "Asignatura",
-                    value=default_asignatura,
-                    key=f"asig_{key_base}"
+                default_idx = 0
+                if default_asignatura in opciones_materias:
+                    default_idx = opciones_materias.index(default_asignatura)
+                elif default_asignatura and materias:
+                    # Si la materia existe pero no está en la lista, la agregamos temporalmente
+                    opciones_materias_con_default = opciones_materias.copy()
+                    if default_asignatura not in opciones_materias_con_default:
+                        opciones_materias_con_default.append(default_asignatura)
+                    default_idx = opciones_materias_con_default.index(default_asignatura)
+                    opciones_materias = opciones_materias_con_default
+                
+                asignatura = st.selectbox(
+                    "Materia",
+                    options=opciones_materias,
+                    index=default_idx,
+                    key=f"mat_{key_base}"
                 )
                 
                 # Docente - con opción vacía al inicio
                 default_docente = existente.get('documento_docente', '') if existente else ''
-                default_idx = 0
+                default_idx_doc = 0
                 if default_docente and default_docente in lista_docentes:
-                    default_idx = lista_docentes.index(default_docente) + 1
+                    default_idx_doc = lista_docentes.index(default_docente) + 1
                 
                 opciones_docentes = [""] + lista_docentes
                 docente = st.selectbox(
                     "Docente",
                     options=opciones_docentes,
-                    index=default_idx,
-                    format_func=lambda x: docentes_dict.get(x, "Ninguno") if x else "Seleccionar",
+                    index=default_idx_doc,
+                    format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
                     key=f"doc_{key_base}"
                 )
                 
@@ -979,6 +1011,7 @@ def configurar_horario_curso(headers):
                         st.error(f"Error al eliminar: {str(e)}")
         
         st.divider()
+
 
 def gestion_festivos(headers):
     st.write("**📆 Festivos**")
