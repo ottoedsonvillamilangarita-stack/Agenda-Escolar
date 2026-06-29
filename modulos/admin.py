@@ -1209,8 +1209,8 @@ def gestionar_asignaturas(headers):
     
     st.divider()
     
-    # =============================================
-    # SECCIÓN 2: ASIGNAR NIVELES A MATERIAS EXISTENTES
+       # =============================================
+    # SECCIÓN 2: ASIGNAR NIVELES A MATERIAS EXISTENTES (CORREGIDO)
     # =============================================
     st.subheader("📌 Asignar niveles a materias existentes")
     st.caption("Selecciona una materia y los niveles en los que se dicta")
@@ -1228,9 +1228,15 @@ def gestionar_asignaturas(headers):
             niveles_actuales = niveles_por_materia.get(materia_id, [])
             niveles_actuales_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_actuales]
             
+            # Mostrar niveles actuales
+            if niveles_actuales_nombres:
+                st.info(f"📌 Niveles actuales: {', '.join(niveles_actuales_nombres)}")
+            else:
+                st.warning("⚠️ Esta materia no tiene niveles asignados")
+            
             # Selector de niveles (multiselect)
             niveles_seleccionados = st.multiselect(
-                f"Niveles para '{materia_nombre}'",
+                f"Selecciona los niveles para '{materia_nombre}'",
                 options=nivel_nombres,
                 default=niveles_actuales_nombres,
                 key=f"niveles_materia_{materia_id}"
@@ -1239,38 +1245,36 @@ def gestionar_asignaturas(headers):
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("💾 Guardar niveles", key=f"guardar_niveles_{materia_id}", type="primary"):
-                    # Eliminar relaciones actuales
-                    requests.delete(
-                        f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
-                        headers=headers
-                    )
-                    
-                    # Insertar nuevas relaciones
-                    for nivel_nombre in niveles_seleccionados:
-                        nivel_id = niveles_dict.get(nivel_nombre)
-                        if nivel_id:
-                            rel_data = {"materia_id": materia_id, "nivel_id": nivel_id}
-                            requests.post(
-                                f"{SUPABASE_URL}/rest/v1/materias_niveles",
-                                headers=headers,
-                                json=rel_data
-                            )
-                    
-                    st.success(f"✅ Niveles actualizados para '{materia_nombre}'")
-                    st.rerun()
-            
-            with col2:
-                if st.button("🗑️ Quitar todos los niveles", key=f"quitar_niveles_{materia_id}"):
-                    requests.delete(
-                        f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
-                        headers=headers
-                    )
-                    st.success(f"✅ Niveles eliminados para '{materia_nombre}'")
-                    st.rerun()
-    else:
-        st.info("No hay materias para asignar niveles")
-    
-    st.divider()
+                    with st.spinner("Guardando cambios..."):
+                        # Eliminar relaciones actuales
+                        delete_response = requests.delete(
+                            f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
+                            headers=headers
+                        )
+                        
+                        if delete_response.status_code not in [200, 204]:
+                            st.error(f"Error al eliminar relaciones: {delete_response.status_code}")
+                            st.code(delete_response.text)
+                        else:
+                            # Insertar nuevas relaciones
+                            insertados = 0
+                            for nivel_nombre in niveles_seleccionados:
+                                nivel_id = niveles_dict.get(nivel_nombre)
+                                if nivel_id:
+                                    rel_data = {"materia_id": materia_id, "nivel_id": nivel_id}
+                                    post_response = requests.post(
+                                        f"{SUPABASE_URL}/rest/v1/materias_niveles",
+                                        headers=headers,
+                                        json=rel_data
+                                    )
+                                    if post_response.status_code == 201:
+                                        insertados += 1
+                            
+                            if insertados > 0 or len(niveles_seleccionados) == 0:
+                                st.success(f"✅ Niveles actualizados para '{materia_nombre}' ({insertados} niveles asignados)")
+                                st.rerun()
+                            else:
+                                st.error("❌ No se pudo guardar ningún nivel")
     
     # =============================================
     # SECCIÓN 3: AGREGAR NUEVA MATERIA
