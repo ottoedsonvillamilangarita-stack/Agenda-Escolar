@@ -842,9 +842,78 @@ def configurar_jornada_nivel(headers):
 def configurar_horario_curso(headers):
     st.write("**📖 Asignar Materias por Curso**")
     
-    # Lista de cursos
-    cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
+    # =============================================
+    # CONFIGURACIÓN DE CURSOS CON SUS NIVELES
+    # (Usando los códigos reales de tu sistema)
+    # =============================================
+    cursos_config = {
+        # ===== PREESCOLAR =====
+        "JARDIN_INICIAL": {"nivel": "Preescolar"},
+        "JARDIN_A": {"nivel": "Preescolar"},
+        "JARDIN_B": {"nivel": "Preescolar"},
+        "TRANSICION_A": {"nivel": "Preescolar"},
+        "TRANSICION_B": {"nivel": "Preescolar"},
+        "TRANSICION_C": {"nivel": "Preescolar"},
+        
+        # ===== PRIMARIA (CÓDIGOS 101-504) =====
+        "101": {"nivel": "Primaria"},
+        "102": {"nivel": "Primaria"},
+        "103": {"nivel": "Primaria"},
+        "201": {"nivel": "Primaria"},
+        "202": {"nivel": "Primaria"},
+        "203": {"nivel": "Primaria"},
+        "301": {"nivel": "Primaria"},
+        "302": {"nivel": "Primaria"},
+        "303": {"nivel": "Primaria"},
+        "401": {"nivel": "Primaria"},
+        "402": {"nivel": "Primaria"},
+        "403": {"nivel": "Primaria"},
+        "404": {"nivel": "Primaria"},
+        "501": {"nivel": "Primaria"},
+        "502": {"nivel": "Primaria"},
+        "503": {"nivel": "Primaria"},
+        "504": {"nivel": "Primaria"},
+        
+        # ===== SECUNDARIA (CÓDIGOS 601-906) =====
+        "601": {"nivel": "Secundaria"},
+        "602": {"nivel": "Secundaria"},
+        "603": {"nivel": "Secundaria"},
+        "604": {"nivel": "Secundaria"},
+        "605": {"nivel": "Secundaria"},
+        "701": {"nivel": "Secundaria"},
+        "702": {"nivel": "Secundaria"},
+        "703": {"nivel": "Secundaria"},
+        "704": {"nivel": "Secundaria"},
+        "705": {"nivel": "Secundaria"},
+        "801": {"nivel": "Secundaria"},
+        "802": {"nivel": "Secundaria"},
+        "803": {"nivel": "Secundaria"},
+        "804": {"nivel": "Secundaria"},
+        "805": {"nivel": "Secundaria"},
+        "806": {"nivel": "Secundaria"},
+        "901": {"nivel": "Secundaria"},
+        "902": {"nivel": "Secundaria"},
+        "903": {"nivel": "Secundaria"},
+        "904": {"nivel": "Secundaria"},
+        "905": {"nivel": "Secundaria"},
+        "906": {"nivel": "Secundaria"},
+        
+        # ===== MEDIA (CÓDIGOS 1001-1106) =====
+        "1001": {"nivel": "Media"},
+        "1002": {"nivel": "Media"},
+        "1003": {"nivel": "Media"},
+        "1004": {"nivel": "Media"},
+        "1005": {"nivel": "Media"},
+        "1006": {"nivel": "Media"},
+        "1101": {"nivel": "Media"},
+        "1102": {"nivel": "Media"},
+        "1103": {"nivel": "Media"},
+        "1104": {"nivel": "Media"},
+        "1105": {"nivel": "Media"},
+        "1106": {"nivel": "Media"}
+    }
     
+    # Obtener niveles de la base de datos
     response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     niveles = response_niveles.json() if response_niveles.status_code == 200 else []
     
@@ -852,12 +921,58 @@ def configurar_horario_curso(headers):
         st.warning("No hay niveles configurados. Ve a la pestaña 'Niveles' primero.")
         return
     
+    # Crear diccionario de niveles por nombre
+    niveles_dict = {n['nombre']: n['id'] for n in niveles}
+    
+    # Obtener cursos reales de la base de datos
+    try:
+        response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
+        if response_cursos.status_code == 200:
+            cursos_bd = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
+            # Filtrar solo los que están en nuestra configuración
+            cursos_disponibles = [c for c in cursos_bd if c in cursos_config]
+        else:
+            cursos_disponibles = list(cursos_config.keys())
+    except:
+        cursos_disponibles = list(cursos_config.keys())
+    
+    # Ordenar cursos (numéricamente)
+    def ordenar_cursos(curso):
+        # Para cursos como JARDIN_INICIAL, ponerlos al inicio
+        if curso.startswith('JARDIN') or curso.startswith('TRANSICION'):
+            return (0, curso)
+        # Para códigos numéricos, ordenar por número
+        try:
+            return (1, int(curso))
+        except:
+            return (2, curso)
+    
+    cursos_disponibles.sort(key=ordenar_cursos)
+    
+    if not cursos_disponibles:
+        st.warning("No hay cursos disponibles. Agrega estudiantes primero.")
+        return
+    
     col1, col2 = st.columns(2)
     with col1:
-        curso = st.selectbox("Curso", cursos, key="curso_select_asignacion")
+        curso = st.selectbox("Curso", cursos_disponibles, key="curso_select_asignacion")
+    
+    # Obtener el nivel automático del curso
+    nivel_curso_nombre = cursos_config.get(curso, {}).get("nivel", "Secundaria")
+    nivel_id = niveles_dict.get(nivel_curso_nombre)
+    
     with col2:
-        nivel_curso = st.selectbox("Nivel del curso", [n['nombre'] for n in niveles], key="nivel_curso_select_asignacion")
-        nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_curso)
+        st.info(f"📌 Nivel asignado automáticamente: **{nivel_curso_nombre}**")
+        st.text_input("Nivel del curso", value=nivel_curso_nombre, disabled=True)
+    
+    # Verificar que el nivel existe
+    if not nivel_id:
+        st.error(f"❌ El nivel '{nivel_curso_nombre}' no existe en la base de datos.")
+        return
+    
+    # =============================================
+    # RESTO DE LA FUNCIÓN (obtener horas, materias, docentes)
+    # =============================================
     
     # Obtener horas del nivel
     url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}&order=orden.asc"
@@ -865,7 +980,7 @@ def configurar_horario_curso(headers):
     horas = response_horas.json() if response_horas.status_code == 200 else []
     
     if not horas:
-        st.warning(f"No hay horas configuradas para el nivel {nivel_curso}. Ve a 'Horas por Nivel' primero.")
+        st.warning(f"No hay horas configuradas para el nivel {nivel_curso_nombre}. Ve a 'Horas por Nivel' primero.")
         return
     
     # Obtener horario actual del curso
@@ -879,9 +994,7 @@ def configurar_horario_curso(headers):
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     lista_docentes = list(docentes_dict.keys())
     
-    # =============================================
-    # NUEVO: Obtener materias disponibles
-    # =============================================
+    # Obtener materias del nivel
     url_materias = f"{SUPABASE_URL}/rest/v1/materias?nivel_id=eq.{nivel_id}&order=nombre.asc"
     response_materias = requests.get(url_materias, headers=headers)
     
@@ -891,7 +1004,6 @@ def configurar_horario_curso(headers):
     else:
         materias = response_materias.json()
     
-    # Crear lista de opciones para el selector
     opciones_materias = [""] + [m['nombre'] for m in materias]
     
     # Días
@@ -918,21 +1030,15 @@ def configurar_horario_curso(headers):
             with cols[idx]:
                 st.write(f"📅 {dia_nombre}")
                 
-                # Buscar si existe horario para esta celda
                 existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
-                
-                # Generar clave ÚNICA para cada widget
                 key_base = f"{curso}_{dia_num}_{hora['orden']}_{idx}"
                 
-                # =============================================
-                # NUEVO: Selector de materias (en lugar de text_input)
-                # =============================================
+                # Selector de materia
                 default_asignatura = existente.get('asignatura', '') if existente else ''
                 default_idx = 0
                 if default_asignatura in opciones_materias:
                     default_idx = opciones_materias.index(default_asignatura)
                 elif default_asignatura and materias:
-                    # Si la materia existe pero no está en la lista, la agregamos temporalmente
                     opciones_materias_con_default = opciones_materias.copy()
                     if default_asignatura not in opciones_materias_con_default:
                         opciones_materias_con_default.append(default_asignatura)
@@ -946,7 +1052,7 @@ def configurar_horario_curso(headers):
                     key=f"mat_{key_base}"
                 )
                 
-                # Docente - con opción vacía al inicio
+                # Selector de docente
                 default_docente = existente.get('documento_docente', '') if existente else ''
                 default_idx_doc = 0
                 if default_docente and default_docente in lista_docentes:
@@ -969,7 +1075,7 @@ def configurar_horario_curso(headers):
                     key=f"salon_{key_base}"
                 )
                 
-                # Guardar automáticamente al cambiar
+                # Guardar automáticamente
                 if asignatura:
                     data_horario = {
                         "curso": curso,
@@ -985,14 +1091,12 @@ def configurar_horario_curso(headers):
                     
                     try:
                         if existente:
-                            # Actualizar existente
                             requests.patch(
                                 f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}", 
                                 headers=headers,
                                 json=data_horario
                             )
                         else:
-                            # Crear nuevo
                             requests.post(
                                 f"{SUPABASE_URL}/rest/v1/horario_base",
                                 headers=headers,
@@ -1001,7 +1105,6 @@ def configurar_horario_curso(headers):
                     except Exception as e:
                         st.error(f"Error al guardar: {str(e)}")
                 elif existente:
-                    # Eliminar si estaba y ahora está vacío
                     try:
                         requests.delete(
                             f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}",
