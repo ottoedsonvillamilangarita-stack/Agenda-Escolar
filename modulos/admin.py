@@ -994,9 +994,8 @@ def configurar_horario_curso(headers):
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     lista_docentes = list(docentes_dict.keys())
     
-    # Obtener materias del nivel
-    url_materias = f"{SUPABASE_URL}/rest/v1/materias?nivel_id=eq.{nivel_id}&order=nombre.asc"
-    response_materias = requests.get(url_materias, headers=headers)
+    # Obtener materias del nivel (usando la nueva relación)
+materias = obtener_materias_por_nivel(headers, nivel_id)
     
     if response_materias.status_code != 200:
         st.warning("No se pudieron cargar las materias. Verifica que la tabla 'materias' exista.")
@@ -1151,129 +1150,124 @@ def gestion_festivos(headers):
             st.rerun()
 
 def gestionar_asignaturas(headers):
-    st.write("**📚 Gestionar Asignaturas por Nivel**")
+    st.write("**📚 Gestionar Asignaturas**")
     
     # Obtener niveles
     response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     niveles = response_niveles.json() if response_niveles.status_code == 200 else []
-    
-    if not niveles:
-        st.warning("No hay niveles configurados. Ve a 'Niveles' primero.")
-        return
-    
-    # Obtener TODAS las materias existentes (para verificar duplicados)
-    url_todas = f"{SUPABASE_URL}/rest/v1/materias?select=nombre&order=nombre.asc"
-    response_todas = requests.get(url_todas, headers=headers)
-    materias_existentes = [m['nombre'] for m in response_todas.json()] if response_todas.status_code == 200 else []
-    
-    # Selector de nivel
     nivel_nombres = [n['nombre'] for n in niveles]
-    nivel_seleccionado = st.selectbox("Filtrar por nivel", ["Todos"] + nivel_nombres, key="asignaturas_nivel_filter")
+    niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    # Obtener asignaturas con JOIN a niveles
-    url_asignaturas = f"{SUPABASE_URL}/rest/v1/materias?select=*,niveles(nombre)&order=nombre.asc"
-    response_asignaturas = requests.get(url_asignaturas, headers=headers)
+    # Obtener todas las materias con sus niveles
+    url_materias = f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc"
+    response_materias = requests.get(url_materias, headers=headers)
+    materias = response_materias.json() if response_materias.status_code == 200 else []
     
-    if response_asignaturas.status_code != 200:
-        st.error("Error al cargar asignaturas")
-        st.code(response_asignaturas.text)
-        return
+    # Obtener relaciones materias-niveles
+    url_relaciones = f"{SUPABASE_URL}/rest/v1/materias_niveles"
+    response_relaciones = requests.get(url_relaciones, headers=headers)
+    relaciones = response_relaciones.json() if response_relaciones.status_code == 200 else []
     
-    asignaturas = response_asignaturas.json()
+    # Crear diccionario de niveles por materia
+    niveles_por_materia = {}
+    for r in relaciones:
+        materia_id = r['materia_id']
+        nivel_id = r['nivel_id']
+        if materia_id not in niveles_por_materia:
+            niveles_por_materia[materia_id] = []
+        niveles_por_materia[materia_id].append(nivel_id)
     
-    # Filtrar por nivel
-    if nivel_seleccionado != "Todos":
-        nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_seleccionado)
-        asignaturas = [a for a in asignaturas if a.get('nivel_id') == nivel_id]
+    # Mostrar materias existentes
+    st.write(f"**{len(materias)} asignaturas registradas**")
     
-    # Mostrar tabla
-    if asignaturas:
-        st.write(f"**{len(asignaturas)} asignaturas encontradas**")
-        
-        df = pd.DataFrame([{
-            "ID": a['id'],
-            "Nombre": a['nombre'],
-            "Código": a.get('codigo', ''),
-            "Nivel": a.get('niveles', {}).get('nombre', 'Sin nivel') if isinstance(a.get('niveles'), dict) else 'Sin nivel'
-        } for a in asignaturas])
-        
-        st.dataframe(df, use_container_width=True, hide_index=True)
-    else:
-        st.info("No hay asignaturas para este nivel")
+    if materias:
+        for m in materias:
+            col1, col2, col3 = st.columns([2, 2, 2])
+            with col1:
+                st.write(f"**{m['nombre']}**")
+            with col2:
+                st.write(f"Código: {m.get('codigo', '')}")
+            with col3:
+                # Mostrar niveles de esta materia
+                niveles_ids = niveles_por_materia.get(m['id'], [])
+                niveles_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_ids]
+                st.write(f"Niveles: {', '.join(niveles_nombres) if niveles_nombres else 'Sin nivel'}")
     
     st.divider()
     
-    # Agregar nueva asignatura (MEJORADO)
+    # Agregar nueva materia
     with st.expander("➕ Agregar nueva asignatura", expanded=False):
         with st.form("nueva_asignatura_form"):
             col1, col2 = st.columns(2)
             with col1:
-                nombre = st.text_input("Nombre de la asignatura *", help="Ej: MATEMATICAS, CIENCIAS, etc.")
-                codigo = st.text_input("Código (opcional)", help="Ej: MAT, CIE, etc.")
+                nombre = st.text_input("Nombre de la asignatura *")
+                codigo = st.text_input("Código (opcional)")
             with col2:
-                nivel_asignatura = st.selectbox("Nivel *", [""] + nivel_nombres)
-            
-            # Mostrar materias existentes para referencia
-            if materias_existentes:
-                st.caption(f"ℹ️ Materias ya registradas: {', '.join(materias_existentes[:15])}{'...' if len(materias_existentes) > 15 else ''}")
+                niveles_seleccionados = st.multiselect(
+                    "Niveles en los que aplica *",
+                    options=nivel_nombres,
+                    help="Selecciona uno o varios niveles donde se dicta esta materia"
+                )
             
             submitted = st.form_submit_button("💾 Guardar asignatura", type="primary")
             
             if submitted:
-                # Validar campos obligatorios
-                if not nombre or not nivel_asignatura:
+                if not nombre or not niveles_seleccionados:
                     st.error("❌ Completa todos los campos obligatorios (*)")
                 else:
+                    # Verificar si ya existe
                     nombre_upper = nombre.upper().strip()
+                    check_url = f"{SUPABASE_URL}/rest/v1/materias?nombre=eq.{nombre_upper}"
+                    check_resp = requests.get(check_url, headers=headers)
                     
-                    # VERIFICAR DUPLICADOS (MEJORADO)
-                    if nombre_upper in materias_existentes:
-                        st.error(f"❌ La asignatura '{nombre_upper}' YA EXISTE. No se puede duplicar.")
+                    if check_resp.status_code == 200 and check_resp.json():
+                        st.error(f"❌ La asignatura '{nombre_upper}' ya existe")
                     else:
-                        nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_asignatura)
+                        # Insertar materia
+                        data = {"nombre": nombre_upper, "codigo": codigo.upper().strip() if codigo else None}
+                        r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
                         
-                        data = {
-                            "nombre": nombre_upper,
-                            "codigo": codigo.upper().strip() if codigo else None,
-                            "nivel_id": nivel_id
-                        }
-                        
-                        try:
-                            r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
+                        if r.status_code == 201:
+                            materia_id = r.json()[0]['id']
                             
-                            if r.status_code == 201:
-                                st.success(f"✅ Asignatura '{nombre_upper}' agregada correctamente")
-                                st.rerun()
-                            elif r.status_code == 409:
-                                st.error(f"❌ La asignatura '{nombre_upper}' YA EXISTE en la base de datos.")
-                            else:
-                                st.error(f"❌ Error al agregar: {r.status_code}")
-                                st.code(r.text)
-                        except Exception as e:
-                            st.error(f"❌ Error: {str(e)}")
+                            # Insertar relación con niveles
+                            for nivel_nombre in niveles_seleccionados:
+                                nivel_id = niveles_dict.get(nivel_nombre)
+                                if nivel_id:
+                                    rel_data = {"materia_id": materia_id, "nivel_id": nivel_id}
+                                    requests.post(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers, json=rel_data)
+                            
+                            st.success(f"✅ Asignatura '{nombre_upper}' agregada correctamente")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Error al agregar: {r.status_code}")
+                            st.code(r.text)
     
-    # Eliminar asignatura
-    if asignaturas:
+    # Eliminar materia
+    if materias:
         st.divider()
         st.write("**🗑️ Eliminar asignatura**")
         st.caption("⚠️ Solo se puede eliminar si no está asignada a ningún horario.")
         
-        for a in asignaturas[:10]:  # Mostrar solo las primeras 10
+        for m in materias[:10]:
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.write(f"{a['nombre']} ({a.get('codigo', '')})")
+                st.write(f"{m['nombre']} ({m.get('codigo', '')})")
             with col2:
-                if st.button("🗑️", key=f"del_asig_{a['id']}"):
+                if st.button("🗑️", key=f"del_mat_{m['id']}"):
                     # Verificar si está en uso
-                    check_url = f"{SUPABASE_URL}/rest/v1/horario_base?asignatura=eq.{a['nombre']}&limit=1"
+                    check_url = f"{SUPABASE_URL}/rest/v1/horario_base?asignatura=eq.{m['nombre']}&limit=1"
                     check_resp = requests.get(check_url, headers=headers)
                     
                     if check_resp.status_code == 200 and check_resp.json():
-                        st.error(f"❌ No se puede eliminar '{a['nombre']}' porque está en uso en horarios")
+                        st.error(f"❌ No se puede eliminar '{m['nombre']}' porque está en uso en horarios")
                     else:
-                        r = requests.delete(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{a['id']}", headers=headers)
+                        # Eliminar relaciones primero
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{m['id']}", headers=headers)
+                        # Eliminar materia
+                        r = requests.delete(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{m['id']}", headers=headers)
                         if r.status_code == 204:
-                            st.success(f"✅ Asignatura '{a['nombre']}' eliminada")
+                            st.success(f"✅ Asignatura '{m['nombre']}' eliminada")
                             st.rerun()
                         else:
                             st.error(f"❌ Error al eliminar: {r.status_code}")
