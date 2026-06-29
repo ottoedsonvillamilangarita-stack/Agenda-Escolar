@@ -1013,6 +1013,7 @@ def gestion_festivos(headers):
             requests.post(f"{SUPABASE_URL}/rest/v1/festivos", headers=headers, json=data)
             st.success("✅ Festivo agregado")
             st.rerun()
+
 def gestionar_asignaturas(headers):
     st.write("**📚 Gestionar Asignaturas por Nivel**")
     
@@ -1023,6 +1024,11 @@ def gestionar_asignaturas(headers):
     if not niveles:
         st.warning("No hay niveles configurados. Ve a 'Niveles' primero.")
         return
+    
+    # Obtener TODAS las materias existentes (para verificar duplicados)
+    url_todas = f"{SUPABASE_URL}/rest/v1/materias?select=nombre&order=nombre.asc"
+    response_todas = requests.get(url_todas, headers=headers)
+    materias_existentes = [m['nombre'] for m in response_todas.json()] if response_todas.status_code == 200 else []
     
     # Selector de nivel
     nivel_nombres = [n['nombre'] for n in niveles]
@@ -1061,43 +1067,60 @@ def gestionar_asignaturas(headers):
     
     st.divider()
     
-    # Agregar nueva asignatura
+    # Agregar nueva asignatura (MEJORADO)
     with st.expander("➕ Agregar nueva asignatura", expanded=False):
         with st.form("nueva_asignatura_form"):
             col1, col2 = st.columns(2)
             with col1:
-                nombre = st.text_input("Nombre de la asignatura *")
-                codigo = st.text_input("Código (opcional)")
+                nombre = st.text_input("Nombre de la asignatura *", help="Ej: MATEMATICAS, CIENCIAS, etc.")
+                codigo = st.text_input("Código (opcional)", help="Ej: MAT, CIE, etc.")
             with col2:
                 nivel_asignatura = st.selectbox("Nivel *", [""] + nivel_nombres)
+            
+            # Mostrar materias existentes para referencia
+            if materias_existentes:
+                st.caption(f"ℹ️ Materias ya registradas: {', '.join(materias_existentes[:15])}{'...' if len(materias_existentes) > 15 else ''}")
             
             submitted = st.form_submit_button("💾 Guardar asignatura", type="primary")
             
             if submitted:
+                # Validar campos obligatorios
                 if not nombre or not nivel_asignatura:
                     st.error("❌ Completa todos los campos obligatorios (*)")
                 else:
-                    nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_asignatura)
+                    nombre_upper = nombre.upper().strip()
                     
-                    data = {
-                        "nombre": nombre.upper(),
-                        "codigo": codigo.upper() if codigo else None,
-                        "nivel_id": nivel_id
-                    }
-                    
-                    r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
-                    
-                    if r.status_code == 201:
-                        st.success(f"✅ Asignatura '{nombre}' agregada correctamente")
-                        st.rerun()
+                    # VERIFICAR DUPLICADOS (MEJORADO)
+                    if nombre_upper in materias_existentes:
+                        st.error(f"❌ La asignatura '{nombre_upper}' YA EXISTE. No se puede duplicar.")
                     else:
-                        st.error(f"❌ Error al agregar: {r.status_code}")
-                        st.code(r.text)
+                        nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_asignatura)
+                        
+                        data = {
+                            "nombre": nombre_upper,
+                            "codigo": codigo.upper().strip() if codigo else None,
+                            "nivel_id": nivel_id
+                        }
+                        
+                        try:
+                            r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
+                            
+                            if r.status_code == 201:
+                                st.success(f"✅ Asignatura '{nombre_upper}' agregada correctamente")
+                                st.rerun()
+                            elif r.status_code == 409:
+                                st.error(f"❌ La asignatura '{nombre_upper}' YA EXISTE en la base de datos.")
+                            else:
+                                st.error(f"❌ Error al agregar: {r.status_code}")
+                                st.code(r.text)
+                        except Exception as e:
+                            st.error(f"❌ Error: {str(e)}")
     
     # Eliminar asignatura
     if asignaturas:
         st.divider()
         st.write("**🗑️ Eliminar asignatura**")
+        st.caption("⚠️ Solo se puede eliminar si no está asignada a ningún horario.")
         
         for a in asignaturas[:10]:  # Mostrar solo las primeras 10
             col1, col2 = st.columns([3, 1])
@@ -1117,8 +1140,7 @@ def gestionar_asignaturas(headers):
                             st.success(f"✅ Asignatura '{a['nombre']}' eliminada")
                             st.rerun()
                         else:
-                            st.error(f"❌ Error al eliminar: {r.status_code}")
-def mostrar_sistema():
+                            st.error(f"❌ Error al eliminar: {r.status_code}")def mostrar_sistema():
     st.subheader("⚙️ Configuración del Sistema")
     
     col1, col2 = st.columns(2)
