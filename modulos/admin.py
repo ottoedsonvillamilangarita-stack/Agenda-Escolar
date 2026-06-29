@@ -959,7 +959,7 @@ def configurar_horario_curso(headers):
         return
     
     # =============================================
-    # OBTENER HORARIO ACTUAL
+    # OBTENER HORARIO ACTUAL DEL CURSO
     # =============================================
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
     response_horario = requests.get(url_horario, headers=headers)
@@ -974,32 +974,34 @@ def configurar_horario_curso(headers):
     lista_docentes = list(docentes_dict.keys())
     
     # =============================================
-    # OBTENER MATERIAS DEL NIVEL (CORREGIDO)
+    # OBTENER MATERIAS DEL NIVEL - VERSIÓN CORREGIDA
     # =============================================
-    # Paso 1: Obtener IDs de materias asociadas al nivel
-    url_materias_ids = f"{SUPABASE_URL}/rest/v1/materias_niveles?nivel_id=eq.{nivel_id}&select=materia_id"
-    response_materias_ids = requests.get(url_materias_ids, headers=headers)
+    # Consulta directa a materias_niveles para obtener los IDs
+    url_relaciones = f"{SUPABASE_URL}/rest/v1/materias_niveles?nivel_id=eq.{nivel_id}&select=materia_id"
+    response_relaciones = requests.get(url_relaciones, headers=headers)
     
     materias = []
-    if response_materias_ids.status_code == 200:
-        relaciones = response_materias_ids.json()
+    if response_relaciones.status_code == 200:
+        relaciones = response_relaciones.json()
         materia_ids = [r['materia_id'] for r in relaciones if r.get('materia_id')]
         
         if materia_ids:
-            # Paso 2: Obtener datos completos de las materias
+            # Convertir IDs a string para la consulta IN
             ids_str = ','.join([str(id) for id in materia_ids])
             url_materias = f"{SUPABASE_URL}/rest/v1/materias?id=in.({ids_str})&order=nombre.asc"
             response_materias = requests.get(url_materias, headers=headers)
             
             if response_materias.status_code == 200:
                 materias = response_materias.json()
+                st.success(f"✅ {len(materias)} materias encontradas para este nivel")
             else:
                 st.warning(f"Error al obtener materias: {response_materias.status_code}")
         else:
-            st.info("No hay materias asignadas a este nivel.")
+            st.warning("⚠️ No hay materias asignadas a este nivel. Ve a 'Gestionar Asignaturas'.")
     else:
-        st.warning(f"Error al obtener relaciones: {response_materias_ids.status_code}")
-        st.code(response_materias_ids.text)
+        st.error(f"Error al obtener relaciones: {response_relaciones.status_code}")
+        st.code(response_relaciones.text)
+        materias = []
     
     opciones_materias = [""] + [m['nombre'] for m in materias]
     
@@ -1035,11 +1037,10 @@ def configurar_horario_curso(headers):
                 if default_asignatura in opciones_materias:
                     default_idx = opciones_materias.index(default_asignatura)
                 elif default_asignatura and materias:
-                    opciones_materias_con_default = opciones_materias.copy()
-                    if default_asignatura not in opciones_materias_con_default:
-                        opciones_materias_con_default.append(default_asignatura)
-                    default_idx = opciones_materias_con_default.index(default_asignatura)
-                    opciones_materias = opciones_materias_con_default
+                    # Si la materia existe pero no está en la lista, la agregamos
+                    if default_asignatura not in opciones_materias:
+                        opciones_materias.append(default_asignatura)
+                    default_idx = opciones_materias.index(default_asignatura)
                 
                 asignatura = st.selectbox(
                     "Materia",
