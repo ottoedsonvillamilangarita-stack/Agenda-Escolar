@@ -1294,3 +1294,11 @@ def mostrar_sistema():
     with col2:
         if st.button("📀 Crear Respaldo", type="primary"):
             st.success("Respaldo creado")
+
+def obtener_materias_por_nivel(headers, nivel_id):
+    """Obtiene materias disponibles para un nivel específico"""
+    url = f"{SUPABASE_URL}/rest/v1/materias?select=*,materias_niveles!inner(nivel_id)&materias_niveles.nivel_id=eq.{nivel_id}&order=nombre.asc"
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    return []
