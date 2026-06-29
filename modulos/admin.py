@@ -843,18 +843,15 @@ def configurar_horario_curso(headers):
     st.write("**📖 Asignar Materias por Curso**")
     
     # =============================================
-    # CONFIGURACIÓN DE CURSOS CON SUS NIVELES
+    # CONFIGURACIÓN DE CURSOS
     # =============================================
     cursos_config = {
-        # ===== PREESCOLAR =====
         "JARDIN_INICIAL": {"nivel": "Preescolar"},
         "JARDIN_A": {"nivel": "Preescolar"},
         "JARDIN_B": {"nivel": "Preescolar"},
         "TRANSICION_A": {"nivel": "Preescolar"},
         "TRANSICION_B": {"nivel": "Preescolar"},
         "TRANSICION_C": {"nivel": "Preescolar"},
-        
-        # ===== PRIMARIA =====
         "101": {"nivel": "Primaria"},
         "102": {"nivel": "Primaria"},
         "103": {"nivel": "Primaria"},
@@ -872,8 +869,6 @@ def configurar_horario_curso(headers):
         "502": {"nivel": "Primaria"},
         "503": {"nivel": "Primaria"},
         "504": {"nivel": "Primaria"},
-        
-        # ===== SECUNDARIA =====
         "601": {"nivel": "Secundaria"},
         "602": {"nivel": "Secundaria"},
         "603": {"nivel": "Secundaria"},
@@ -896,8 +891,6 @@ def configurar_horario_curso(headers):
         "904": {"nivel": "Secundaria"},
         "905": {"nivel": "Secundaria"},
         "906": {"nivel": "Secundaria"},
-        
-        # ===== MEDIA =====
         "1001": {"nivel": "Media"},
         "1002": {"nivel": "Media"},
         "1003": {"nivel": "Media"},
@@ -983,15 +976,30 @@ def configurar_horario_curso(headers):
     # =============================================
     # OBTENER MATERIAS DEL NIVEL (CORREGIDO)
     # =============================================
-    url_materias = f"{SUPABASE_URL}/rest/v1/materias_niveles?select=materias(*),nivel_id=eq.{nivel_id}&order=materias.nombre.asc"
-    response_materias = requests.get(url_materias, headers=headers)
+    # Paso 1: Obtener IDs de materias asociadas al nivel
+    url_materias_ids = f"{SUPABASE_URL}/rest/v1/materias_niveles?nivel_id=eq.{nivel_id}&select=materia_id"
+    response_materias_ids = requests.get(url_materias_ids, headers=headers)
     
-    if response_materias.status_code == 200:
-        relaciones = response_materias.json()
-        materias = [r['materias'] for r in relaciones if r.get('materias')]
+    materias = []
+    if response_materias_ids.status_code == 200:
+        relaciones = response_materias_ids.json()
+        materia_ids = [r['materia_id'] for r in relaciones if r.get('materia_id')]
+        
+        if materia_ids:
+            # Paso 2: Obtener datos completos de las materias
+            ids_str = ','.join([str(id) for id in materia_ids])
+            url_materias = f"{SUPABASE_URL}/rest/v1/materias?id=in.({ids_str})&order=nombre.asc"
+            response_materias = requests.get(url_materias, headers=headers)
+            
+            if response_materias.status_code == 200:
+                materias = response_materias.json()
+            else:
+                st.warning(f"Error al obtener materias: {response_materias.status_code}")
+        else:
+            st.info("No hay materias asignadas a este nivel.")
     else:
-        st.warning(f"No se pudieron cargar las materias. Código: {response_materias.status_code}")
-        materias = []
+        st.warning(f"Error al obtener relaciones: {response_materias_ids.status_code}")
+        st.code(response_materias_ids.text)
     
     opciones_materias = [""] + [m['nombre'] for m in materias]
     
@@ -1000,10 +1008,10 @@ def configurar_horario_curso(headers):
     # =============================================
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    st.info(f"Horas: {len(horas)} | Materias: {len(materias)}")
+    st.info(f"Horas: {len(horas)} | Materias disponibles: {len(materias)}")
     
     if not materias:
-        st.warning("⚠️ No hay materias para este nivel.")
+        st.warning("⚠️ No hay materias registradas para este nivel. Ve a 'Gestionar Asignaturas'.")
     
     st.divider()
     
@@ -1026,6 +1034,12 @@ def configurar_horario_curso(headers):
                 default_idx = 0
                 if default_asignatura in opciones_materias:
                     default_idx = opciones_materias.index(default_asignatura)
+                elif default_asignatura and materias:
+                    opciones_materias_con_default = opciones_materias.copy()
+                    if default_asignatura not in opciones_materias_con_default:
+                        opciones_materias_con_default.append(default_asignatura)
+                    default_idx = opciones_materias_con_default.index(default_asignatura)
+                    opciones_materias = opciones_materias_con_default
                 
                 asignatura = st.selectbox(
                     "Materia",
