@@ -844,7 +844,6 @@ def configurar_horario_curso(headers):
     
     # =============================================
     # CONFIGURACIÓN DE CURSOS CON SUS NIVELES
-    # (Usando los códigos reales de tu sistema)
     # =============================================
     cursos_config = {
         # ===== PREESCOLAR =====
@@ -855,7 +854,7 @@ def configurar_horario_curso(headers):
         "TRANSICION_B": {"nivel": "Preescolar"},
         "TRANSICION_C": {"nivel": "Preescolar"},
         
-        # ===== PRIMARIA (CÓDIGOS 101-504) =====
+        # ===== PRIMARIA =====
         "101": {"nivel": "Primaria"},
         "102": {"nivel": "Primaria"},
         "103": {"nivel": "Primaria"},
@@ -874,7 +873,7 @@ def configurar_horario_curso(headers):
         "503": {"nivel": "Primaria"},
         "504": {"nivel": "Primaria"},
         
-        # ===== SECUNDARIA (CÓDIGOS 601-906) =====
+        # ===== SECUNDARIA =====
         "601": {"nivel": "Secundaria"},
         "602": {"nivel": "Secundaria"},
         "603": {"nivel": "Secundaria"},
@@ -898,7 +897,7 @@ def configurar_horario_curso(headers):
         "905": {"nivel": "Secundaria"},
         "906": {"nivel": "Secundaria"},
         
-        # ===== MEDIA (CÓDIGOS 1001-1106) =====
+        # ===== MEDIA =====
         "1001": {"nivel": "Media"},
         "1002": {"nivel": "Media"},
         "1003": {"nivel": "Media"},
@@ -913,122 +912,104 @@ def configurar_horario_curso(headers):
         "1106": {"nivel": "Media"}
     }
     
-    # Obtener niveles de la base de datos
+    # Obtener niveles
     response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     niveles = response_niveles.json() if response_niveles.status_code == 200 else []
     
     if not niveles:
-        st.warning("No hay niveles configurados. Ve a la pestaña 'Niveles' primero.")
+        st.warning("No hay niveles configurados.")
         return
     
-    # Crear diccionario de niveles por nombre
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    # Obtener cursos reales de la base de datos
+    # Obtener cursos de la BD
     try:
         response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
         if response_cursos.status_code == 200:
             cursos_bd = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
-            # Filtrar solo los que están en nuestra configuración
             cursos_disponibles = [c for c in cursos_bd if c in cursos_config]
         else:
             cursos_disponibles = list(cursos_config.keys())
     except:
         cursos_disponibles = list(cursos_config.keys())
     
-    # Ordenar cursos (numéricamente)
-    def ordenar_cursos(curso):
-        # Para cursos como JARDIN_INICIAL, ponerlos al inicio
-        if curso.startswith('JARDIN') or curso.startswith('TRANSICION'):
-            return (0, curso)
-        # Para códigos numéricos, ordenar por número
-        try:
-            return (1, int(curso))
-        except:
-            return (2, curso)
-    
-    cursos_disponibles.sort(key=ordenar_cursos)
-    
     if not cursos_disponibles:
-        st.warning("No hay cursos disponibles. Agrega estudiantes primero.")
+        st.warning("No hay cursos disponibles.")
         return
+    
+    cursos_disponibles.sort()
     
     col1, col2 = st.columns(2)
     with col1:
         curso = st.selectbox("Curso", cursos_disponibles, key="curso_select_asignacion")
     
-    # Obtener el nivel automático del curso
     nivel_curso_nombre = cursos_config.get(curso, {}).get("nivel", "Secundaria")
     nivel_id = niveles_dict.get(nivel_curso_nombre)
     
     with col2:
-        st.info(f"📌 Nivel asignado automáticamente: **{nivel_curso_nombre}**")
+        st.info(f"📌 Nivel: **{nivel_curso_nombre}**")
         st.text_input("Nivel del curso", value=nivel_curso_nombre, disabled=True)
     
-    # Verificar que el nivel existe
     if not nivel_id:
-        st.error(f"❌ El nivel '{nivel_curso_nombre}' no existe en la base de datos.")
+        st.error(f"❌ El nivel '{nivel_curso_nombre}' no existe.")
         return
     
     # =============================================
-    # RESTO DE LA FUNCIÓN (obtener horas, materias, docentes)
+    # OBTENER HORAS DEL NIVEL
     # =============================================
-    
-    # Obtener horas del nivel
     url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}&order=orden.asc"
     response_horas = requests.get(url_horas, headers=headers)
     horas = response_horas.json() if response_horas.status_code == 200 else []
     
     if not horas:
-        st.warning(f"No hay horas configuradas para el nivel {nivel_curso_nombre}. Ve a 'Horas por Nivel' primero.")
+        st.warning(f"No hay horas para '{nivel_curso_nombre}'.")
         return
     
-    # Obtener horario actual del curso
+    # =============================================
+    # OBTENER HORARIO ACTUAL
+    # =============================================
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
     response_horario = requests.get(url_horario, headers=headers)
     horarios = response_horario.json() if response_horario.status_code == 200 else []
     
-    # Obtener docentes
+    # =============================================
+    # OBTENER DOCENTES
+    # =============================================
     response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     docentes = response_docentes.json() if response_docentes.status_code == 200 else []
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     lista_docentes = list(docentes_dict.keys())
     
-   # Obtener materias del nivel (usando la nueva relación)
-url_materias = f"{SUPABASE_URL}/rest/v1/materias_niveles?select=materias(*),nivel_id=eq.{nivel_id}&order=materias.nombre.asc"
-response_materias = requests.get(url_materias, headers=headers)
-
-if response_materias.status_code == 200:
-    # Extraer las materias de la relación
-    relaciones = response_materias.json()
-    materias = [r['materias'] for r in relaciones if r.get('materias')]
-else:
-    materias = []
+    # =============================================
+    # OBTENER MATERIAS DEL NIVEL (CORREGIDO)
+    # =============================================
+    url_materias = f"{SUPABASE_URL}/rest/v1/materias_niveles?select=materias(*),nivel_id=eq.{nivel_id}&order=materias.nombre.asc"
+    response_materias = requests.get(url_materias, headers=headers)
     
-    if response_materias.status_code != 200:
-        st.warning("No se pudieron cargar las materias. Verifica que la tabla 'materias' exista.")
-        materias = []
+    if response_materias.status_code == 200:
+        relaciones = response_materias.json()
+        materias = [r['materias'] for r in relaciones if r.get('materias')]
     else:
-        materias = response_materias.json()
+        st.warning(f"No se pudieron cargar las materias. Código: {response_materias.status_code}")
+        materias = []
     
     opciones_materias = [""] + [m['nombre'] for m in materias]
     
-    # Días
+    # =============================================
+    # DÍAS
+    # =============================================
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    st.info(f"Horas del nivel: {len(horas)} clases por día | Materias disponibles: {len(materias)}")
+    st.info(f"Horas: {len(horas)} | Materias: {len(materias)}")
     
     if not materias:
-        st.warning("⚠️ No hay materias registradas para este nivel. Ve a 'Gestionar Asignaturas' para agregarlas.")
-    
-    # Botón para guardar todo de una vez
-    if st.button("💾 Guardar todas las asignaciones", type="primary", key="guardar_todo_asignacion"):
-        st.success("✅ Horario guardado correctamente")
-        st.rerun()
+        st.warning("⚠️ No hay materias para este nivel.")
     
     st.divider()
     
-    # Mostrar tabla de asignación
+    # =============================================
+    # TABLA DE ASIGNACIÓN
+    # =============================================
     for hora in horas:
         st.write(f"**Hora {hora['orden']}: {str(hora['hora_inicio'])[:5]} - {str(hora['hora_fin'])[:5]}**")
         
@@ -1045,12 +1026,6 @@ else:
                 default_idx = 0
                 if default_asignatura in opciones_materias:
                     default_idx = opciones_materias.index(default_asignatura)
-                elif default_asignatura and materias:
-                    opciones_materias_con_default = opciones_materias.copy()
-                    if default_asignatura not in opciones_materias_con_default:
-                        opciones_materias_con_default.append(default_asignatura)
-                    default_idx = opciones_materias_con_default.index(default_asignatura)
-                    opciones_materias = opciones_materias_con_default
                 
                 asignatura = st.selectbox(
                     "Materia",
