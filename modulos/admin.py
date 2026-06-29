@@ -994,8 +994,16 @@ def configurar_horario_curso(headers):
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     lista_docentes = list(docentes_dict.keys())
     
-    # Obtener materias del nivel (usando la nueva relación)
-materias = obtener_materias_por_nivel(headers, nivel_id)
+   # Obtener materias del nivel (usando la nueva relación)
+url_materias = f"{SUPABASE_URL}/rest/v1/materias_niveles?select=materias(*),nivel_id=eq.{nivel_id}&order=materias.nombre.asc"
+response_materias = requests.get(url_materias, headers=headers)
+
+if response_materias.status_code == 200:
+    # Extraer las materias de la relación
+    relaciones = response_materias.json()
+    materias = [r['materias'] for r in relaciones if r.get('materias')]
+else:
+    materias = []
     
     if response_materias.status_code != 200:
         st.warning("No se pudieron cargar las materias. Verifica que la tabla 'materias' exista.")
@@ -1158,10 +1166,16 @@ def gestionar_asignaturas(headers):
     nivel_nombres = [n['nombre'] for n in niveles]
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    # Obtener todas las materias con sus niveles
+    # Obtener todas las materias (sin JOIN)
     url_materias = f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc"
     response_materias = requests.get(url_materias, headers=headers)
-    materias = response_materias.json() if response_materias.status_code == 200 else []
+    
+    if response_materias.status_code != 200:
+        st.error(f"Error al cargar materias: {response_materias.status_code}")
+        st.code(response_materias.text)
+        return
+    
+    materias = response_materias.json()
     
     # Obtener relaciones materias-niveles
     url_relaciones = f"{SUPABASE_URL}/rest/v1/materias_niveles"
@@ -1181,17 +1195,22 @@ def gestionar_asignaturas(headers):
     st.write(f"**{len(materias)} asignaturas registradas**")
     
     if materias:
+        # Mostrar tabla con las materias y sus niveles
+        data = []
         for m in materias:
-            col1, col2, col3 = st.columns([2, 2, 2])
-            with col1:
-                st.write(f"**{m['nombre']}**")
-            with col2:
-                st.write(f"Código: {m.get('codigo', '')}")
-            with col3:
-                # Mostrar niveles de esta materia
-                niveles_ids = niveles_por_materia.get(m['id'], [])
-                niveles_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_ids]
-                st.write(f"Niveles: {', '.join(niveles_nombres) if niveles_nombres else 'Sin nivel'}")
+            niveles_ids = niveles_por_materia.get(m['id'], [])
+            niveles_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_ids]
+            data.append({
+                "Nombre": m['nombre'],
+                "Código": m.get('codigo', ''),
+                "Niveles": ', '.join(niveles_nombres) if niveles_nombres else 'Sin asignar'
+            })
+        
+        if data:
+            df = pd.DataFrame(data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+    else:
+        st.info("No hay asignaturas registradas")
     
     st.divider()
     
@@ -1215,8 +1234,9 @@ def gestionar_asignaturas(headers):
                 if not nombre or not niveles_seleccionados:
                     st.error("❌ Completa todos los campos obligatorios (*)")
                 else:
-                    # Verificar si ya existe
                     nombre_upper = nombre.upper().strip()
+                    
+                    # Verificar si ya existe
                     check_url = f"{SUPABASE_URL}/rest/v1/materias?nombre=eq.{nombre_upper}"
                     check_resp = requests.get(check_url, headers=headers)
                     
