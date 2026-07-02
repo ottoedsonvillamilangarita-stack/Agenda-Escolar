@@ -1209,7 +1209,7 @@ def gestionar_asignaturas(headers):
     
     st.divider()
     
-       # =============================================
+           # =============================================
     # SECCIÓN 2: ASIGNAR NIVELES A MATERIAS EXISTENTES (CORREGIDO)
     # =============================================
     st.subheader("📌 Asignar niveles a materias existentes")
