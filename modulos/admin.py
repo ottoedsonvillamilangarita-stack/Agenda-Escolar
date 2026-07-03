@@ -933,24 +933,18 @@ def configurar_horario_curso(headers):
     cursos_disponibles.sort()
     
     # =============================================
-    # SELECTOR DE CURSO CON GUARDADO AUTOMÁTICO
+    # FUNCIÓN PARA GUARDAR AL CAMBIAR DE CURSO
     # =============================================
-    # Función que se ejecuta al cambiar de curso
-    def guardar_al_cambiar_curso():
-        # Guardar el curso actual en session_state para saber que cambió
-        if "curso_anterior" in st.session_state:
-            curso_anterior = st.session_state.curso_anterior
-            curso_actual = st.session_state.curso_select_asignacion
-            if curso_anterior != curso_actual:
-                st.session_state.guardar_curso = True
+    if "curso_anterior" not in st.session_state:
+        st.session_state.curso_anterior = cursos_disponibles[0] if cursos_disponibles else None
     
     col1, col2 = st.columns(2)
     with col1:
         curso = st.selectbox(
             "Curso", 
-            cursos_disponibles, 
-            key="curso_select_asignacion",
-            on_change=guardar_al_cambiar_curso
+            cursos_disponibles,
+            index=cursos_disponibles.index(st.session_state.curso_anterior) if st.session_state.curso_anterior in cursos_disponibles else 0,
+            key="curso_select_asignacion"
         )
     
     nivel_curso_nombre = cursos_config.get(curso, {}).get("nivel", "Secundaria")
@@ -1000,87 +994,98 @@ def configurar_horario_curso(headers):
     
     opciones_materias = [""] + [m['nombre'] for m in materias]
     
-    # =============================================
-    # TABLA EDITABLE
-    # =============================================
+    # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
-    dias_lista = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
     
-    st.info(f"📊 Horas: {len(horas)} | Materias disponibles: {len(materias)}")
+    st.info(f"Horas: {len(horas)} | Materias disponibles: {len(materias)}")
     
     if not materias:
-        st.warning("⚠️ No hay materias registradas para este nivel. Ve a 'Gestionar Asignaturas'.")
+        st.warning("⚠️ No hay materias registradas para este nivel.")
         return
     
-    import pandas as pd
-    
-    data = []
-    for hora in horas:
-        fila = {
-            "Hora": f"{str(hora['hora_inicio'])[:5]} - {str(hora['hora_fin'])[:5]}",
-            "Orden": hora['orden']
-        }
-        for dia_nombre in dias_lista:
-            fila[dia_nombre] = ""
-        data.append(fila)
-    
-    df = pd.DataFrame(data)
-    
-    for i, hora in enumerate(horas):
-        for dia_num, dia_nombre in dias.items():
-            existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
-            if existente:
-                df.at[i, dia_nombre] = existente.get('asignatura', '')
-    
-    st.write("### ✏️ Editar horario")
-    st.caption("Escribe el nombre de la materia en cada celda. Los cambios se guardan al cambiar de curso o al presionar el botón.")
-    
-    edited_df = st.data_editor(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        key=f"horario_editor_{curso}",
-        column_config={
-            "Hora": st.column_config.TextColumn("Hora", width="small", disabled=True),
-            "Orden": st.column_config.TextColumn("Orden", disabled=True),
-        }
-    )
-    
     # =============================================
-    # BOTÓN GUARDAR MANUAL (SIEMPRE DISPONIBLE)
+    # TABLA CON DROPDOWNS (USANDO COLUMNAS)
     # =============================================
-    col_guardar1, col_guardar2 = st.columns([1, 3])
-    with col_guardar1:
-        if st.button("💾 Guardar horario", type="primary", use_container_width=True):
-            guardar_horario_actual(curso, nivel_id, horas, dias, edited_df, horarios, headers, opciones_materias)
+    st.write("### ✏️ Asignar materias y docentes")
+    st.caption("Selecciona materia y docente para cada hora/día. Los cambios se guardan automáticamente.")
     
-    # =============================================
-    # GUARDADO AUTOMÁTICO AL CAMBIAR DE CURSO
-    # =============================================
-    if st.session_state.get("guardar_curso", False):
-        guardar_horario_actual(curso, nivel_id, horas, dias, edited_df, horarios, headers, opciones_materias)
-        st.session_state.guardar_curso = False
-        st.session_state.curso_anterior = curso
-
-
-# =============================================
-# FUNCIÓN AUXILIAR PARA GUARDAR HORARIO
-# =============================================
-def guardar_horario_actual(curso, nivel_id, horas, dias, edited_df, horarios, headers, opciones_materias):
-    """Guarda el horario actual en la base de datos"""
-    with st.spinner("Guardando horario..."):
-        guardados = 0
-        eliminados = 0
-        errores = 0
+    # Usar un formulario para evitar el blanqueo
+    with st.form(key=f"horario_form_{curso}"):
+        # Mostrar tabla con selectores
+        for hora in horas:
+            st.write(f"**Hora {hora['orden']}: {str(hora['hora_inicio'])[:5]} - {str(hora['hora_fin'])[:5]}**")
+            
+            cols = st.columns(len(dias))
+            for idx, (dia_num, dia_nombre) in enumerate(dias.items()):
+                with cols[idx]:
+                    st.write(f"📅 {dia_nombre}")
+                    
+                    existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
+                    key_base = f"{curso}_{dia_num}_{hora['orden']}_{idx}"
+                    
+                    # Materia (dropdown)
+                    default_asignatura = existente.get('asignatura', '') if existente else ''
+                    default_idx = 0
+                    if default_asignatura in opciones_materias:
+                        default_idx = opciones_materias.index(default_asignatura)
+                    
+                    asignatura = st.selectbox(
+                        "Materia",
+                        options=opciones_materias,
+                        index=default_idx,
+                        key=f"mat_{key_base}"
+                    )
+                    
+                    # Docente (dropdown)
+                    default_docente = existente.get('documento_docente', '') if existente else ''
+                    default_idx_doc = 0
+                    if default_docente and default_docente in lista_docentes:
+                        default_idx_doc = lista_docentes.index(default_docente) + 1
+                    
+                    opciones_docentes = [""] + lista_docentes
+                    docente = st.selectbox(
+                        "Docente",
+                        options=opciones_docentes,
+                        index=default_idx_doc,
+                        format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
+                        key=f"doc_{key_base}"
+                    )
+                    
+                    # Salón
+                    default_salon = existente.get('salon', '') if existente else ''
+                    salon = st.text_input(
+                        "Salón",
+                        value=default_salon,
+                        key=f"salon_{key_base}"
+                    )
+            
+            st.divider()
         
-        for i, hora in enumerate(horas):
-            for dia_num, dia_nombre in dias.items():
-                asignatura = edited_df.iloc[i][dia_nombre]
-                existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
-                
-                if asignatura and asignatura.strip():
-                    materia_nombre = asignatura.strip()
-                    if materia_nombre in opciones_materias:
+        # Botón de guardado
+        col_guardar1, col_guardar2, col_guardar3 = st.columns([1, 2, 1])
+        with col_guardar2:
+            submitted = st.form_submit_button("💾 Guardar horario", type="primary", use_container_width=True)
+    
+    # =============================================
+    # PROCESAR GUARDADO (FUERA DEL FORMULARIO)
+    # =============================================
+    if submitted:
+        with st.spinner("Guardando horario..."):
+            guardados = 0
+            eliminados = 0
+            errores = 0
+            
+            for hora in horas:
+                for dia_num, dia_nombre in dias.items():
+                    key_base = f"{curso}_{dia_num}_{hora['orden']}_{list(dias.keys()).index(dia_num)}"
+                    
+                    asignatura = st.session_state.get(f"mat_{key_base}", "")
+                    docente = st.session_state.get(f"doc_{key_base}", "")
+                    salon = st.session_state.get(f"salon_{key_base}", "")
+                    
+                    existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
+                    
+                    if asignatura and asignatura.strip():
                         data_horario = {
                             "curso": curso,
                             "nivel_id": nivel_id,
@@ -1088,9 +1093,9 @@ def guardar_horario_actual(curso, nivel_id, horas, dias, edited_df, horarios, he
                             "orden_clase": hora['orden'],
                             "hora_inicio": str(hora['hora_inicio']),
                             "hora_fin": str(hora['hora_fin']),
-                            "asignatura": materia_nombre,
-                            "documento_docente": None,
-                            "salon": ""
+                            "asignatura": asignatura.strip(),
+                            "documento_docente": docente if docente else None,
+                            "salon": salon
                         }
                         try:
                             if existente:
@@ -1108,24 +1113,29 @@ def guardar_horario_actual(curso, nivel_id, horas, dias, edited_df, horarios, he
                             guardados += 1
                         except Exception as e:
                             errores += 1
-                    else:
-                        errores += 1
-                elif existente:
-                    try:
-                        requests.delete(
-                            f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}",
-                            headers=headers
-                        )
-                        eliminados += 1
-                    except Exception as e:
-                        errores += 1
-        
-        if errores > 0:
-            st.warning(f"⚠️ Guardado con {errores} errores. {guardados} clases guardadas, {eliminados} eliminadas.")
-        else:
-            st.success(f"✅ Horario guardado: {guardados} clases guardadas, {eliminados} eliminadas.")
-            st.rerun()
-
+                    elif existente:
+                        try:
+                            requests.delete(
+                                f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}",
+                                headers=headers
+                            )
+                            eliminados += 1
+                        except Exception as e:
+                            errores += 1
+            
+            if errores > 0:
+                st.warning(f"⚠️ Guardado con {errores} errores. {guardados} clases guardadas, {eliminados} eliminadas.")
+            else:
+                st.success(f"✅ Horario guardado: {guardados} clases guardadas, {eliminados} eliminadas.")
+                st.rerun()
+    
+    # =============================================
+    # GUARDADO AUTOMÁTICO AL CAMBIAR DE CURSO
+    # =============================================
+    if curso != st.session_state.get("curso_anterior"):
+        if st.session_state.get("curso_anterior") is not None:
+            st.warning(f"⚠️ No olvides guardar los cambios antes de cambiar de curso.")
+        st.session_state.curso_anterior = curso
 def gestion_festivos(headers):
     st.write("**📆 Festivos**")
     
