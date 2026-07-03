@@ -1185,159 +1185,119 @@ def gestionar_asignaturas(headers):
         niveles_por_materia[materia_id].append(nivel_id)
     
     # =============================================
-    # SECCIÓN 1: MOSTRAR MATERIAS CON SUS NIVELES
+    # CREAR DATAFRAME EDITABLE
     # =============================================
-    st.subheader("📋 Lista de asignaturas")
+    import pandas as pd
     
-    if materias:
-        # Crear DataFrame para mostrar
-        import pandas as pd
-        data = []
-        for m in materias:
-            niveles_ids = niveles_por_materia.get(m['id'], [])
-            niveles_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_ids]
-            
-            # Crear checkboxes para cada nivel
-            row = {
-                "ID": m['id'],
-                "Nombre": m['nombre'],
-                "Código": m.get('codigo', ''),
-            }
-            # Agregar columnas de niveles
-            for nivel in nivel_nombres:
-                row[nivel] = "✅" if nivel in niveles_nombres else "❌"
-            data.append(row)
-        
-        df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        st.caption(f"✅ = Asignada | ❌ = No asignada | Total: {len(materias)} materias")
-    else:
-        st.info("No hay asignaturas registradas")
+    # Construir DataFrame con checkboxes para cada nivel
+    data = []
+    for m in materias:
+        niveles_ids = niveles_por_materia.get(m['id'], [])
+        row = {
+            "id": m['id'],
+            "nombre": m['nombre'],
+            "codigo": m.get('codigo', '')
+        }
+        # Agregar columna booleana para cada nivel
+        for nivel in nivel_nombres:
+            nivel_id = niveles_dict.get(nivel)
+            row[nivel] = nivel_id in niveles_ids if nivel_id else False
+        data.append(row)
     
-    st.divider()
+    df = pd.DataFrame(data)
     
     # =============================================
-    # SECCIÓN 2: EDITAR MATERIA EXISTENTE
+    # MOSTRAR TABLA EDITABLE
     # =============================================
-    st.subheader("✏️ Editar asignatura existente")
-    st.caption("Selecciona una materia, edita su nombre/código y marca los niveles donde se dicta")
+    st.subheader("📋 Asignaturas y niveles")
+    st.caption("✅ Marca/Desmarca los niveles para cada materia. Los cambios se guardan al final con un solo botón.")
     
-    if materias:
-        # Selector de materia
-        opciones_materias = [f"{m['id']} - {m['nombre']}" for m in materias]
-        materia_seleccionada = st.selectbox("Seleccionar materia", opciones_materias, key="editar_materia_select")
-        
-        if materia_seleccionada:
-            materia_id = int(materia_seleccionada.split(' - ')[0])
-            materia_actual = next(m for m in materias if m['id'] == materia_id)
-            materia_nombre_actual = materia_actual['nombre']
-            materia_codigo_actual = materia_actual.get('codigo', '')
-            
-            # Obtener niveles actuales
-            niveles_actuales_ids = niveles_por_materia.get(materia_id, [])
-            niveles_actuales_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_actuales_ids]
-            
-            with st.form(key=f"editar_materia_form_{materia_id}"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    nuevo_nombre = st.text_input("Nombre", value=materia_nombre_actual)
-                    nuevo_codigo = st.text_input("Código", value=materia_codigo_actual)
-                with col2:
-                    st.write("**Niveles donde se dicta:**")
-                    niveles_seleccionados = []
-                    for nivel in nivel_nombres:
-                        checked = st.checkbox(
-                            nivel, 
-                            value=(nivel in niveles_actuales_nombres),
-                            key=f"nivel_{materia_id}_{nivel}"
-                        )
-                        if checked:
-                            niveles_seleccionados.append(nivel)
+    # Configurar columnas
+    column_config = {
+        "id": st.column_config.NumberColumn("ID", width="small", disabled=True),
+        "nombre": st.column_config.TextColumn("Materia", width="medium", disabled=True),
+        "codigo": st.column_config.TextColumn("Código", width="small")
+    }
+    
+    # Agregar columnas de niveles como checkboxes
+    for nivel in nivel_nombres:
+        column_config[nivel] = st.column_config.CheckboxColumn(nivel, width="small")
+    
+    # Mostrar el editor
+    edited_df = st.data_editor(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        key="materias_editor",
+        column_config=column_config
+    )
+    
+    # =============================================
+    # BOTÓN PARA GUARDAR TODOS LOS CAMBIOS
+    # =============================================
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("💾 Guardar todos los cambios", type="primary", use_container_width=True):
+            with st.spinner("Guardando cambios..."):
+                guardados = 0
+                errores = 0
                 
-                col_guardar, col_eliminar = st.columns(2)
-                with col_guardar:
-                    submitted = st.form_submit_button("💾 Guardar cambios", type="primary")
+                # Recorrer cada fila del DataFrame editado
+                for idx, row in edited_df.iterrows():
+                    materia_id = row['id']
+                    materia_nombre = row['nombre']
+                    nuevo_codigo = row['codigo']
                     
-                    if submitted:
-                        if not nuevo_nombre:
-                            st.error("❌ El nombre es obligatorio")
-                        else:
-                            # 1. Actualizar nombre y código
-                            nombre_upper = nuevo_nombre.upper().strip()
-                            data_update = {
-                                "nombre": nombre_upper,
-                                "codigo": nuevo_codigo.upper().strip() if nuevo_codigo else None
-                            }
-                            
-                            # Verificar si el nuevo nombre ya existe (excepto si es el mismo)
-                            if nombre_upper != materia_nombre_actual:
-                                check_url = f"{SUPABASE_URL}/rest/v1/materias?nombre=eq.{nombre_upper}"
-                                check_resp = requests.get(check_url, headers=headers)
-                                if check_resp.status_code == 200 and check_resp.json():
-                                    st.error(f"❌ Ya existe una materia con el nombre '{nombre_upper}'")
-                                    st.stop()
-                            
-                            # Actualizar materia
-                            update_url = f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}"
-                            r = requests.patch(update_url, headers=headers, json=data_update)
-                            
-                            if r.status_code == 200:
-                                # 2. Actualizar niveles
-                                # Eliminar relaciones actuales
-                                requests.delete(
-                                    f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
-                                    headers=headers
-                                )
-                                
-                                # Insertar nuevas relaciones
-                                for nivel_nombre in niveles_seleccionados:
-                                    nivel_id = niveles_dict.get(nivel_nombre)
-                                    if nivel_id:
-                                        rel_data = {"materia_id": materia_id, "nivel_id": nivel_id}
-                                        requests.post(
-                                            f"{SUPABASE_URL}/rest/v1/materias_niveles",
-                                            headers=headers,
-                                            json=rel_data
-                                        )
-                                
-                                st.success(f"✅ Materia '{nombre_upper}' actualizada correctamente")
-                                st.rerun()
-                            else:
-                                st.error(f"❌ Error al actualizar: {r.status_code}")
-                                st.code(r.text)
-                
-                with col_eliminar:
-                    if st.form_submit_button("🗑️ Eliminar materia", type="secondary"):
-                        # Verificar si está en uso
-                        check_url = f"{SUPABASE_URL}/rest/v1/horario_base?asignatura=eq.{materia_nombre_actual}&limit=1"
-                        check_resp = requests.get(check_url, headers=headers)
-                        
-                        if check_resp.status_code == 200 and check_resp.json():
-                            st.error(f"❌ No se puede eliminar '{materia_nombre_actual}' porque está en uso en horarios")
-                        else:
-                            # Eliminar relaciones
-                            requests.delete(
-                                f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
-                                headers=headers
-                            )
-                            # Eliminar materia
-                            r = requests.delete(
+                    try:
+                        # 1. Actualizar código si cambió
+                        materia_original = next((m for m in materias if m['id'] == materia_id), None)
+                        if materia_original and nuevo_codigo != materia_original.get('codigo', ''):
+                            update_data = {"codigo": nuevo_codigo.upper().strip() if nuevo_codigo else None}
+                            requests.patch(
                                 f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}",
-                                headers=headers
+                                headers=headers,
+                                json=update_data
                             )
-                            if r.status_code == 204:
-                                st.success(f"✅ Materia '{materia_nombre_actual}' eliminada")
-                                st.rerun()
-                            else:
-                                st.error(f"❌ Error al eliminar: {r.status_code}")
-    else:
-        st.info("No hay materias para editar")
+                        
+                        # 2. Obtener niveles seleccionados
+                        niveles_seleccionados = []
+                        for nivel in nivel_nombres:
+                            if row.get(nivel, False):
+                                niveles_seleccionados.append(nivel)
+                        
+                        # 3. Eliminar relaciones actuales
+                        requests.delete(
+                            f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
+                            headers=headers
+                        )
+                        
+                        # 4. Insertar nuevas relaciones
+                        for nivel_nombre in niveles_seleccionados:
+                            nivel_id = niveles_dict.get(nivel_nombre)
+                            if nivel_id:
+                                rel_data = {"materia_id": materia_id, "nivel_id": nivel_id}
+                                requests.post(
+                                    f"{SUPABASE_URL}/rest/v1/materias_niveles",
+                                    headers=headers,
+                                    json=rel_data
+                                )
+                        
+                        guardados += 1
+                        
+                    except Exception as e:
+                        errores += 1
+                        st.error(f"Error en '{materia_nombre}': {str(e)}")
+                
+                if errores == 0:
+                    st.success(f"✅ {guardados} materias actualizadas correctamente")
+                    st.rerun()
+                else:
+                    st.warning(f"⚠️ {guardados} actualizadas, {errores} errores")
     
+    # =============================================
+    # SECCIÓN PARA CREAR NUEVA MATERIA
+    # =============================================
     st.divider()
-    
-    # =============================================
-    # SECCIÓN 3: CREAR NUEVA MATERIA
-    # =============================================
     st.subheader("➕ Crear nueva asignatura")
     
     with st.form("nueva_materia_form"):
@@ -1368,7 +1328,7 @@ def gestionar_asignaturas(headers):
                 check_resp = requests.get(check_url, headers=headers)
                 
                 if check_resp.status_code == 200 and check_resp.json():
-                    st.error(f"❌ La asignatura '{nombre_upper}' ya existe. Edítala en la sección de arriba.")
+                    st.error(f"❌ La asignatura '{nombre_upper}' ya existe. Edítala en la tabla de arriba.")
                 else:
                     # Insertar materia
                     data = {"nombre": nombre_upper, "codigo": codigo.upper().strip() if codigo else None}
@@ -1393,6 +1353,51 @@ def gestionar_asignaturas(headers):
                     else:
                         st.error(f"❌ Error al crear: {r.status_code}")
                         st.code(r.text)
+    
+    # =============================================
+    # SECCIÓN PARA ELIMINAR MATERIA
+    # =============================================
+    if materias:
+        st.divider()
+        st.subheader("🗑️ Eliminar asignatura")
+        st.caption("⚠️ Solo se puede eliminar si no está asignada a ningún horario.")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            materia_eliminar = st.selectbox(
+                "Seleccionar materia para eliminar",
+                options=[f"{m['id']} - {m['nombre']}" for m in materias],
+                key="eliminar_materia_select"
+            )
+        with col2:
+            if st.button("🗑️ Eliminar", type="secondary", use_container_width=True):
+                if materia_eliminar:
+                    materia_id = int(materia_eliminar.split(' - ')[0])
+                    materia_nombre = materia_eliminar.split(' - ')[1]
+                    
+                    # Verificar si está en uso
+                    check_url = f"{SUPABASE_URL}/rest/v1/horario_base?asignatura=eq.{materia_nombre}&limit=1"
+                    check_resp = requests.get(check_url, headers=headers)
+                    
+                    if check_resp.status_code == 200 and check_resp.json():
+                        st.error(f"❌ No se puede eliminar '{materia_nombre}' porque está en uso en horarios")
+                    else:
+                        # Eliminar relaciones
+                        requests.delete(
+                            f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
+                            headers=headers
+                        )
+                        # Eliminar materia
+                        r = requests.delete(
+                            f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}",
+                            headers=headers
+                        )
+                        if r.status_code == 204:
+                            st.success(f"✅ Materia '{materia_nombre}' eliminada")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Error al eliminar: {r.status_code}")
+
 def mostrar_sistema():
     st.subheader("⚙️ Configuración del Sistema")
     
