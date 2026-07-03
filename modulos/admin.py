@@ -1156,9 +1156,6 @@ def gestionar_asignaturas(headers):
     nivel_nombres = [n['nombre'] for n in niveles]
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    # =============================================
-    # OBTENER DATOS DE LA BASE DE DATOS
-    # =============================================
     # Obtener todas las materias
     url_materias = f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc"
     response_materias = requests.get(url_materias, headers=headers)
@@ -1189,16 +1186,14 @@ def gestionar_asignaturas(headers):
     # =============================================
     import pandas as pd
     
-    # Construir DataFrame con checkboxes para cada nivel
     data = []
     for m in materias:
         niveles_ids = niveles_por_materia.get(m['id'], [])
         row = {
             "id": m['id'],
             "nombre": m['nombre'],
-            "codigo": m.get('codigo', '')
+            "codigo": m.get('codigo', '') if m.get('codigo') is not None else ''
         }
-        # Agregar columna booleana para cada nivel
         for nivel in nivel_nombres:
             nivel_id = niveles_dict.get(nivel)
             row[nivel] = nivel_id in niveles_ids if nivel_id else False
@@ -1212,18 +1207,15 @@ def gestionar_asignaturas(headers):
     st.subheader("📋 Asignaturas y niveles")
     st.caption("✅ Marca/Desmarca los niveles para cada materia. Los cambios se guardan al final con un solo botón.")
     
-    # Configurar columnas
     column_config = {
         "id": st.column_config.NumberColumn("ID", width="small", disabled=True),
         "nombre": st.column_config.TextColumn("Materia", width="medium", disabled=True),
         "codigo": st.column_config.TextColumn("Código", width="small")
     }
     
-    # Agregar columnas de niveles como checkboxes
     for nivel in nivel_nombres:
         column_config[nivel] = st.column_config.CheckboxColumn(nivel, width="small")
     
-    # Mostrar el editor
     edited_df = st.data_editor(
         df,
         use_container_width=True,
@@ -1241,23 +1233,35 @@ def gestionar_asignaturas(headers):
             with st.spinner("Guardando cambios..."):
                 guardados = 0
                 errores = 0
+                errores_lista = []
                 
-                # Recorrer cada fila del DataFrame editado
                 for idx, row in edited_df.iterrows():
                     materia_id = row['id']
                     materia_nombre = row['nombre']
                     nuevo_codigo = row['codigo']
                     
                     try:
-                        # 1. Actualizar código si cambió
+                        # 1. Actualizar código si cambió (CORREGIDO)
                         materia_original = next((m for m in materias if m['id'] == materia_id), None)
-                        if materia_original and nuevo_codigo != materia_original.get('codigo', ''):
-                            update_data = {"codigo": nuevo_codigo.upper().strip() if nuevo_codigo else None}
-                            requests.patch(
-                                f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}",
-                                headers=headers,
-                                json=update_data
-                            )
+                        if materia_original:
+                            # Manejar valores nulos o float
+                            codigo_actual = materia_original.get('codigo', '') or ''
+                            codigo_nuevo = nuevo_codigo if nuevo_codigo and not pd.isna(nuevo_codigo) else ''
+                            
+                            # Convertir a string y limpiar
+                            if isinstance(codigo_nuevo, float):
+                                codigo_nuevo = str(codigo_nuevo) if not pd.isna(codigo_nuevo) else ''
+                            
+                            codigo_nuevo = codigo_nuevo.strip().upper() if codigo_nuevo else None
+                            codigo_actual = codigo_actual.strip().upper() if codigo_actual else ''
+                            
+                            if codigo_nuevo != codigo_actual:
+                                update_data = {"codigo": codigo_nuevo}
+                                requests.patch(
+                                    f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}",
+                                    headers=headers,
+                                    json=update_data
+                                )
                         
                         # 2. Obtener niveles seleccionados
                         niveles_seleccionados = []
@@ -1286,13 +1290,15 @@ def gestionar_asignaturas(headers):
                         
                     except Exception as e:
                         errores += 1
-                        st.error(f"Error en '{materia_nombre}': {str(e)}")
+                        errores_lista.append(f"{materia_nombre}: {str(e)}")
                 
                 if errores == 0:
                     st.success(f"✅ {guardados} materias actualizadas correctamente")
                     st.rerun()
                 else:
                     st.warning(f"⚠️ {guardados} actualizadas, {errores} errores")
+                    for err in errores_lista[:5]:  # Mostrar solo los primeros 5 errores
+                        st.error(f"❌ {err}")
     
     # =============================================
     # SECCIÓN PARA CREAR NUEVA MATERIA
@@ -1322,6 +1328,7 @@ def gestionar_asignaturas(headers):
                 st.error("❌ Selecciona al menos un nivel")
             else:
                 nombre_upper = nombre.upper().strip()
+                codigo_upper = codigo.upper().strip() if codigo else None
                 
                 # Verificar si ya existe
                 check_url = f"{SUPABASE_URL}/rest/v1/materias?nombre=eq.{nombre_upper}"
@@ -1330,14 +1337,12 @@ def gestionar_asignaturas(headers):
                 if check_resp.status_code == 200 and check_resp.json():
                     st.error(f"❌ La asignatura '{nombre_upper}' ya existe. Edítala en la tabla de arriba.")
                 else:
-                    # Insertar materia
-                    data = {"nombre": nombre_upper, "codigo": codigo.upper().strip() if codigo else None}
+                    data = {"nombre": nombre_upper, "codigo": codigo_upper}
                     r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
                     
                     if r.status_code == 201:
                         materia_id = r.json()[0]['id']
                         
-                        # Insertar relaciones con niveles
                         for nivel_nombre in niveles_nueva:
                             nivel_id = niveles_dict.get(nivel_nombre)
                             if nivel_id:
@@ -1375,19 +1380,16 @@ def gestionar_asignaturas(headers):
                     materia_id = int(materia_eliminar.split(' - ')[0])
                     materia_nombre = materia_eliminar.split(' - ')[1]
                     
-                    # Verificar si está en uso
                     check_url = f"{SUPABASE_URL}/rest/v1/horario_base?asignatura=eq.{materia_nombre}&limit=1"
                     check_resp = requests.get(check_url, headers=headers)
                     
                     if check_resp.status_code == 200 and check_resp.json():
                         st.error(f"❌ No se puede eliminar '{materia_nombre}' porque está en uso en horarios")
                     else:
-                        # Eliminar relaciones
                         requests.delete(
                             f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
                             headers=headers
                         )
-                        # Eliminar materia
                         r = requests.delete(
                             f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}",
                             headers=headers
@@ -1397,7 +1399,6 @@ def gestionar_asignaturas(headers):
                             st.rerun()
                         else:
                             st.error(f"❌ Error al eliminar: {r.status_code}")
-
 def mostrar_sistema():
     st.subheader("⚙️ Configuración del Sistema")
     
