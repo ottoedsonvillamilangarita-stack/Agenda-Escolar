@@ -615,10 +615,6 @@ def configurar_horas_nivel(headers):
         st.info("No hay horas configuradas para este nivel.")
 
 
-def configurar_jornada_nivel(headers):
-    st.write("**📅 Configurar Días Laborales por Nivel**")
-    
-    response_niveles
 
 # ============================================
 # FUNCIÓN 9: CONFIGURAR JORNADA POR NIVEL
@@ -906,7 +902,7 @@ def gestion_directores_grupo(headers):
     st.subheader("👨‍🏫 Directores de Grupo")
     st.caption("Asigna o cambia el director de grupo para cada curso.")
     
-    # Obtener cursos desde estudiantes
+    # 1. Obtener cursos desde estudiantes
     response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
     if response_cursos.status_code != 200:
         st.error("❌ Error al cargar los cursos")
@@ -919,25 +915,26 @@ def gestion_directores_grupo(headers):
         st.warning("⚠️ No hay cursos registrados")
         return
     
-    # Obtener docentes
+    # 2. Obtener docentes (usando documento_docente como clave)
     response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     if response_docentes.status_code != 200:
         st.error("❌ Error al cargar docentes")
         return
     
     docentes = response_docentes.json()
-    docentes_por_id = {d['id']: d for d in docentes}
+    
+    # Crear diccionario de docentes por documento
     docentes_por_documento = {d['documento_docente']: d for d in docentes}
-    opciones_docentes = [""] + [d['documento_docente'] for d in docentes]
+    opciones_docentes = [""] + list(docentes_por_documento.keys())
     docentes_nombres = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     
-    # Obtener grados
+    # 3. Obtener grados (cursos con ID interno)
     response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
     grados = response_grados.json() if response_grados.status_code == 200 else []
     grados_por_nombre = {g['nombre']: g['id'] for g in grados}
     grados_por_id = {g['id']: g['nombre'] for g in grados}
     
-    # Obtener directores actuales
+    # 4. Obtener directores actuales
     response_directores = requests.get(f"{SUPABASE_URL}/rest/v1/directores_grupo", headers=headers)
     
     directores_por_curso = {}
@@ -946,15 +943,13 @@ def gestion_directores_grupo(headers):
         st.info(f"📌 {len(directores)} directores encontrados en la base de datos")
         for d in directores:
             id_grado = d.get('id_grado')
-            id_docente = d.get('id_docente')
-            if id_grado and id_docente:
+            docente_documento = d.get('docente_documento')  # ← Usamos el campo correcto
+            if id_grado and docente_documento:
                 nombre_grado = grados_por_id.get(id_grado)
                 if nombre_grado:
-                    docente = docentes_por_id.get(id_docente)
-                    if docente:
-                        directores_por_curso[nombre_grado] = docente['documento_docente']
+                    directores_por_curso[nombre_grado] = docente_documento
     
-    # Mostrar tabla
+    # 5. Mostrar tabla
     st.write("### 📋 Directores por curso")
     
     data = []
@@ -973,7 +968,7 @@ def gestion_directores_grupo(headers):
     
     st.divider()
     
-    # Asignar/Editar director
+    # 6. Asignar/Editar director
     st.write("### ✏️ Asignar director de grupo")
     
     col1, col2 = st.columns(2)
@@ -1002,39 +997,36 @@ def gestion_directores_grupo(headers):
             elif not documento_seleccionado:
                 st.error("❌ Selecciona un docente")
             else:
-                docente = docentes_por_documento.get(documento_seleccionado)
-                if not docente:
-                    st.error("❌ Docente no encontrado")
+                # Verificar si ya existe asignación
+                check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?id_grado=eq.{id_grado}"
+                check_resp = requests.get(check_url, headers=headers)
+                
+                if check_resp.status_code == 200 and check_resp.json():
+                    # Actualizar
+                    dir_id = check_resp.json()[0]['id']
+                    r = requests.patch(
+                        f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
+                        headers=headers,
+                        json={"docente_documento": documento_seleccionado}
+                    )
                 else:
-                    id_docente = docente['id']
-                    
-                    check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?id_grado=eq.{id_grado}"
-                    check_resp = requests.get(check_url, headers=headers)
-                    
-                    if check_resp.status_code == 200 and check_resp.json():
-                        dir_id = check_resp.json()[0]['id']
-                        r = requests.patch(
-                            f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
-                            headers=headers,
-                            json={"id_docente": id_docente}
-                        )
-                    else:
-                        r = requests.post(
-                            f"{SUPABASE_URL}/rest/v1/directores_grupo",
-                            headers=headers,
-                            json={
-                                "id_grado": id_grado,
-                                "id_docente": id_docente,
-                                "id_periodo_lectivo": 1
-                            }
-                        )
-                    
-                    if r.status_code in [200, 201, 204]:
-                        st.success(f"✅ Director asignado para {curso_seleccionado}")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Error: {r.status_code}")
-                        st.code(r.text)
+                    # Crear
+                    r = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/directores_grupo",
+                        headers=headers,
+                        json={
+                            "id_grado": id_grado,
+                            "docente_documento": documento_seleccionado,
+                            "id_periodo_lectivo": 1
+                        }
+                    )
+                
+                if r.status_code in [200, 201, 204]:
+                    st.success(f"✅ Director asignado para {curso_seleccionado}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error: {r.status_code}")
+                    st.code(r.text)
     
     with col_btn2:
         if st.button("🗑️ Eliminar director", type="secondary", key="btn_eliminar_director"):
@@ -1058,7 +1050,6 @@ def gestion_directores_grupo(headers):
                     st.warning("⚠️ No hay director asignado para este curso")
             else:
                 st.error("❌ Curso no encontrado en la tabla grados")
-
 
 # ============================================
 # FUNCIÓN 13: MOSTRAR ASIGNACIÓN
