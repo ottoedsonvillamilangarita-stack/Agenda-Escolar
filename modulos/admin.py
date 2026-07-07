@@ -616,27 +616,32 @@ def mostrar_asignacion():
     
     headers = get_headers()
     
-    # Crear tabs para las diferentes funciones
     tabs = st.tabs([
-        "📖 Asignar Materias", 
+        "📖 Asignar Horarios", 
+        "📋 Asignación Docente",
+        "👨‍🏫 Directores de Grupo",
         "⏰ Horas por Nivel", 
         "📅 Días Laborales", 
         "📚 Niveles", 
-        "📚 Gestionar Asignaturas",  # ← NUEVA PESTAÑA
+        "📚 Gestionar Asignaturas",
         "📆 Festivos"
     ])
     
     with tabs[0]:
         configurar_horario_curso(headers)
     with tabs[1]:
-        configurar_horas_nivel(headers)
+        gestion_asignacion_academica(headers)
     with tabs[2]:
-        configurar_jornada_nivel(headers)
+        gestion_directores_grupo(headers)
     with tabs[3]:
-        configurar_niveles(headers)
+        configurar_horas_nivel(headers)
     with tabs[4]:
-        gestionar_asignaturas(headers)  # ← NUEVA FUNCIÓN
+        configurar_jornada_nivel(headers)
     with tabs[5]:
+        configurar_niveles(headers)
+    with tabs[6]:
+        gestionar_asignaturas(headers)
+    with tabs[7]:
         gestion_festivos(headers)
 
 def configurar_niveles(headers):
