@@ -1628,19 +1628,24 @@ def gestion_asignacion_academica(headers):
         return
     
     materias = response_materias.json()
-    materias_dict = {m['id']: m['nombre'] for m in materias}
     
     # Obtener asignaciones existentes
     response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
-    asignaciones = response_asignaciones.json() if response_asignaciones.status_code == 200 else []
     
-    # Crear diccionario de asignaciones por curso
     asignaciones_por_curso = {}
-    for a in asignaciones:
-        curso = a['curso']
-        if curso not in asignaciones_por_curso:
-            asignaciones_por_curso[curso] = {}
-        asignaciones_por_curso[curso][a['materia_id']] = a['docente_id']
+    if response_asignaciones.status_code == 200:
+        asignaciones = response_asignaciones.json()
+        # Crear diccionario de asignaciones por curso
+        for a in asignaciones:
+            curso = a.get('curso')
+            materia_id = a.get('materia_id')
+            docente_id = a.get('docente_id')
+            if curso and materia_id:
+                if curso not in asignaciones_por_curso:
+                    asignaciones_por_curso[curso] = {}
+                asignaciones_por_curso[curso][materia_id] = docente_id
+    else:
+        st.warning("No se pudieron cargar las asignaciones existentes")
     
     # Selector de curso
     curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="asignacion_academica_curso")
