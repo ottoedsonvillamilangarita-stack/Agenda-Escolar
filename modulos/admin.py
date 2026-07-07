@@ -1105,7 +1105,7 @@ def mostrar_asignacion():
     ])
     
     with tabs[0]:
-        st.info("🚧 Módulo de asignación de horarios en construcción")
+        configurar_horario_curso(headers)  # ← CAMBIADO: ya no muestra "en construcción"
     with tabs[1]:
         gestion_directores_grupo(headers)
     with tabs[2]:
@@ -1118,7 +1118,6 @@ def mostrar_asignacion():
         gestionar_asignaturas(headers)
     with tabs[6]:
         gestion_festivos(headers)
-
 def configurar_horario_curso(headers):
     st.write("**📖 Asignar Materias por Curso**")
     
