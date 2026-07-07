@@ -1136,6 +1136,7 @@ def configurar_horario_curso(headers):
         if st.session_state.get("curso_anterior") is not None:
             st.warning(f"⚠️ No olvides guardar los cambios antes de cambiar de curso.")
         st.session_state.curso_anterior = curso
+        
 def gestion_festivos(headers):
     st.write("**📆 Festivos**")
     
@@ -1445,3 +1446,141 @@ def obtener_materias_por_nivel(headers, nivel_id):
     if response.status_code == 200:
         return response.json()
     return []
+
+def gestion_directores_grupo(headers):
+    st.subheader("👨‍🏫 Directores de Grupo")
+    st.caption("Asigna o cambia el director de grupo para cada curso.")
+    
+    # Obtener cursos disponibles
+    try:
+        response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
+        if response_cursos.status_code == 200:
+            cursos = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
+            cursos.sort()
+        else:
+            st.warning("No se pudieron cargar los cursos")
+            return
+    except:
+        cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
+    
+    if not cursos:
+        st.info("No hay cursos registrados")
+        return
+    
+    # Obtener docentes
+    response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+    if response_docentes.status_code != 200:
+        st.error("Error al cargar docentes")
+        return
+    
+    docentes = response_docentes.json()
+    docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
+    opciones_docentes = [""] + list(docentes_dict.keys())
+    
+    # Obtener directores actuales
+    response_directores = requests.get(f"{SUPABASE_URL}/rest/v1/directores_grupo", headers=headers)
+    if response_directores.status_code != 200:
+        st.error("Error al cargar directores")
+        return
+    
+    directores = response_directores.json()
+    directores_por_curso = {d['curso']: d['docente_id'] for d in directores}
+    
+    st.write("### 📋 Directores por curso")
+    
+    # Mostrar tabla de directores
+    data = []
+    for curso in cursos:
+        docente_id = directores_por_curso.get(curso)
+        data.append({
+            "Curso": curso,
+            "Director": docentes_dict.get(docente_id, "Sin asignar") if docente_id else "Sin asignar",
+            "docente_id": docente_id
+        })
+    
+    import pandas as pd
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    st.divider()
+    
+    # =============================================
+    # ASIGNAR/EDITAR DIRECTOR POR CURSO
+    # =============================================
+    st.write("### ✏️ Asignar director de grupo")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="director_curso_select")
+    
+    # Obtener director actual del curso seleccionado
+    director_actual_id = directores_por_curso.get(curso_seleccionado)
+    director_actual_nombre = docentes_dict.get(director_actual_id, "Sin asignar") if director_actual_id else "Sin asignar"
+    
+    st.info(f"📌 Director actual de {curso_seleccionado}: **{director_actual_nombre}**")
+    
+    with col2:
+        docente_seleccionado = st.selectbox(
+            "Seleccionar docente",
+            options=opciones_docentes,
+            format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
+            key="director_docente_select"
+        )
+    
+    col_guardar, col_eliminar = st.columns(2)
+    
+    with col_guardar:
+        if st.button("💾 Asignar director", type="primary", use_container_width=True):
+            if not docente_seleccionado:
+                st.error("❌ Selecciona un docente")
+            else:
+                # Verificar si ya existe asignación para este curso
+                check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?curso=eq.{curso_seleccionado}"
+                check_resp = requests.get(check_url, headers=headers)
+                
+                if check_resp.status_code == 200 and check_resp.json():
+                    # Actualizar
+                    dir_id = check_resp.json()[0]['id']
+                    data_update = {"docente_id": docente_seleccionado}
+                    r = requests.patch(
+                        f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
+                        headers=headers,
+                        json=data_update
+                    )
+                else:
+                    # Crear
+                    data_insert = {
+                        "curso": curso_seleccionado,
+                        "docente_id": docente_seleccionado
+                    }
+                    r = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/directores_grupo",
+                        headers=headers,
+                        json=data_insert
+                    )
+                
+                if r.status_code in [200, 201, 204]:
+                    st.success(f"✅ Director asignado para {curso_seleccionado}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error: {r.status_code}")
+                    st.code(r.text)
+    
+    with col_eliminar:
+        if st.button("🗑️ Eliminar director", type="secondary", use_container_width=True):
+            check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?curso=eq.{curso_seleccionado}"
+            check_resp = requests.get(check_url, headers=headers)
+            
+            if check_resp.status_code == 200 and check_resp.json():
+                dir_id = check_resp.json()[0]['id']
+                r = requests.delete(
+                    f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
+                    headers=headers
+                )
+                if r.status_code == 204:
+                    st.success(f"✅ Director eliminado para {curso_seleccionado}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error: {r.status_code}")
+            else:
+                st.warning("No hay director asignado para este curso")
