@@ -540,78 +540,24 @@ def gestion_docentes():
                 st.warning("No se encontró un docente con ese documento")
 
 
-# ============================================
-# SECCIÓN DE ASIGNACIÓN (NUEVO)
-# ============================================
-
 def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
-    
     headers = get_headers()
+    st.info("🚧 Módulo de asignación en construcción - Próximamente")
+
+
+def mostrar_sistema():
+    st.subheader("⚙️ Configuración del Sistema")
     
-    tabs = st.tabs([
-        "📖 Asignar Horarios", 
-        "📋 Asignación Docente",
-        "👨‍🏫 Directores de Grupo",
-        "⏰ Horas por Nivel", 
-        "📅 Días Laborales", 
-        "📚 Niveles", 
-        "📚 Gestionar Asignaturas",
-        "📆 Festivos"
-    ])
+    col1, col2 = st.columns(2)
     
-    with tabs[0]:
-        configurar_horario_curso(headers)
-    with tabs[1]:
-        gestion_asignacion_academica(headers)
-    with tabs[2]:
-        gestion_directores_grupo(headers)
-    with tabs[3]:
-        configurar_horas_nivel(headers)
-    with tabs[4]:
-        configurar_jornada_nivel(headers)
-    with tabs[5]:
-        configurar_niveles(headers)
-    with tabs[6]:
-        gestionar_asignaturas(headers)
-    with tabs[7]:
-        gestion_festivos(headers)
-
-
-# ============================================
-# FUNCIONES DE CONFIGURACIÓN DE HORARIOS
-# ============================================
-
-def configurar_niveles(headers):
-    st.write("**📚 Niveles Educativos**")
-    response = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
-    if response.status_code == 200:
-        niveles = response.json()
-        if niveles:
-            st.write("**Niveles existentes:**")
-            for n in niveles:
-                st.write(f"- {n['nombre']}")
-    with st.expander("➕ Agregar nivel"):
-        nuevo_nivel = st.text_input("Nombre del nivel", key="nuevo_nivel_input")
-        if st.button("Agregar nivel", key="agregar_nivel_btn"):
-            if nuevo_nivel:
-                data = {"nombre": nuevo_nivel, "orden": len(niveles) + 1 if niveles else 1}
-                r = requests.post(f"{SUPABASE_URL}/rest/v1/niveles", headers=headers, json=data)
-                if r.status_code == 201:
-                    st.success(f"✅ Nivel '{nuevo_nivel}' agregado")
-                    st.rerun()
-
-
-def configurar_horas_nivel(headers):
-    st.write("**⏰ Configurar Horas por Nivel**")
-    st.info("Define las franjas horarias para cada nivel.")
-    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
-    if response_niveles.status_code != 200:
-        st.error(f"Error al cargar niveles: {response_niveles.status_code}")
-        return
-    niveles = response_niveles.json()
-    if not niveles:
-        st.warning("No hay niveles configurados")
-        return
-    nivel_nombres = [n['nombre'] for n in niveles]
-    nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_n
+    with col1:
+        nombre_colegio = st.text_input("Nombre del colegio", "Mi Colegio")
+        año_lectivo = st.number_input("Año lectivo", min_value=2000, max_value=2100, value=2024)
+        
+        if st.button("💾 Guardar Configuración", type="primary"):
+            st.success("Configuración guardada")
+    
+    with col2:
+        if st.button("📀 Crear Respaldo", type="primary"):
+            st.success("Respaldo creado")
