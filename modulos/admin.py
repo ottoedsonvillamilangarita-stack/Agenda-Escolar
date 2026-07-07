@@ -1454,145 +1454,6 @@ def obtener_materias_por_nivel(headers, nivel_id):
         return response.json()
     return []
 
-def gestion_directores_grupo(headers):
-    st.subheader("👨‍🏫 Directores de Grupo")
-    st.caption("Asigna o cambia el director de grupo para cada curso.")
-    
-    # Obtener cursos disponibles
-    try:
-        response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
-        if response_cursos.status_code == 200:
-            cursos = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
-            cursos.sort()
-        else:
-            st.warning("No se pudieron cargar los cursos")
-            return
-    except:
-        cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
-    
-    if not cursos:
-        st.info("No hay cursos registrados")
-        return
-    
-    # Obtener docentes
-    response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
-    if response_docentes.status_code != 200:
-        st.error("Error al cargar docentes")
-        return
-    
-    docentes = response_docentes.json()
-    docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
-    opciones_docentes = [""] + list(docentes_dict.keys())
-    
-    # Obtener directores actuales
-    response_directores = requests.get(f"{SUPABASE_URL}/rest/v1/directores_grupo", headers=headers)
-    if response_directores.status_code != 200:
-        st.error("Error al cargar directores")
-        return
-    
-    directores = response_directores.json()
-    directores_por_curso = {d['curso']: d['docente_id'] for d in directores}
-    
-    st.write("### 📋 Directores por curso")
-    
-    # Mostrar tabla de directores
-    data = []
-    for curso in cursos:
-        docente_id = directores_por_curso.get(curso)
-        data.append({
-            "Curso": curso,
-            "Director": docentes_dict.get(docente_id, "Sin asignar") if docente_id else "Sin asignar",
-            "docente_id": docente_id
-        })
-    
-    import pandas as pd
-    df = pd.DataFrame(data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    st.divider()
-    
-    # =============================================
-    # ASIGNAR/EDITAR DIRECTOR POR CURSO
-    # =============================================
-    st.write("### ✏️ Asignar director de grupo")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="director_curso_select")
-    
-    # Obtener director actual del curso seleccionado
-    director_actual_id = directores_por_curso.get(curso_seleccionado)
-    director_actual_nombre = docentes_dict.get(director_actual_id, "Sin asignar") if director_actual_id else "Sin asignar"
-    
-    st.info(f"📌 Director actual de {curso_seleccionado}: **{director_actual_nombre}**")
-    
-    with col2:
-        docente_seleccionado = st.selectbox(
-            "Seleccionar docente",
-            options=opciones_docentes,
-            format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
-            key="director_docente_select"
-        )
-    
-    col_guardar, col_eliminar = st.columns(2)
-    
-    with col_guardar:
-        if st.button("💾 Asignar director", type="primary", use_container_width=True):
-            if not docente_seleccionado:
-                st.error("❌ Selecciona un docente")
-            else:
-                # Verificar si ya existe asignación para este curso
-                check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?curso=eq.{curso_seleccionado}"
-                check_resp = requests.get(check_url, headers=headers)
-                
-                if check_resp.status_code == 200 and check_resp.json():
-                    # Actualizar
-                    dir_id = check_resp.json()[0]['id']
-                    data_update = {"docente_id": docente_seleccionado}
-                    r = requests.patch(
-                        f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
-                        headers=headers,
-                        json=data_update
-                    )
-                else:
-                    # Crear
-                    data_insert = {
-                        "curso": curso_seleccionado,
-                        "docente_id": docente_seleccionado
-                    }
-                    r = requests.post(
-                        f"{SUPABASE_URL}/rest/v1/directores_grupo",
-                        headers=headers,
-                        json=data_insert
-                    )
-                
-                if r.status_code in [200, 201, 204]:
-                    st.success(f"✅ Director asignado para {curso_seleccionado}")
-                    st.rerun()
-                else:
-                    st.error(f"❌ Error: {r.status_code}")
-                    st.code(r.text)
-    
-    with col_eliminar:
-        if st.button("🗑️ Eliminar director", type="secondary", use_container_width=True):
-            check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?curso=eq.{curso_seleccionado}"
-            check_resp = requests.get(check_url, headers=headers)
-            
-            if check_resp.status_code == 200 and check_resp.json():
-                dir_id = check_resp.json()[0]['id']
-                r = requests.delete(
-                    f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
-                    headers=headers
-                )
-                if r.status_code == 204:
-                    st.success(f"✅ Director eliminado para {curso_seleccionado}")
-                    st.rerun()
-                else:
-                    st.error(f"❌ Error: {r.status_code}")
-            else:
-                st.warning("No hay director asignado para este curso")
-
-
 def gestion_asignacion_academica(headers):
     st.subheader("📋 Asignación Docente por Materia y Curso")
     st.caption("Asigna qué docente dicta cada materia en cada curso.")
@@ -1602,6 +1463,7 @@ def gestion_asignacion_academica(headers):
     if response_cursos.status_code == 200:
         cursos = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
         cursos.sort()
+        st.info(f"📌 Cursos encontrados: {len(cursos)}")
     else:
         st.warning("No se pudieron cargar los cursos")
         return
@@ -1617,6 +1479,7 @@ def gestion_asignacion_academica(headers):
         return
     
     docentes = response_docentes.json()
+    st.info(f"📌 Docentes encontrados: {len(docentes)}")
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     opciones_docentes = [""] + list(docentes_dict.keys())
     
@@ -1627,12 +1490,18 @@ def gestion_asignacion_academica(headers):
         return
     
     materias = response_materias.json()
+    st.info(f"📌 Materias encontradas: {len(materias)}")
     
     # Obtener asignaciones existentes
     response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
+    st.write(f"📌 Asignaciones - Status code: {response_asignaciones.status_code}")
+    
     asignaciones_por_curso = {}
     if response_asignaciones.status_code == 200:
-        for a in response_asignaciones.json():
+        asignaciones = response_asignaciones.json()
+        st.write(f"📌 Asignaciones encontradas: {len(asignaciones)}")
+        for a in asignaciones:
+            st.write(f"   - Curso: {a.get('curso')}, Materia: {a.get('materia_id')}, Docente: {a.get('docente_id')}")
             curso = a.get('curso')
             materia_id = a.get('materia_id')
             docente_id = a.get('docente_id')
@@ -1640,12 +1509,16 @@ def gestion_asignacion_academica(headers):
                 if curso not in asignaciones_por_curso:
                     asignaciones_por_curso[curso] = {}
                 asignaciones_por_curso[curso][materia_id] = docente_id
+    else:
+        st.warning(f"No se pudieron cargar las asignaciones: {response_asignaciones.status_code}")
+        st.code(response_asignaciones.text)
     
     # Selector de curso
     curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="asignacion_docente_curso_unique")
     
     if curso_seleccionado:
         st.write(f"### Asignaciones para {curso_seleccionado}")
+        st.write(f"📌 Asignaciones en este curso: {len(asignaciones_por_curso.get(curso_seleccionado, {}))}")
         
         # Mostrar materias con sus docentes
         for m in materias:
@@ -1691,4 +1564,118 @@ def gestion_asignacion_academica(headers):
                         )
                     
                     st.success(f"✅ Asignación guardada para {m['nombre']}")
+                    st.rerun()
+
+
+def gestion_asignacion_academica(headers):
+    st.subheader("📋 Asignación Docente por Materia y Curso")
+    st.caption("Asigna qué docente dicta cada materia en cada curso.")
+    
+    # Obtener cursos
+    response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
+    if response_cursos.status_code == 200:
+        cursos = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
+        cursos.sort()
+        st.info(f"📌 Cursos encontrados: {len(cursos)}")
+    else:
+        st.warning("No se pudieron cargar los cursos")
+        return
+    
+    if not cursos:
+        st.info("No hay cursos registrados")
+        return
+    
+    # Obtener docentes
+    response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+    if response_docentes.status_code != 200:
+        st.error("Error al cargar docentes")
+        return
+    
+    docentes = response_docentes.json()
+    st.info(f"📌 Docentes encontrados: {len(docentes)}")
+    docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
+    opciones_docentes = [""] + list(docentes_dict.keys())
+    
+    # Obtener materias
+    response_materias = requests.get(f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc", headers=headers)
+    if response_materias.status_code != 200:
+        st.error("Error al cargar materias")
+        return
+    
+    materias = response_materias.json()
+    st.info(f"📌 Materias encontradas: {len(materias)}")
+    
+    # Obtener asignaciones existentes
+    response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
+    st.write(f"📌 Asignaciones - Status code: {response_asignaciones.status_code}")
+    
+    asignaciones_por_curso = {}
+    if response_asignaciones.status_code == 200:
+        asignaciones = response_asignaciones.json()
+        st.write(f"📌 Asignaciones encontradas: {len(asignaciones)}")
+        for a in asignaciones:
+            st.write(f"   - Curso: {a.get('curso')}, Materia: {a.get('materia_id')}, Docente: {a.get('docente_id')}")
+            curso = a.get('curso')
+            materia_id = a.get('materia_id')
+            docente_id = a.get('docente_id')
+            if curso and materia_id:
+                if curso not in asignaciones_por_curso:
+                    asignaciones_por_curso[curso] = {}
+                asignaciones_por_curso[curso][materia_id] = docente_id
+    else:
+        st.warning(f"No se pudieron cargar las asignaciones: {response_asignaciones.status_code}")
+        st.code(response_asignaciones.text)
+    
+    # Selector de curso
+    curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="asignacion_docente_curso_unique")
+    
+    if curso_seleccionado:
+        st.write(f"### Asignaciones para {curso_seleccionado}")
+        st.write(f"📌 Asignaciones en este curso: {len(asignaciones_por_curso.get(curso_seleccionado, {}))}")
+        
+        # Mostrar materias con sus docentes
+        for m in materias:
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                st.write(f"**{m['nombre']}**")
+            with col2:
+                docente_actual = asignaciones_por_curso.get(curso_seleccionado, {}).get(m['id'])
+                default_idx = 0
+                if docente_actual and docente_actual in opciones_docentes:
+                    default_idx = opciones_docentes.index(docente_actual)
+                
+                docente_seleccionado = st.selectbox(
+                    "Docente",
+                    options=opciones_docentes,
+                    index=default_idx,
+                    format_func=lambda x: docentes_dict.get(x, "Sin asignar") if x else "Ninguno",
+                    key=f"asignacion_{curso_seleccionado}_{m['id']}"
+                )
+            with col3:
+                if st.button("💾", key=f"save_asignacion_{curso_seleccionado}_{m['id']}"):
+                    data_asig = {
+                        "curso": curso_seleccionado,
+                        "materia_id": m['id'],
+                        "docente_id": docente_seleccionado if docente_seleccionado else None
+                    }
+                    
+                    check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&materia_id=eq.{m['id']}"
+                    check_resp = requests.get(check_url, headers=headers)
+                    
+                    if check_resp.status_code == 200 and check_resp.json():
+                        asig_id = check_resp.json()[0]['id']
+                        requests.patch(
+                            f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{asig_id}",
+                            headers=headers,
+                            json=data_asig
+                        )
+                    else:
+                        requests.post(
+                            f"{SUPABASE_URL}/rest/v1/asignacion_academica",
+                            headers=headers,
+                            json=data_asig
+                        )
+                    
+                    st.success(f"✅ Asignación guardada para {m['nombre']}")
+                    st.rerun()guardada para {m['nombre']}")
                     st.rerun()
