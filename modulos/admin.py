@@ -610,4 +610,10 @@ def configurar_horas_nivel(headers):
     
     if horas:
         for h in horas:
-            st.write(f"- Hora {h['orden']}: {h['hora_inicio'][:5]} - {h['hora_fin'][:5]
+            st.write(f"- Hora {h['orden']}: {h['hora_inicio'][:5]} - {h['hora_fin'][:5]}")
+    else:
+        st.info("No hay horas configuradas para este nivel.")
+
+
+def configurar_jornada_nivel(headers):
+    st.write("**
