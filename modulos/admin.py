@@ -619,3 +619,495 @@ def configurar_jornada_nivel(headers):
     st.write("**📅 Configurar Días Laborales por Nivel**")
     
     response_niveles
+
+# ============================================
+# FUNCIÓN 9: CONFIGURAR JORNADA POR NIVEL
+# ============================================
+def configurar_jornada_nivel(headers):
+    st.write("**📅 Configurar Días Laborales por Nivel**")
+    
+    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
+    
+    if response_niveles.status_code != 200:
+        st.error("Error al cargar niveles")
+        return
+    
+    niveles = response_niveles.json()
+    
+    if not niveles:
+        st.warning("No hay niveles configurados")
+        return
+    
+    nivel_nombres = [n['nombre'] for n in niveles]
+    nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres, key="jornada_nivel_select")
+    
+    st.info(f"Configuración para {nivel_seleccionado}")
+    st.write("(Funcionalidad en desarrollo)")
+
+
+# ============================================
+# FUNCIÓN 10: GESTIONAR ASIGNATURAS
+# ============================================
+def gestionar_asignaturas(headers):
+    st.subheader("📚 Gestionar Asignaturas")
+    st.caption("Crea, edita y asigna materias a los niveles educativos.")
+    
+    # Obtener niveles
+    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
+    if response_niveles.status_code != 200:
+        st.error("Error al cargar niveles")
+        return
+    
+    niveles = response_niveles.json()
+    nivel_nombres = [n['nombre'] for n in niveles]
+    niveles_dict = {n['nombre']: n['id'] for n in niveles}
+    
+    # Obtener materias existentes
+    response_materias = requests.get(f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc", headers=headers)
+    if response_materias.status_code != 200:
+        st.error("Error al cargar materias")
+        return
+    
+    materias = response_materias.json()
+    
+    # Obtener relaciones materias-niveles
+    response_relaciones = requests.get(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers)
+    relaciones = response_relaciones.json() if response_relaciones.status_code == 200 else []
+    
+    # Crear diccionario de niveles por materia
+    niveles_por_materia = {}
+    for r in relaciones:
+        materia_id = r['materia_id']
+        nivel_id = r['nivel_id']
+        if materia_id not in niveles_por_materia:
+            niveles_por_materia[materia_id] = []
+        niveles_por_materia[materia_id].append(nivel_id)
+    
+    # Mostrar materias existentes
+    st.write("### 📋 Lista de asignaturas")
+    
+    if materias:
+        data = []
+        for m in materias:
+            niveles_ids = niveles_por_materia.get(m['id'], [])
+            niveles_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_ids]
+            data.append({
+                "ID": m['id'],
+                "Nombre": m['nombre'],
+                "Código": m.get('codigo', ''),
+                "Niveles": ', '.join(niveles_nombres) if niveles_nombres else '⚠️ Sin asignar'
+            })
+        
+        df = pd.DataFrame(data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.caption(f"Total: {len(materias)} materias")
+    else:
+        st.info("No hay asignaturas registradas")
+    
+    st.divider()
+    
+    # Agregar nueva materia
+    st.write("### ➕ Agregar nueva asignatura")
+    
+    with st.form("nueva_asignatura_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nombre = st.text_input("Nombre de la asignatura *")
+            codigo = st.text_input("Código (opcional)")
+        with col2:
+            niveles_seleccionados = st.multiselect(
+                "Niveles en los que aplica *",
+                options=nivel_nombres,
+                help="Selecciona uno o varios niveles donde se dicta esta materia"
+            )
+        
+        submitted = st.form_submit_button("💾 Crear asignatura", type="primary")
+        
+        if submitted:
+            if not nombre:
+                st.error("❌ El nombre es obligatorio")
+            elif not niveles_seleccionados:
+                st.error("❌ Selecciona al menos un nivel")
+            else:
+                nombre_upper = nombre.upper().strip()
+                codigo_upper = codigo.upper().strip() if codigo else None
+                
+                check_url = f"{SUPABASE_URL}/rest/v1/materias?nombre=eq.{nombre_upper}"
+                check_resp = requests.get(check_url, headers=headers)
+                
+                if check_resp.status_code == 200 and check_resp.json():
+                    st.error(f"❌ La asignatura '{nombre_upper}' ya existe")
+                else:
+                    data = {"nombre": nombre_upper, "codigo": codigo_upper}
+                    r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
+                    
+                    if r.status_code == 201:
+                        materia_id = r.json()[0]['id']
+                        
+                        for nivel_nombre in niveles_seleccionados:
+                            nivel_id = niveles_dict.get(nivel_nombre)
+                            if nivel_id:
+                                rel_data = {"materia_id": materia_id, "nivel_id": nivel_id}
+                                requests.post(
+                                    f"{SUPABASE_URL}/rest/v1/materias_niveles",
+                                    headers=headers,
+                                    json=rel_data
+                                )
+                        
+                        st.success(f"✅ Asignatura '{nombre_upper}' creada correctamente")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error al crear: {r.status_code}")
+                        st.code(r.text)
+    
+    st.divider()
+    
+    # Editar materia existente
+    st.write("### ✏️ Editar asignatura existente")
+    
+    if materias:
+        opciones_materias = [f"{m['id']} - {m['nombre']}" for m in materias]
+        materia_seleccionada = st.selectbox("Seleccionar materia", opciones_materias, key="editar_materia_select")
+        
+        if materia_seleccionada:
+            materia_id = int(materia_seleccionada.split(' - ')[0])
+            materia_actual = next(m for m in materias if m['id'] == materia_id)
+            niveles_actuales_ids = niveles_por_materia.get(materia_id, [])
+            niveles_actuales_nombres = [n for n in nivel_nombres if niveles_dict.get(n) in niveles_actuales_ids]
+            
+            with st.form("editar_materia_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nuevo_nombre = st.text_input("Nombre", value=materia_actual['nombre'])
+                    nuevo_codigo = st.text_input("Código", value=materia_actual.get('codigo', ''))
+                with col2:
+                    nuevos_niveles = st.multiselect(
+                        "Niveles en los que aplica",
+                        options=nivel_nombres,
+                        default=niveles_actuales_nombres
+                    )
+                
+                col_btn1, col_btn2 = st.columns(2)
+                
+                with col_btn1:
+                    if st.form_submit_button("💾 Guardar cambios", type="primary"):
+                        if not nuevo_nombre:
+                            st.error("❌ El nombre es obligatorio")
+                        else:
+                            nombre_upper = nuevo_nombre.upper().strip()
+                            
+                            if nombre_upper != materia_actual['nombre']:
+                                check_url = f"{SUPABASE_URL}/rest/v1/materias?nombre=eq.{nombre_upper}"
+                                check_resp = requests.get(check_url, headers=headers)
+                                if check_resp.status_code == 200 and check_resp.json():
+                                    st.error(f"❌ Ya existe una materia con el nombre '{nombre_upper}'")
+                                    st.stop()
+                            
+                            update_data = {
+                                "nombre": nombre_upper,
+                                "codigo": nuevo_codigo.upper().strip() if nuevo_codigo else None
+                            }
+                            r = requests.patch(
+                                f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}",
+                                headers=headers,
+                                json=update_data
+                            )
+                            
+                            if r.status_code == 200:
+                                requests.delete(
+                                    f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
+                                    headers=headers
+                                )
+                                
+                                for nivel_nombre in nuevos_niveles:
+                                    nivel_id = niveles_dict.get(nivel_nombre)
+                                    if nivel_id:
+                                        rel_data = {"materia_id": materia_id, "nivel_id": nivel_id}
+                                        requests.post(
+                                            f"{SUPABASE_URL}/rest/v1/materias_niveles",
+                                            headers=headers,
+                                            json=rel_data
+                                        )
+                                
+                                st.success(f"✅ Materia '{nombre_upper}' actualizada")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Error: {r.status_code}")
+                
+                with col_btn2:
+                    if st.form_submit_button("🗑️ Eliminar materia", type="secondary"):
+                        check_url = f"{SUPABASE_URL}/rest/v1/horario_base?asignatura=eq.{materia_actual['nombre']}&limit=1"
+                        check_resp = requests.get(check_url, headers=headers)
+                        
+                        if check_resp.status_code == 200 and check_resp.json():
+                            st.error(f"❌ No se puede eliminar '{materia_actual['nombre']}' porque está en uso en horarios")
+                        else:
+                            requests.delete(
+                                f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_id}",
+                                headers=headers
+                            )
+                            r = requests.delete(
+                                f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_id}",
+                                headers=headers
+                            )
+                            if r.status_code == 204:
+                                st.success(f"✅ Materia '{materia_actual['nombre']}' eliminada")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Error: {r.status_code}")
+
+
+# ============================================
+# FUNCIÓN 11: GESTIONAR FESTIVOS
+# ============================================
+def gestion_festivos(headers):
+    st.write("**📆 Festivos**")
+    
+    year = st.selectbox("Año", [2024, 2025, 2026], key="festivos_year")
+    
+    url_festivos = f"{SUPABASE_URL}/rest/v1/festivos?year=eq.{year}&order=fecha.asc"
+    response_festivos = requests.get(url_festivos, headers=headers)
+    
+    if response_festivos.status_code == 200:
+        festivos = response_festivos.json()
+        if festivos:
+            st.write("**Festivos registrados:**")
+            for f in festivos:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"{f['fecha']} - {f.get('descripcion', 'Sin descripción')}")
+                with col2:
+                    if st.button("🗑️", key=f"del_festivo_{f['id']}"):
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/festivos?id=eq.{f['id']}", headers=headers)
+                        st.rerun()
+        else:
+            st.info("No hay festivos registrados")
+    else:
+        st.warning("No se pudieron cargar los festivos")
+    
+    with st.expander("➕ Agregar festivo"):
+        col1, col2 = st.columns(2)
+        with col1:
+            fecha = st.date_input("Fecha", key="festivo_fecha")
+        with col2:
+            descripcion = st.text_input("Descripción", key="festivo_desc")
+        
+        if st.button("Agregar", key="agregar_festivo_btn"):
+            data = {"fecha": str(fecha), "descripcion": descripcion, "year": fecha.year}
+            requests.post(f"{SUPABASE_URL}/rest/v1/festivos", headers=headers, json=data)
+            st.success("✅ Festivo agregado")
+            st.rerun()
+
+
+# ============================================
+# FUNCIÓN 12: GESTIONAR DIRECTORES DE GRUPO
+# ============================================
+def gestion_directores_grupo(headers):
+    st.subheader("👨‍🏫 Directores de Grupo")
+    st.caption("Asigna o cambia el director de grupo para cada curso.")
+    
+    # Obtener cursos desde estudiantes
+    response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
+    if response_cursos.status_code != 200:
+        st.error("❌ Error al cargar los cursos")
+        return
+    
+    cursos = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
+    cursos.sort()
+    
+    if not cursos:
+        st.warning("⚠️ No hay cursos registrados")
+        return
+    
+    # Obtener docentes
+    response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+    if response_docentes.status_code != 200:
+        st.error("❌ Error al cargar docentes")
+        return
+    
+    docentes = response_docentes.json()
+    docentes_por_id = {d['id']: d for d in docentes}
+    docentes_por_documento = {d['documento_docente']: d for d in docentes}
+    opciones_docentes = [""] + [d['documento_docente'] for d in docentes]
+    docentes_nombres = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
+    
+    # Obtener grados
+    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
+    grados = response_grados.json() if response_grados.status_code == 200 else []
+    grados_por_nombre = {g['nombre']: g['id'] for g in grados}
+    grados_por_id = {g['id']: g['nombre'] for g in grados}
+    
+    # Obtener directores actuales
+    response_directores = requests.get(f"{SUPABASE_URL}/rest/v1/directores_grupo", headers=headers)
+    
+    directores_por_curso = {}
+    if response_directores.status_code == 200:
+        directores = response_directores.json()
+        st.info(f"📌 {len(directores)} directores encontrados en la base de datos")
+        for d in directores:
+            id_grado = d.get('id_grado')
+            id_docente = d.get('id_docente')
+            if id_grado and id_docente:
+                nombre_grado = grados_por_id.get(id_grado)
+                if nombre_grado:
+                    docente = docentes_por_id.get(id_docente)
+                    if docente:
+                        directores_por_curso[nombre_grado] = docente['documento_docente']
+    
+    # Mostrar tabla
+    st.write("### 📋 Directores por curso")
+    
+    data = []
+    for curso in cursos:
+        documento_docente = directores_por_curso.get(curso)
+        data.append({
+            "Curso": curso,
+            "Director": docentes_nombres.get(documento_docente, "Sin asignar") if documento_docente else "Sin asignar"
+        })
+    
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    total_directores = len([d for d in directores_por_curso.values() if d])
+    st.caption(f"📌 {total_directores} de {len(cursos)} cursos tienen director asignado")
+    
+    st.divider()
+    
+    # Asignar/Editar director
+    st.write("### ✏️ Asignar director de grupo")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="director_curso_edit")
+    
+    documento_actual = directores_por_curso.get(curso_seleccionado)
+    nombre_actual = docentes_nombres.get(documento_actual, "Sin asignar") if documento_actual else "Sin asignar"
+    st.info(f"📌 Director actual: **{nombre_actual}**")
+    
+    with col2:
+        documento_seleccionado = st.selectbox(
+            "Seleccionar docente",
+            options=opciones_docentes,
+            format_func=lambda x: docentes_nombres.get(x, "Seleccionar") if x else "Ninguno",
+            key="director_docente_edit"
+        )
+    
+    col_btn1, col_btn2 = st.columns(2)
+    
+    with col_btn1:
+        if st.button("💾 Asignar director", type="primary", key="btn_asignar_director"):
+            id_grado = grados_por_nombre.get(curso_seleccionado)
+            if not id_grado:
+                st.error(f"❌ El curso '{curso_seleccionado}' no existe en la tabla grados")
+            elif not documento_seleccionado:
+                st.error("❌ Selecciona un docente")
+            else:
+                docente = docentes_por_documento.get(documento_seleccionado)
+                if not docente:
+                    st.error("❌ Docente no encontrado")
+                else:
+                    id_docente = docente['id']
+                    
+                    check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?id_grado=eq.{id_grado}"
+                    check_resp = requests.get(check_url, headers=headers)
+                    
+                    if check_resp.status_code == 200 and check_resp.json():
+                        dir_id = check_resp.json()[0]['id']
+                        r = requests.patch(
+                            f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
+                            headers=headers,
+                            json={"id_docente": id_docente}
+                        )
+                    else:
+                        r = requests.post(
+                            f"{SUPABASE_URL}/rest/v1/directores_grupo",
+                            headers=headers,
+                            json={
+                                "id_grado": id_grado,
+                                "id_docente": id_docente,
+                                "id_periodo_lectivo": 1
+                            }
+                        )
+                    
+                    if r.status_code in [200, 201, 204]:
+                        st.success(f"✅ Director asignado para {curso_seleccionado}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error: {r.status_code}")
+                        st.code(r.text)
+    
+    with col_btn2:
+        if st.button("🗑️ Eliminar director", type="secondary", key="btn_eliminar_director"):
+            id_grado = grados_por_nombre.get(curso_seleccionado)
+            if id_grado:
+                check_url = f"{SUPABASE_URL}/rest/v1/directores_grupo?id_grado=eq.{id_grado}"
+                check_resp = requests.get(check_url, headers=headers)
+                
+                if check_resp.status_code == 200 and check_resp.json():
+                    dir_id = check_resp.json()[0]['id']
+                    r = requests.delete(
+                        f"{SUPABASE_URL}/rest/v1/directores_grupo?id=eq.{dir_id}",
+                        headers=headers
+                    )
+                    if r.status_code == 204:
+                        st.success(f"✅ Director eliminado para {curso_seleccionado}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error: {r.status_code}")
+                else:
+                    st.warning("⚠️ No hay director asignado para este curso")
+            else:
+                st.error("❌ Curso no encontrado en la tabla grados")
+
+
+# ============================================
+# FUNCIÓN 13: MOSTRAR ASIGNACIÓN
+# ============================================
+def mostrar_asignacion():
+    st.subheader("📚 Asignación Académica")
+    headers = get_headers()
+    
+    tabs = st.tabs([
+        "📖 Asignar Horarios", 
+        "👨‍🏫 Directores de Grupo",
+        "⏰ Horas por Nivel", 
+        "📅 Días Laborales", 
+        "📚 Niveles", 
+        "📚 Gestionar Asignaturas",
+        "📆 Festivos"
+    ])
+    
+    with tabs[0]:
+        st.info("🚧 Módulo de asignación de horarios en construcción")
+    with tabs[1]:
+        gestion_directores_grupo(headers)
+    with tabs[2]:
+        configurar_horas_nivel(headers)
+    with tabs[3]:
+        configurar_jornada_nivel(headers)
+    with tabs[4]:
+        configurar_niveles(headers)
+    with tabs[5]:
+        gestionar_asignaturas(headers)
+    with tabs[6]:
+        gestion_festivos(headers)
+
+
+# ============================================
+# FUNCIÓN 14: MOSTRAR SISTEMA
+# ============================================
+def mostrar_sistema():
+    st.subheader("⚙️ Configuración del Sistema")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        nombre_colegio = st.text_input("Nombre del colegio", "Mi Colegio")
+        año_lectivo = st.number_input("Año lectivo", min_value=2000, max_value=2100, value=2024)
+        
+        if st.button("💾 Guardar Configuración", type="primary"):
+            st.success("Configuración guardada")
+    
+    with col2:
+        if st.button("📀 Crear Respaldo", type="primary"):
+            st.success("Respaldo creado")
