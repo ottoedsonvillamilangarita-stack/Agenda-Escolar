@@ -1611,7 +1611,7 @@ def gestion_asignacion_academica(headers):
         st.info("No hay cursos registrados")
         return
     
-    # Obtener docentes
+    # Obtener docentes (con documento_docente como clave)
     response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     if response_docentes.status_code != 200:
         st.error("Error al cargar docentes")
@@ -1628,6 +1628,7 @@ def gestion_asignacion_academica(headers):
         return
     
     materias = response_materias.json()
+    materias_dict = {m['id']: m['nombre'] for m in materias}
     
     # Obtener asignaciones existentes
     response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
@@ -1635,6 +1636,8 @@ def gestion_asignacion_academica(headers):
     asignaciones_por_curso = {}
     if response_asignaciones.status_code == 200:
         asignaciones = response_asignaciones.json()
+        st.info(f"📌 {len(asignaciones)} asignaciones encontradas")
+        
         # Crear diccionario de asignaciones por curso
         for a in asignaciones:
             curso = a.get('curso')
@@ -1645,7 +1648,7 @@ def gestion_asignacion_academica(headers):
                     asignaciones_por_curso[curso] = {}
                 asignaciones_por_curso[curso][materia_id] = docente_id
     else:
-        st.warning("No se pudieron cargar las asignaciones existentes")
+        st.warning("No se pudieron cargar las asignaciones")
     
     # Selector de curso
     curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="asignacion_academica_curso")
@@ -1653,10 +1656,14 @@ def gestion_asignacion_academica(headers):
     if curso_seleccionado:
         st.write(f"### Asignaciones para {curso_seleccionado}")
         
+        # Verificar si hay asignaciones para este curso
+        asignaciones_curso = asignaciones_por_curso.get(curso_seleccionado, {})
+        st.write(f"**{len(asignaciones_curso)} asignaciones encontradas para este curso**")
+        
         # Mostrar tabla con todas las materias y sus docentes asignados
         data = []
         for m in materias:
-            docente_id = asignaciones_por_curso.get(curso_seleccionado, {}).get(m['id'])
+            docente_id = asignaciones_curso.get(m['id'])
             data.append({
                 "id": m['id'],
                 "Materia": m['nombre'],
