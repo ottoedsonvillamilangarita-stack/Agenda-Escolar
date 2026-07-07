@@ -616,7 +616,8 @@ def mostrar_asignacion():
     
     headers = get_headers()
     
-    tabs = st.tabs([
+    # Usar un solo tab con claves únicas
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📖 Asignar Horarios", 
         "📋 Asignación Docente",
         "👨‍🏫 Directores de Grupo",
@@ -627,23 +628,22 @@ def mostrar_asignacion():
         "📆 Festivos"
     ])
     
-    with tabs[0]:
+    with tab1:
         configurar_horario_curso(headers)
-    with tabs[1]:
+    with tab2:
         gestion_asignacion_academica(headers)
-    with tabs[2]:
+    with tab3:
         gestion_directores_grupo(headers)
-    with tabs[3]:
+    with tab4:
         configurar_horas_nivel(headers)
-    with tabs[4]:
+    with tab5:
         configurar_jornada_nivel(headers)
-    with tabs[5]:
+    with tab6:
         configurar_niveles(headers)
-    with tabs[6]:
+    with tab7:
         gestionar_asignaturas(headers)
-    with tabs[7]:
+    with tab8:
         gestion_festivos(headers)
-
 def configurar_niveles(headers):
     st.write("**📚 Niveles Educativos**")
     
@@ -1611,7 +1611,7 @@ def gestion_asignacion_academica(headers):
         st.info("No hay cursos registrados")
         return
     
-    # Obtener docentes (con documento_docente como clave)
+    # Obtener docentes
     response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     if response_docentes.status_code != 200:
         st.error("Error al cargar docentes")
@@ -1628,7 +1628,6 @@ def gestion_asignacion_academica(headers):
         return
     
     materias = response_materias.json()
-    materias_dict = {m['id']: m['nombre'] for m in materias}
     
     # Obtener asignaciones existentes
     response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
@@ -1636,9 +1635,6 @@ def gestion_asignacion_academica(headers):
     asignaciones_por_curso = {}
     if response_asignaciones.status_code == 200:
         asignaciones = response_asignaciones.json()
-        st.info(f"📌 {len(asignaciones)} asignaciones encontradas")
-        
-        # Crear diccionario de asignaciones por curso
         for a in asignaciones:
             curso = a.get('curso')
             materia_id = a.get('materia_id')
@@ -1647,20 +1643,20 @@ def gestion_asignacion_academica(headers):
                 if curso not in asignaciones_por_curso:
                     asignaciones_por_curso[curso] = {}
                 asignaciones_por_curso[curso][materia_id] = docente_id
-    else:
-        st.warning("No se pudieron cargar las asignaciones")
     
-    # Selector de curso
-    curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="asignacion_academica_curso")
+    # Selector de curso (clave ÚNICA)
+    curso_seleccionado = st.selectbox(
+        "Seleccionar curso",
+        cursos,
+        key="asignacion_docente_curso_select"  # ← Clave única
+    )
     
     if curso_seleccionado:
         st.write(f"### Asignaciones para {curso_seleccionado}")
         
-        # Verificar si hay asignaciones para este curso
         asignaciones_curso = asignaciones_por_curso.get(curso_seleccionado, {})
-        st.write(f"**{len(asignaciones_curso)} asignaciones encontradas para este curso**")
         
-        # Mostrar tabla con todas las materias y sus docentes asignados
+        # Mostrar tabla con todas las materias
         data = []
         for m in materias:
             docente_id = asignaciones_curso.get(m['id'])
@@ -1671,119 +1667,51 @@ def gestion_asignacion_academica(headers):
                 "docente_id": docente_id
             })
         
-        # Mostrar tabla con selectores
         st.write("**Asignar docentes:**")
         
-        for item in data:
-            col1, col2, col3 = st.columns([2, 2, 1])
-            with col1:
-                st.write(f"**{item['Materia']}**")
-            with col2:
-                # Selector de docente
-                default_idx = 0
-                if item['docente_id'] and item['docente_id'] in opciones_docentes:
-                    default_idx = opciones_docentes.index(item['docente_id'])
-                
-                docente_seleccionado = st.selectbox(
-                    "Docente",
-                    options=opciones_docentes,
-                    index=default_idx,
-                    format_func=lambda x: docentes_dict.get(x, "Sin asignar") if x else "Ninguno",
-                    key=f"asig_{curso_seleccionado}_{item['id']}"
-                )
-            with col3:
-                if st.button("💾", key=f"save_asig_{curso_seleccionado}_{item['id']}"):
-                    # Guardar asignación individual
-                    data_asig = {
-                        "curso": curso_seleccionado,
-                        "materia_id": item['id'],
-                        "docente_id": docente_seleccionado if docente_seleccionado else None
-                    }
+        # Usar un contenedor para evitar conflictos
+        with st.container():
+            for idx, item in enumerate(data):
+                col1, col2, col3 = st.columns([2, 2, 1])
+                with col1:
+                    st.write(f"**{item['Materia']}**")
+                with col2:
+                    default_idx = 0
+                    if item['docente_id'] and item['docente_id'] in opciones_docentes:
+                        default_idx = opciones_docentes.index(item['docente_id'])
                     
-                    # Verificar si ya existe
-                    check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&materia_id=eq.{item['id']}"
-                    check_resp = requests.get(check_url, headers=headers)
-                    
-                    if check_resp.status_code == 200 and check_resp.json():
-                        asig_id = check_resp.json()[0]['id']
-                        requests.patch(
-                            f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{asig_id}",
-                            headers=headers,
-                            json=data_asig
-                        )
-                    else:
-                        requests.post(
-                            f"{SUPABASE_URL}/rest/v1/asignacion_academica",
-                            headers=headers,
-                            json=data_asig
-                        )
-                    
-                    st.success(f"✅ Asignación guardada para {item['Materia']}")
-                    st.rerun()
-        
-        # Botón para guardar todas de una vez
-        col_guardar1, col_guardar2, col_guardar3 = st.columns([1, 2, 1])
-        with col_guardar2:
-            if st.button("💾 Guardar todas las asignaciones", type="primary", use_container_width=True):
-                for item in data:
-                    docente_seleccionado = st.session_state.get(f"asig_{curso_seleccionado}_{item['id']}", None)
-                    data_asig = {
-                        "curso": curso_seleccionado,
-                        "materia_id": item['id'],
-                        "docente_id": docente_seleccionado if docente_seleccionado else None
-                    }
-                    
-                    check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&materia_id=eq.{item['id']}"
-                    check_resp = requests.get(check_url, headers=headers)
-                    
-                    if check_resp.status_code == 200 and check_resp.json():
-                        asig_id = check_resp.json()[0]['id']
-                        requests.patch(
-                            f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{asig_id}",
-                            headers=headers,
-                            json=data_asig
-                        )
-                    else:
-                        requests.post(
-                            f"{SUPABASE_URL}/rest/v1/asignacion_academica",
-                            headers=headers,
-                            json=data_asig
-                        )
-                
-                st.success(f"✅ Todas las asignaciones guardadas para {curso_seleccionado}")
-                st.rerun()
-        
-        # Opción para eliminar asignación
-        st.divider()
-        st.write("**🗑️ Eliminar asignación**")
-        
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            materias_con_asignacion = [m for m in data if m['docente_id']]
-            if materias_con_asignacion:
-                materia_eliminar = st.selectbox(
-                    "Seleccionar materia para eliminar su asignación",
-                    options=[f"{m['id']} - {m['Materia']}" for m in materias_con_asignacion],
-                    key="eliminar_asignacion_select"
-                )
-            else:
-                st.info("No hay asignaciones para eliminar")
-                materia_eliminar = None
-        
-        with col2:
-            if materia_eliminar and st.button("🗑️ Eliminar asignación", type="secondary", use_container_width=True):
-                materia_id = int(materia_eliminar.split(' - ')[0])
-                check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&materia_id=eq.{materia_id}"
-                check_resp = requests.get(check_url, headers=headers)
-                
-                if check_resp.status_code == 200 and check_resp.json():
-                    asig_id = check_resp.json()[0]['id']
-                    r = requests.delete(
-                        f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{asig_id}",
-                        headers=headers
+                    # Clave única para cada selectbox
+                    docente_seleccionado = st.selectbox(
+                        "Docente",
+                        options=opciones_docentes,
+                        index=default_idx,
+                        format_func=lambda x: docentes_dict.get(x, "Sin asignar") if x else "Ninguno",
+                        key=f"asig_{curso_seleccionado}_{item['id']}_{idx}"  # ← Clave única
                     )
-                    if r.status_code == 204:
-                        st.success("✅ Asignación eliminada")
+                with col3:
+                    if st.button("💾", key=f"save_asig_{curso_seleccionado}_{item['id']}_{idx}"):
+                        data_asig = {
+                            "curso": curso_seleccionado,
+                            "materia_id": item['id'],
+                            "docente_id": docente_seleccionado if docente_seleccionado else None
+                        }
+                        
+                        check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&materia_id=eq.{item['id']}"
+                        check_resp = requests.get(check_url, headers=headers)
+                        
+                        if check_resp.status_code == 200 and check_resp.json():
+                            asig_id = check_resp.json()[0]['id']
+                            requests.patch(
+                                f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{asig_id}",
+                                headers=headers,
+                                json=data_asig
+                            )
+                        else:
+                            requests.post(
+                                f"{SUPABASE_URL}/rest/v1/asignacion_academica",
+                                headers=headers,
+                                json=data_asig
+                            )
+                        
+                        st.success(f"✅ Asignación guardada para {item['Materia']}")
                         st.rerun()
-                    else:
-                        st.error(f"❌ Error: {r.status_code}")
