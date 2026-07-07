@@ -1094,30 +1094,75 @@ def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
     headers = get_headers()
     
-    tabs = st.tabs([
-        "📖 Asignar Horarios", 
-        "👨‍🏫 Directores de Grupo",
-        "⏰ Horas por Nivel", 
-        "📅 Días Laborales", 
-        "📚 Niveles", 
-        "📚 Gestionar Asignaturas",
-        "📆 Festivos"
-    ])
+    # Usar un selector de sección como en el panel principal
+    if "asignacion_seccion" not in st.session_state:
+        st.session_state.asignacion_seccion = "horarios"
     
-    with tabs[0]:
-        configurar_horario_curso(headers)  # ← CAMBIADO: ya no muestra "en construcción"
-    with tabs[1]:
+    # Botones para navegar entre secciones
+    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    
+    with col1:
+        if st.button("📖 Horarios", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "horarios" else "secondary"):
+            st.session_state.asignacion_seccion = "horarios"
+            st.rerun()
+    
+    with col2:
+        if st.button("👨‍🏫 Directores", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "directores" else "secondary"):
+            st.session_state.asignacion_seccion = "directores"
+            st.rerun()
+    
+    with col3:
+        if st.button("⏰ Horas", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "horas" else "secondary"):
+            st.session_state.asignacion_seccion = "horas"
+            st.rerun()
+    
+    with col4:
+        if st.button("📅 Días", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "dias" else "secondary"):
+            st.session_state.asignacion_seccion = "dias"
+            st.rerun()
+    
+    with col5:
+        if st.button("📚 Niveles", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "niveles" else "secondary"):
+            st.session_state.asignacion_seccion = "niveles"
+            st.rerun()
+    
+    with col6:
+        if st.button("📚 Materias", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "materias" else "secondary"):
+            st.session_state.asignacion_seccion = "materias"
+            st.rerun()
+    
+    with col7:
+        if st.button("📆 Festivos", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "festivos" else "secondary"):
+            st.session_state.asignacion_seccion = "festivos"
+            st.rerun()
+    
+    st.divider()
+    
+    # Mostrar la sección correspondiente
+    if st.session_state.asignacion_seccion == "horarios":
+        configurar_horario_curso(headers)
+    elif st.session_state.asignacion_seccion == "directores":
         gestion_directores_grupo(headers)
-    with tabs[2]:
+    elif st.session_state.asignacion_seccion == "horas":
         configurar_horas_nivel(headers)
-    with tabs[3]:
+    elif st.session_state.asignacion_seccion == "dias":
         configurar_jornada_nivel(headers)
-    with tabs[4]:
+    elif st.session_state.asignacion_seccion == "niveles":
         configurar_niveles(headers)
-    with tabs[5]:
+    elif st.session_state.asignacion_seccion == "materias":
         gestionar_asignaturas(headers)
-    with tabs[6]:
+    elif st.session_state.asignacion_seccion == "festivos":
         gestion_festivos(headers)
+
+
+
 def configurar_horario_curso(headers):
     st.write("**📖 Asignar Materias por Curso**")
     
