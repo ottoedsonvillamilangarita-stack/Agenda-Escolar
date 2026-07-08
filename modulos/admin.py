@@ -1181,16 +1181,17 @@ def configurar_horario_curso(headers):
     
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    # 2. Obtener cursos REALES desde la tabla grados
+    # 2. Obtener cursos REALES desde la tabla grados (usando la columna "curso")
     cursos_disponibles = []
     
     try:
         response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
         if response_grados.status_code == 200:
             grados = response_grados.json()
+            # Extraer los cursos que tienen nivel_id asignado
             cursos_disponibles = [g['curso'] for g in grados if g.get('curso') and g.get('nivel_id') is not None]
-    except:
-        pass
+    except Exception as e:
+        st.error(f"Error al consultar grados: {str(e)}")
     
     if not cursos_disponibles:
         st.warning("⚠️ No hay cursos disponibles en la tabla 'grados'. Ve a 'Gestionar Cursos' para agregarlos.")
@@ -1203,7 +1204,7 @@ def configurar_horario_curso(headers):
     with col1:
         curso = st.selectbox("Seleccionar curso", cursos_disponibles, key="curso_select_asignacion")
     
-    # 4. Obtener nivel del curso SOLO desde la tabla grados (sin inferencia)
+    # 4. Obtener nivel del curso desde la tabla grados (usando "curso")
     nivel_curso_nombre = "Sin nivel"
     nivel_id = None
     
@@ -1398,7 +1399,6 @@ def configurar_horario_curso(headers):
             else:
                 st.success(f"✅ Horario guardado: {guardados} clases, {eliminados} eliminadas.")
                 st.rerun()
-
 def gestionar_grados(headers):
     st.subheader("📚 Gestionar Cursos (Grados)")
     st.caption("Crea, edita o elimina cursos y asígnales un nivel educativo.")
