@@ -1091,8 +1091,7 @@ def gestion_directores_grupo(headers):
 # FUNCIÓN 13: MOSTRAR ASIGNACIÓN
 # ============================================
 
-    
-    def mostrar_asignacion():
+def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
     headers = get_headers()
     
@@ -1168,7 +1167,6 @@ def gestion_directores_grupo(headers):
         gestionar_grados(headers)
     elif st.session_state.asignacion_seccion == "festivos":
         gestion_festivos(headers)
-
 
 def configurar_horario_curso(headers):
     st.write("**📖 Asignar Materias por Curso**")
