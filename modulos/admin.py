@@ -1090,7 +1090,6 @@ def gestion_directores_grupo(headers):
 # ============================================
 # FUNCIÓN 13: MOSTRAR ASIGNACIÓN
 # ============================================
-
 def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
     headers = get_headers()
