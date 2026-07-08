@@ -1413,15 +1413,18 @@ def gestionar_grados(headers):
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     nivel_nombres = [n['nombre'] for n in niveles]
     
-    # Obtener grados existentes
+    # Obtener grados
     response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
     if response_grados.status_code != 200:
-        st.error("Error al cargar grados")
+        st.error(f"Error al cargar grados: {response_grados.status_code}")
+        st.code(response_grados.text)
         return
     
     grados = response_grados.json()
     
-    # Mostrar tabla de grados
+    # =============================================
+    # MOSTRAR TABLA DE GRADOS
+    # =============================================
     st.write("### 📋 Lista de cursos")
     
     if grados:
@@ -1442,13 +1445,15 @@ def gestionar_grados(headers):
     
     st.divider()
     
-    # Agregar nuevo grado
+    # =============================================
+    # AGREGAR NUEVO GRADO
+    # =============================================
     st.write("### ➕ Agregar nuevo curso")
     
     with st.form("nuevo_grado_form"):
         col1, col2 = st.columns(2)
         with col1:
-            nombre = st.text_input("Nombre del curso *", help="Ej: 904, 1004, JARDIN_C")
+            nombre = st.text_input("Nombre del curso *")
         with col2:
             nivel_seleccionado = st.selectbox("Nivel *", nivel_nombres)
         
@@ -1464,7 +1469,6 @@ def gestionar_grados(headers):
                 if not nivel_id:
                     st.error("❌ Nivel no válido")
                 else:
-                    # Verificar si ya existe
                     check_url = f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{nombre_upper}"
                     check_resp = requests.get(check_url, headers=headers)
                     
@@ -1481,10 +1485,11 @@ def gestionar_grados(headers):
                             st.error(f"❌ Error al crear: {r.status_code}")
                             st.code(r.text)
     
-    st.divider()
-    
-    # Eliminar grado
+    # =============================================
+    # ELIMINAR GRADO
+    # =============================================
     if grados:
+        st.divider()
         st.write("### 🗑️ Eliminar curso")
         st.caption("⚠️ Solo se puede eliminar si no está en uso (sin estudiantes asignados)")
         
@@ -1501,7 +1506,6 @@ def gestionar_grados(headers):
                     grado_id = int(grado_eliminar.split(' - ')[0])
                     grado_nombre = grado_eliminar.split(' - ')[1]
                     
-                    # Verificar si hay estudiantes en este curso
                     check_url = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{grado_nombre}&limit=1"
                     check_resp = requests.get(check_url, headers=headers)
                     
@@ -1517,7 +1521,6 @@ def gestionar_grados(headers):
                             st.rerun()
                         else:
                             st.error(f"❌ Error al eliminar: {r.status_code}")
-
 
 # ============================================
 # FUNCIÓN 14: MOSTRAR SISTEMA
