@@ -1181,52 +1181,86 @@ def configurar_horario_curso(headers):
     
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    # 2. Obtener cursos REALES desde la tabla grados (usando la columna "curso")
-    cursos_disponibles = []
+    # =============================================
+    # OBTENER TODOS LOS CURSOS (SIN FILTRAR)
+    # =============================================
+    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
     
-    try:
-        response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
-        if response_grados.status_code == 200:
-            grados = response_grados.json()
-            # Extraer los cursos que tienen nivel_id asignado
-            cursos_disponibles = [g['curso'] for g in grados if g.get('curso') and g.get('nivel_id') is not None]
-    except Exception as e:
-        st.error(f"Error al consultar grados: {str(e)}")
+    if response_grados.status_code != 200:
+        st.error(f"Error al consultar grados: {response_grados.status_code}")
+        st.code(response_grados.text)
+        return
+    
+    grados = response_grados.json()
+    
+    # =============================================
+    # MOSTRAR TODOS LOS CURSOS (para depuración)
+    # =============================================
+    st.write("### 🔍 Cursos encontrados en la tabla 'grados'")
+    
+    if not grados:
+        st.warning("⚠️ La tabla 'grados' está vacía")
+        return
+    
+    # Mostrar tabla de cursos
+    data = []
+    for g in grados:
+        data.append({
+            "Curso": g.get('curso', '?'),
+            "nivel_id": g.get('nivel_id', 'NULL'),
+            "Nivel": next((n['nombre'] for n in niveles if n['id'] == g.get('nivel_id')), "Sin nivel")
+        })
+    
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.caption(f"Total: {len(grados)} cursos")
+    
+    # =============================================
+    # CREAR LISTA DE CURSOS DISPONIBLES (TODOS)
+    # =============================================
+    cursos_disponibles = []
+    for g in grados:
+        curso_nombre = g.get('curso')
+        if curso_nombre:
+            cursos_disponibles.append(curso_nombre)
     
     if not cursos_disponibles:
-        st.warning("⚠️ No hay cursos disponibles en la tabla 'grados'. Ve a 'Gestionar Cursos' para agregarlos.")
+        st.warning("⚠️ No se encontraron cursos con la columna 'curso'")
         return
     
     cursos_disponibles.sort()
+    
+    st.write(f"**Cursos disponibles:** {cursos_disponibles}")
+    st.divider()
     
     # 3. Selector de curso
     col1, col2 = st.columns([2, 1])
     with col1:
         curso = st.selectbox("Seleccionar curso", cursos_disponibles, key="curso_select_asignacion")
     
-    # 4. Obtener nivel del curso desde la tabla grados (usando "curso")
+    # 4. Obtener nivel del curso
     nivel_curso_nombre = "Sin nivel"
     nivel_id = None
     
-    response_grado = requests.get(f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{curso}", headers=headers)
-    if response_grado.status_code == 200 and response_grado.json():
-        grado = response_grado.json()[0]
-        nivel_id = grado.get('nivel_id')
-        if nivel_id:
-            for n in niveles:
-                if n['id'] == nivel_id:
-                    nivel_curso_nombre = n['nombre']
-                    break
+    for g in grados:
+        if g.get('curso') == curso:
+            nivel_id = g.get('nivel_id')
+            if nivel_id:
+                for n in niveles:
+                    if n['id'] == nivel_id:
+                        nivel_curso_nombre = n['nombre']
+                        break
+            break
     
     with col2:
         if nivel_id:
             st.info(f"📌 Nivel: **{nivel_curso_nombre}**")
         else:
-            st.error(f"❌ El curso '{curso}' no tiene nivel asignado en la tabla 'grados'.")
+            st.error(f"❌ El curso '{curso}' no tiene nivel asignado.")
             return
     
     if not nivel_id:
-        st.error(f"❌ El curso '{curso}' no tiene nivel asignado. Ve a 'Gestionar Cursos' para corregirlo.")
+        st.error(f"❌ El curso '{curso}' no tiene nivel asignado.")
         return
     
     # 5. Obtener horas del nivel
@@ -1399,6 +1433,7 @@ def configurar_horario_curso(headers):
             else:
                 st.success(f"✅ Horario guardado: {guardados} clases, {eliminados} eliminadas.")
                 st.rerun()
+
 def gestionar_grados(headers):
     st.subheader("📚 Gestionar Cursos (Grados)")
     st.caption("Crea, edita o elimina cursos y asígnales un nivel educativo.")
