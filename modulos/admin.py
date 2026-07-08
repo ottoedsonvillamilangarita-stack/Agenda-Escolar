@@ -1089,17 +1089,15 @@ def gestion_directores_grupo(headers):
 
 # ============================================
 # FUNCIÓN 13: MOSTRAR ASIGNACIÓN
-# ============================================
-def mostrar_asignacion():
+# ============================================def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
     headers = get_headers()
     
-    # Usar un selector de sección como en el panel principal
     if "asignacion_seccion" not in st.session_state:
         st.session_state.asignacion_seccion = "horarios"
     
-    # Botones para navegar entre secciones
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    # 8 botones
+    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
     
     with col1:
         if st.button("📖 Horarios", use_container_width=True,
@@ -1138,6 +1136,12 @@ def mostrar_asignacion():
             st.rerun()
     
     with col7:
+        if st.button("📚 Cursos", use_container_width=True,
+                     type="primary" if st.session_state.asignacion_seccion == "grados" else "secondary"):
+            st.session_state.asignacion_seccion = "grados"
+            st.rerun()
+    
+    with col8:
         if st.button("📆 Festivos", use_container_width=True,
                      type="primary" if st.session_state.asignacion_seccion == "festivos" else "secondary"):
             st.session_state.asignacion_seccion = "festivos"
@@ -1145,7 +1149,6 @@ def mostrar_asignacion():
     
     st.divider()
     
-    # Mostrar la sección correspondiente
     if st.session_state.asignacion_seccion == "horarios":
         configurar_horario_curso(headers)
     elif st.session_state.asignacion_seccion == "directores":
@@ -1158,6 +1161,8 @@ def mostrar_asignacion():
         configurar_niveles(headers)
     elif st.session_state.asignacion_seccion == "materias":
         gestionar_asignaturas(headers)
+    elif st.session_state.asignacion_seccion == "grados":
+        gestionar_grados(headers)
     elif st.session_state.asignacion_seccion == "festivos":
         gestion_festivos(headers)
 
@@ -1393,6 +1398,127 @@ def configurar_horario_curso(headers):
             else:
                 st.success(f"✅ Horario guardado: {guardados} clases, {eliminados} eliminadas.")
                 st.rerun()
+
+def gestionar_grados(headers):
+    st.subheader("📚 Gestionar Cursos (Grados)")
+    st.caption("Crea, edita o elimina cursos y asígnales un nivel educativo.")
+    
+    # Obtener niveles
+    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
+    if response_niveles.status_code != 200:
+        st.error("Error al cargar niveles")
+        return
+    
+    niveles = response_niveles.json()
+    niveles_dict = {n['nombre']: n['id'] for n in niveles}
+    nivel_nombres = [n['nombre'] for n in niveles]
+    
+    # Obtener grados existentes
+    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
+    if response_grados.status_code != 200:
+        st.error("Error al cargar grados")
+        return
+    
+    grados = response_grados.json()
+    
+    # Mostrar tabla de grados
+    st.write("### 📋 Lista de cursos")
+    
+    if grados:
+        data = []
+        for g in grados:
+            nivel_nombre = next((n['nombre'] for n in niveles if n['id'] == g['nivel_id']), "Sin nivel")
+            data.append({
+                "ID": g['id_grado'],
+                "Curso": g['curso'],
+                "Nivel": nivel_nombre
+            })
+        
+        df = pd.DataFrame(data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.caption(f"Total: {len(grados)} cursos")
+    else:
+        st.info("No hay cursos registrados")
+    
+    st.divider()
+    
+    # Agregar nuevo grado
+    st.write("### ➕ Agregar nuevo curso")
+    
+    with st.form("nuevo_grado_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nombre = st.text_input("Nombre del curso *", help="Ej: 904, 1004, JARDIN_C")
+        with col2:
+            nivel_seleccionado = st.selectbox("Nivel *", nivel_nombres)
+        
+        submitted = st.form_submit_button("💾 Crear curso", type="primary")
+        
+        if submitted:
+            if not nombre:
+                st.error("❌ El nombre es obligatorio")
+            else:
+                nombre_upper = nombre.upper().strip()
+                nivel_id = niveles_dict.get(nivel_seleccionado)
+                
+                if not nivel_id:
+                    st.error("❌ Nivel no válido")
+                else:
+                    # Verificar si ya existe
+                    check_url = f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{nombre_upper}"
+                    check_resp = requests.get(check_url, headers=headers)
+                    
+                    if check_resp.status_code == 200 and check_resp.json():
+                        st.error(f"❌ El curso '{nombre_upper}' ya existe")
+                    else:
+                        data = {"curso": nombre_upper, "nivel_id": nivel_id}
+                        r = requests.post(f"{SUPABASE_URL}/rest/v1/grados", headers=headers, json=data)
+                        
+                        if r.status_code == 201:
+                            st.success(f"✅ Curso '{nombre_upper}' creado correctamente")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Error al crear: {r.status_code}")
+                            st.code(r.text)
+    
+    st.divider()
+    
+    # Eliminar grado
+    if grados:
+        st.write("### 🗑️ Eliminar curso")
+        st.caption("⚠️ Solo se puede eliminar si no está en uso (sin estudiantes asignados)")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            grado_eliminar = st.selectbox(
+                "Seleccionar curso para eliminar",
+                options=[f"{g['id_grado']} - {g['curso']}" for g in grados],
+                key="eliminar_grado_select"
+            )
+        with col2:
+            if st.button("🗑️ Eliminar", type="secondary", use_container_width=True):
+                if grado_eliminar:
+                    grado_id = int(grado_eliminar.split(' - ')[0])
+                    grado_nombre = grado_eliminar.split(' - ')[1]
+                    
+                    # Verificar si hay estudiantes en este curso
+                    check_url = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{grado_nombre}&limit=1"
+                    check_resp = requests.get(check_url, headers=headers)
+                    
+                    if check_resp.status_code == 200 and check_resp.json():
+                        st.error(f"❌ No se puede eliminar '{grado_nombre}' porque tiene estudiantes asignados")
+                    else:
+                        r = requests.delete(
+                            f"{SUPABASE_URL}/rest/v1/grados?id_grado=eq.{grado_id}",
+                            headers=headers
+                        )
+                        if r.status_code == 204:
+                            st.success(f"✅ Curso '{grado_nombre}' eliminado")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Error al eliminar: {r.status_code}")
+
+
 # ============================================
 # FUNCIÓN 14: MOSTRAR SISTEMA
 # ============================================
