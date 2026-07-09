@@ -1165,55 +1165,49 @@ def configurar_horario_curso(headers):
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
     # =============================================
-    # OBTENER TODOS LOS CURSOS (SIN FILTRAR)
+    # OBTENER CURSOS DESDE estudiantes (SOLO CURSOS CON ESTUDIANTES)
     # =============================================
-    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
+    response_estudiantes = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
     
-    if response_grados.status_code != 200:
-        st.error(f"Error al consultar grados: {response_grados.status_code}")
-        st.code(response_grados.text)
+    if response_estudiantes.status_code != 200:
+        st.error(f"Error al consultar estudiantes: {response_estudiantes.status_code}")
+        st.code(response_estudiantes.text)
         return
     
-    grados = response_grados.json()
-    
-    # =============================================
-    # MOSTRAR TODOS LOS CURSOS (para depuración)
-    # =============================================
-    st.write("### 🔍 Cursos encontrados en la tabla 'grados'")
-    
-    if not grados:
-        st.warning("⚠️ La tabla 'grados' está vacía")
-        return
-    
-    # Mostrar tabla de cursos
-    data = []
-    for g in grados:
-        data.append({
-            "Curso": g.get('curso', '?'),
-            "nivel_id": g.get('nivel_id', 'NULL'),
-            "Nivel": next((n['nombre'] for n in niveles if n['id'] == g.get('nivel_id')), "Sin nivel")
-        })
-    
-    df = pd.DataFrame(data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    st.caption(f"Total: {len(grados)} cursos")
-    
-    # =============================================
-    # CREAR LISTA DE CURSOS DISPONIBLES (TODOS)
-    # =============================================
-    cursos_disponibles = []
-    for g in grados:
-        curso_nombre = g.get('curso')
-        if curso_nombre:
-            cursos_disponibles.append(curso_nombre)
-    
-    if not cursos_disponibles:
-        st.warning("⚠️ No se encontraron cursos con la columna 'curso'")
-        return
-    
+    estudiantes = response_estudiantes.json()
+    cursos_disponibles = list(set([e['curso'] for e in estudiantes if e.get('curso')]))
     cursos_disponibles.sort()
     
-    st.write(f"**Cursos disponibles:** {cursos_disponibles}")
+    if not cursos_disponibles:
+        st.warning("⚠️ No hay cursos con estudiantes registrados.")
+        return
+    
+    # =============================================
+    # OBTENER nivel_id PARA CADA CURSO desde grados
+    # =============================================
+    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
+    grados = response_grados.json() if response_grados.status_code == 200 else []
+    grados_dict = {g['curso']: g['nivel_id'] for g in grados if g.get('curso')}
+    
+    # =============================================
+    # MOSTRAR CURSOS ENCONTRADOS
+    # =============================================
+    st.write("### 📋 Cursos con estudiantes")
+    
+    data = []
+    for curso in cursos_disponibles:
+        nivel_id = grados_dict.get(curso)
+        nivel_nombre = next((n['nombre'] for n in niveles if n['id'] == nivel_id), "Sin nivel")
+        data.append({
+            "Curso": curso,
+            "Nivel": nivel_nombre
+        })
+    
+    if data:
+        df = pd.DataFrame(data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.caption(f"Total: {len(data)} cursos con estudiantes")
+    
     st.divider()
     
     # 3. Selector de curso
@@ -1222,24 +1216,14 @@ def configurar_horario_curso(headers):
         curso = st.selectbox("Seleccionar curso", cursos_disponibles, key="curso_select_asignacion")
     
     # 4. Obtener nivel del curso
-    nivel_curso_nombre = "Sin nivel"
-    nivel_id = None
-    
-    for g in grados:
-        if g.get('curso') == curso:
-            nivel_id = g.get('nivel_id')
-            if nivel_id:
-                for n in niveles:
-                    if n['id'] == nivel_id:
-                        nivel_curso_nombre = n['nombre']
-                        break
-            break
+    nivel_id = grados_dict.get(curso)
+    nivel_curso_nombre = next((n['nombre'] for n in niveles if n['id'] == nivel_id), "Sin nivel")
     
     with col2:
         if nivel_id:
             st.info(f"📌 Nivel: **{nivel_curso_nombre}**")
         else:
-            st.error(f"❌ El curso '{curso}' no tiene nivel asignado.")
+            st.error(f"❌ El curso '{curso}' no tiene nivel asignado en 'grados'.")
             return
     
     if not nivel_id:
