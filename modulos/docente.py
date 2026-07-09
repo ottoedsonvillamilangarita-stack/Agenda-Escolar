@@ -17,9 +17,7 @@ def mostrar(data):
     
     headers = get_headers()
     
-    # =============================================
-    # OBTENER ASIGNACIONES
-    # =============================================
+    # Obtener asignaciones
     url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
     response = requests.get(url, headers=headers)
     
