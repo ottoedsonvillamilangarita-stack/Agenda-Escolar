@@ -32,14 +32,41 @@ def mostrar(data):
         st.warning("No tienes asignaciones académicas")
         return
     
-    # Mostrar si es director
-    direcciones = [a for a in asignaciones if a.get('asignatura') == 'Dirección de Curso']
+   # Mostrar si es director - FORZAR ACTUALIZACIÓN
+direcciones = [a for a in asignaciones if a.get('asignatura') == 'Dirección de Curso']
+
+if direcciones:
+    st.success("🎓 Eres Director de Curso")
     
-    if direcciones:
-        st.success("🎓 Eres Director de Curso")
-        
-        for d in direcciones:
-            st.info(f"📌 Curso: {d.get('curso')}")
+    # FORZAR ACTUALIZACIÓN DE user_roles si no tiene el rol
+    username = data.get('username')
+    check_rol_url = f"{SUPABASE_URL}/rest/v1/user_roles?username=eq.{username}&rol=eq.director_grupo"
+    check_rol_resp = requests.get(check_rol_url, headers=get_headers())
+    
+    if check_rol_resp.status_code == 200 and not check_rol_resp.json():
+        # El usuario tiene asignación pero no el rol → agregarlo
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/user_roles",
+            headers=get_headers(),
+            json={"username": username, "rol": "director_grupo"}
+        )
+        st.rerun()
+    
+    for d in direcciones:
+        st.info(f"📌 Curso: {d.get('curso')}")
+else:
+    # Si no tiene asignación pero tiene el rol, eliminarlo
+    username = data.get('username')
+    check_rol_url = f"{SUPABASE_URL}/rest/v1/user_roles?username=eq.{username}&rol=eq.director_grupo"
+    check_rol_resp = requests.get(check_rol_url, headers=get_headers())
+    
+    if check_rol_resp.status_code == 200 and check_rol_resp.json():
+        rol_id = check_rol_resp.json()[0]['id']
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/user_roles?id=eq.{rol_id}",
+            headers=get_headers()
+        )
+        st.rerun()
         
     
     # ============================================
