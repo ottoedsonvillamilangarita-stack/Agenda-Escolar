@@ -1004,17 +1004,17 @@ def gestion_directores_grupo(headers):
     st.info(f"📌 Director actual: **{nombre_actual}**")
     
     with col2:
-        default_index = 0
-        if documento_actual and documento_actual in opciones_docentes:
-            default_index = opciones_docentes.index(documento_actual)
-        
-        docente_seleccionado = st.selectbox(
-            "Seleccionar docente",
-            options=opciones_docentes,
-            index=default_index,
-            format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
-            key="director_docente_edit"
-        )
+    default_index = 0
+    if documento_actual and documento_actual in opciones_docentes:
+        default_index = opciones_docentes.index(documento_actual)
+    
+    docente_seleccionado = st.selectbox(
+        "Seleccionar docente",
+        options=opciones_docentes,
+        index=default_index,
+        format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
+        key=f"director_docente_edit_{curso_seleccionado}"  # ← CLAVE ÚNICA POR CURSO
+    )
     
     if st.button("💾 Asignar director", type="primary", key="btn_asignar_director"):
         if not docente_seleccionado:
