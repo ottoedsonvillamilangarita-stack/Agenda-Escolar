@@ -999,14 +999,21 @@ def gestion_directores_grupo(headers):
     with col1:
         curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="director_curso_edit")
     
+    # Obtener el director actual del curso seleccionado
     documento_actual = directores_por_curso.get(curso_seleccionado)
     nombre_actual = docentes_dict.get(documento_actual, "Sin asignar") if documento_actual else "Sin asignar"
     st.info(f"📌 Director actual: **{nombre_actual}**")
     
     with col2:
+        # Calcular el índice del docente actual en la lista de opciones
+        default_index = 0
+        if documento_actual and documento_actual in opciones_docentes:
+            default_index = opciones_docentes.index(documento_actual)
+        
         docente_seleccionado = st.selectbox(
             "Seleccionar docente",
             options=opciones_docentes,
+            index=default_index,  # ← ESTO ES LO QUE FALTABA
             format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
             key="director_docente_edit"
         )
