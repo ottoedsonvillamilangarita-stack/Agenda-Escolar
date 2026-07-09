@@ -1405,6 +1405,8 @@ def gestionar_grados(headers):
     st.subheader("📚 Gestionar Cursos (Grados)")
     st.caption("Crea, edita o elimina cursos y asígnales un nivel educativo.")
     
+    st.write(f"**🔍 URL de Supabase:** {SUPABASE_URL}")
+    
     # =============================================
     # DEPURACIÓN: Ver qué devuelve Supabase
     # =============================================
@@ -1424,8 +1426,10 @@ def gestionar_grados(headers):
     
     # 2. Obtener TODOS los datos de grados
     try:
-        response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
+        # FORZAR la consulta sin filtros adicionales
+        response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=*", headers=headers)
         st.write(f"**Status code grados:** {response_grados.status_code}")
+        st.write(f"**Respuesta cruda:** {response_grados.text[:500]}")  # Mostrar los primeros 500 caracteres
         
         if response_grados.status_code == 200:
             grados = response_grados.json()
@@ -1434,8 +1438,6 @@ def gestionar_grados(headers):
             if grados:
                 st.write("**Primer registro:**")
                 st.write(grados[0])
-                st.write("**Todos los registros:**")
-                st.write(grados)
                 
                 # Mostrar tabla
                 st.write("### 📋 Lista de cursos")
@@ -1457,6 +1459,7 @@ def gestionar_grados(headers):
     except Exception as e:
         st.error(f"Error al consultar grados: {str(e)}")
         return
+        
 # ============================================
 # FUNCIÓN 14: MOSTRAR SISTEMA
 # ============================================
