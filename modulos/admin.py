@@ -937,7 +937,7 @@ def gestion_directores_grupo(headers):
     st.subheader("👨‍🏫 Directores de Grupo")
     st.caption("Asigna o cambia el director de grupo para cada curso.")
     
-    # 1. Obtener cursos
+    # 1. Obtener cursos desde estudiantes
     response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
     if response_cursos.status_code != 200:
         st.error("❌ Error al cargar los cursos")
@@ -960,25 +960,20 @@ def gestion_directores_grupo(headers):
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     opciones_docentes = [""] + list(docentes_dict.keys())
     
-    # 3. Obtener grados (para convertir id_grado a nombre de curso)
-    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
-    grados = response_grados.json() if response_grados.status_code == 200 else []
-    grados_por_id = {g['id_grado']: g['curso'] for g in grados}
-    
-    # 4. Obtener directores desde directores_grupo
-    response_directores = requests.get(f"{SUPABASE_URL}/rest/v1/directores_grupo", headers=headers)
+    # 3. Obtener directores directamente desde asignacion_academica (USANDO CURSO)
+    response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
     
     directores_por_curso = {}
-    if response_directores.status_code == 200:
-        for d in response_directores.json():
-            id_grado = d.get('id_grado')
-            docente_documento = d.get('docente_documento')
-            if id_grado and docente_documento:
-                curso = grados_por_id.get(id_grado)
-                if curso:
+    if response_asignaciones.status_code == 200:
+        asignaciones = response_asignaciones.json()
+        for a in asignaciones:
+            if a.get('asignatura') == 'Dirección de Curso':
+                curso = a.get('curso')
+                docente_documento = a.get('documento_docente')
+                if curso and docente_documento:
                     directores_por_curso[curso] = docente_documento
     
-    # 5. Mostrar tabla
+    # 4. Mostrar tabla
     st.write("### 📋 Directores por curso")
     
     data = []
@@ -997,7 +992,7 @@ def gestion_directores_grupo(headers):
     
     st.divider()
     
-    # 6. Asignar director (escribe en asignacion_academica)
+    # 5. Asignar director
     st.write("### ✏️ Asignar director de grupo")
     
     col1, col2 = st.columns(2)
@@ -1016,62 +1011,60 @@ def gestion_directores_grupo(headers):
             key="director_docente_edit"
         )
     
-    col_btn1, col_btn2 = st.columns(2)
-    
-    with col_btn1:
-        if st.button("💾 Asignar director", type="primary", key="btn_asignar_director"):
-            if not docente_seleccionado:
-                st.error("❌ Selecciona un docente")
-            else:
-                data_director = {
-                    "curso": curso_seleccionado,
-                    "asignatura": "Dirección de Curso",
-                    "documento_docente": docente_seleccionado,
-                    "anio": 2025
-                }
-                
-                check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.Dirección de Curso"
-                check_resp = requests.get(check_url, headers=headers)
-                
-                if check_resp.status_code == 200 and check_resp.json():
-                    dir_id = check_resp.json()[0]['id']
-                    r = requests.patch(
-                        f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{dir_id}",
-                        headers=headers,
-                        json=data_director
-                    )
-                else:
-                    r = requests.post(
-                        f"{SUPABASE_URL}/rest/v1/asignacion_academica",
-                        headers=headers,
-                        json=data_director
-                    )
-                
-                if r.status_code in [200, 201, 204]:
-                    st.success(f"✅ Director asignado para {curso_seleccionado}")
-                    st.rerun()
-                else:
-                    st.error(f"❌ Error: {r.status_code}")
-                    st.code(r.text)
-    
-    with col_btn2:
-        if st.button("🗑️ Eliminar director", type="secondary", key="btn_eliminar_director"):
+    if st.button("💾 Asignar director", type="primary", key="btn_asignar_director"):
+        if not docente_seleccionado:
+            st.error("❌ Selecciona un docente")
+        else:
+            data_director = {
+                "curso": curso_seleccionado,
+                "asignatura": "Dirección de Curso",
+                "documento_docente": docente_seleccionado,
+                "anio": 2025
+            }
+            
             check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.Dirección de Curso"
             check_resp = requests.get(check_url, headers=headers)
             
             if check_resp.status_code == 200 and check_resp.json():
                 dir_id = check_resp.json()[0]['id']
-                r = requests.delete(
+                r = requests.patch(
                     f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{dir_id}",
-                    headers=headers
+                    headers=headers,
+                    json=data_director
                 )
-                if r.status_code == 204:
-                    st.success(f"✅ Director eliminado para {curso_seleccionado}")
-                    st.rerun()
-                else:
-                    st.error(f"❌ Error: {r.status_code}")
             else:
-                st.warning("⚠️ No hay director asignado para este curso")
+                r = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/asignacion_academica",
+                    headers=headers,
+                    json=data_director
+                )
+            
+            if r.status_code in [200, 201, 204]:
+                st.success(f"✅ Director asignado para {curso_seleccionado}")
+                st.rerun()
+            else:
+                st.error(f"❌ Error: {r.status_code}")
+                st.code(r.text)
+    
+    # 6. Eliminar director
+    if st.button("🗑️ Eliminar director", type="secondary", key="btn_eliminar_director"):
+        check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.Dirección de Curso"
+        check_resp = requests.get(check_url, headers=headers)
+        
+        if check_resp.status_code == 200 and check_resp.json():
+            dir_id = check_resp.json()[0]['id']
+            r = requests.delete(
+                f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{dir_id}",
+                headers=headers
+            )
+            if r.status_code == 204:
+                st.success(f"✅ Director eliminado para {curso_seleccionado}")
+                st.rerun()
+            else:
+                st.error(f"❌ Error: {r.status_code}")
+        else:
+            st.warning("⚠️ No hay director asignado para este curso")
+            
 # ============================================
 # FUNCIÓN 13: MOSTRAR ASIGNACIÓN
 # ============================================
