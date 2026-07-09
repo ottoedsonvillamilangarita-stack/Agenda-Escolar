@@ -1405,40 +1405,23 @@ def gestionar_grados(headers):
     st.subheader("📚 Gestionar Cursos (Grados)")
     st.caption("Crea, edita o elimina cursos y asígnales un nivel educativo.")
     
-    st.write(f"**🔍 URL de Supabase:** {SUPABASE_URL}")
-    
     # =============================================
-    # DEPURACIÓN: Ver qué devuelve Supabase
+    # FORZAR LECTURA DE DATOS
     # =============================================
-    st.write("### 🔍 DEPURACIÓN")
-    
-    # 1. Probar conexión a Supabase
     try:
-        response_test = requests.get(f"{SUPABASE_URL}/rest/v1/grados?limit=1", headers=headers)
-        st.write(f"**Conexión a Supabase:** Status {response_test.status_code}")
-        if response_test.status_code != 200:
-            st.error(f"Error de conexión: {response_test.status_code}")
-            st.code(response_test.text)
-            return
-    except Exception as e:
-        st.error(f"Error de conexión: {str(e)}")
-        return
-    
-    # 2. Obtener TODOS los datos de grados
-    try:
-        # FORZAR la consulta sin filtros adicionales
-        response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=*", headers=headers)
-        st.write(f"**Status code grados:** {response_grados.status_code}")
-        st.write(f"**Respuesta cruda:** {response_grados.text[:500]}")  # Mostrar los primeros 500 caracteres
+        # Usar select=* para forzar la lectura de todos los campos
+        response_grados = requests.get(
+            f"{SUPABASE_URL}/rest/v1/grados?select=*",
+            headers=headers
+        )
+        
+        st.write(f"**Status code:** {response_grados.status_code}")
         
         if response_grados.status_code == 200:
             grados = response_grados.json()
-            st.write(f"**Registros en grados:** {len(grados)}")
+            st.write(f"**Registros encontrados:** {len(grados)}")
             
             if grados:
-                st.write("**Primer registro:**")
-                st.write(grados[0])
-                
                 # Mostrar tabla
                 st.write("### 📋 Lista de cursos")
                 data = []
@@ -1450,15 +1433,19 @@ def gestionar_grados(headers):
                     })
                 df = pd.DataFrame(data)
                 st.dataframe(df, use_container_width=True, hide_index=True)
+                st.caption(f"Total: {len(grados)} cursos")
             else:
                 st.warning("⚠️ La tabla 'grados' está vacía")
+                
+                # Mostrar la respuesta cruda para depuración
+                st.write("**Respuesta cruda de Supabase:**")
+                st.code(response_grados.text)
         else:
             st.error(f"Error: {response_grados.status_code}")
             st.code(response_grados.text)
-            return
+            
     except Exception as e:
-        st.error(f"Error al consultar grados: {str(e)}")
-        return
+        st.error(f"Error: {str(e)}")
         
 # ============================================
 # FUNCIÓN 14: MOSTRAR SISTEMA
