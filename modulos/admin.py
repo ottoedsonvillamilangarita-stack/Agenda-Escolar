@@ -1415,10 +1415,9 @@ def gestionar_grados(headers):
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     nivel_nombres = [n['nombre'] for n in niveles]
     
-    # =============================================
-    # OBTENER GRADOS
-    # =============================================
-    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
+    # Obtener grados
+    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
+    
     if response_grados.status_code != 200:
         st.error(f"Error al cargar grados: {response_grados.status_code}")
         st.code(response_grados.text)
@@ -1426,9 +1425,7 @@ def gestionar_grados(headers):
     
     grados = response_grados.json()
     
-    # =============================================
-    # MOSTRAR TABLA DE GRADOS
-    # =============================================
+    # Mostrar tabla
     st.write("### 📋 Lista de cursos")
     
     if grados:
@@ -1447,87 +1444,7 @@ def gestionar_grados(headers):
         st.caption(f"Total: {len(grados)} cursos")
     else:
         st.info("No hay cursos registrados")
-    
-    st.divider()
-    
-    # =============================================
-    # AGREGAR NUEVO CURSO
-    # =============================================
-    st.write("### ➕ Agregar nuevo curso")
-    
-    with st.form("nuevo_grado_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            nombre = st.text_input("Nombre del curso *")
-        with col2:
-            nivel_seleccionado = st.selectbox("Nivel *", nivel_nombres)
-        
-        submitted = st.form_submit_button("💾 Crear curso", type="primary")
-        
-        if submitted:
-            if not nombre:
-                st.error("❌ El nombre es obligatorio")
-            else:
-                nombre_upper = nombre.upper().strip()
-                nivel_id = niveles_dict.get(nivel_seleccionado)
-                
-                if not nivel_id:
-                    st.error("❌ Nivel no válido")
-                else:
-                    # Verificar si ya existe
-                    check_url = f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{nombre_upper}"
-                    check_resp = requests.get(check_url, headers=headers)
-                    
-                    if check_resp.status_code == 200 and check_resp.json():
-                        st.error(f"❌ El curso '{nombre_upper}' ya existe")
-                    else:
-                        data = {"curso": nombre_upper, "nivel_id": nivel_id}
-                        r = requests.post(f"{SUPABASE_URL}/rest/v1/grados", headers=headers, json=data)
-                        
-                        if r.status_code == 201:
-                            st.success(f"✅ Curso '{nombre_upper}' creado correctamente")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ Error al crear: {r.status_code}")
-                            st.code(r.text)
-    
-    # =============================================
-    # ELIMINAR CURSO
-    # =============================================
-    if grados:
-        st.divider()
-        st.write("### 🗑️ Eliminar curso")
-        st.caption("⚠️ Solo se puede eliminar si no está en uso (sin estudiantes asignados)")
-        
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            grado_eliminar = st.selectbox(
-                "Seleccionar curso para eliminar",
-                options=[f"{g.get('id_grado')} - {g.get('curso')}" for g in grados],
-                key="eliminar_grado_select"
-            )
-        with col2:
-            if st.button("🗑️ Eliminar", type="secondary", use_container_width=True):
-                if grado_eliminar:
-                    grado_id = int(grado_eliminar.split(' - ')[0])
-                    grado_nombre = grado_eliminar.split(' - ')[1]
-                    
-                    # Verificar si hay estudiantes en este curso
-                    check_url = f"{SUPABASE_URL}/rest/v1/estudiantes?curso=eq.{grado_nombre}&limit=1"
-                    check_resp = requests.get(check_url, headers=headers)
-                    
-                    if check_resp.status_code == 200 and check_resp.json():
-                        st.error(f"❌ No se puede eliminar '{grado_nombre}' porque tiene estudiantes asignados")
-                    else:
-                        r = requests.delete(
-                            f"{SUPABASE_URL}/rest/v1/grados?id_grado=eq.{grado_id}",
-                            headers=headers
-                        )
-                        if r.status_code == 204:
-                            st.success(f"✅ Curso '{grado_nombre}' eliminado")
-                            st.rerun()
-                        else:
-                            st.error(f"❌ Error al eliminar: {r.status_code}")
+
 # ============================================
 # FUNCIÓN 14: MOSTRAR SISTEMA
 # ============================================
