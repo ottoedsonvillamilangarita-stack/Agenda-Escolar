@@ -1532,7 +1532,7 @@ def gestionar_grados(headers):
                     
                     st.write(f"**Asignaciones para {curso_seleccionado}**")
                     
-                    # Usar un contador manual para evitar problemas con enumerate
+                    # Mostrar materias con selectores
                     contador = 0
                     for materia in materias_curso:
                         col1, col2, col3 = st.columns([2, 2, 1])
@@ -1580,6 +1580,58 @@ def gestionar_grados(headers):
                                 st.success(f"✅ Asignación guardada para {materia['nombre']}")
                                 st.rerun()
                         contador += 1
+                    
+                    # =============================================
+                    # BOTÓN "GUARDAR TODAS LAS ASIGNACIONES"
+                    # =============================================
+                    st.divider()
+                    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+                    with col_btn2:
+                        if st.button("💾 Guardar todas las asignaciones", type="primary", use_container_width=True, key="guardar_todas_asignaciones"):
+                            with st.spinner("Guardando todas las asignaciones..."):
+                                guardados = 0
+                                errores = 0
+                                
+                                contador2 = 0
+                                for materia in materias_curso:
+                                    docente_seleccionado = st.session_state.get(f"asignacion_{curso_seleccionado}_{materia['id']}_{contador2}", None)
+                                    
+                                    if docente_seleccionado is not None:
+                                        data_asignacion = {
+                                            "curso": curso_seleccionado,
+                                            "asignatura": materia['nombre'],
+                                            "documento_docente": docente_seleccionado if docente_seleccionado else None,
+                                            "anio": 2025
+                                        }
+                                        
+                                        check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.{materia['nombre']}"
+                                        check_resp = requests.get(check_url, headers=headers)
+                                        
+                                        try:
+                                            if check_resp.status_code == 200 and check_resp.json():
+                                                asig_id = check_resp.json()[0]['id']
+                                                requests.patch(
+                                                    f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{asig_id}",
+                                                    headers=headers,
+                                                    json=data_asignacion
+                                                )
+                                            else:
+                                                requests.post(
+                                                    f"{SUPABASE_URL}/rest/v1/asignacion_academica",
+                                                    headers=headers,
+                                                    json=data_asignacion
+                                                )
+                                            guardados += 1
+                                        except Exception as e:
+                                            errores += 1
+                                    
+                                    contador2 += 1
+                                
+                                if errores == 0:
+                                    st.success(f"✅ {guardados} asignaciones guardadas correctamente")
+                                    st.rerun()
+                                else:
+                                    st.warning(f"⚠️ {guardados} guardadas, {errores} errores")
                 else:
                     st.info("No hay materias asignadas a este nivel. Ve a 'Gestionar Asignaturas'.")
             else:
