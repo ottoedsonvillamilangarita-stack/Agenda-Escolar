@@ -1444,21 +1444,19 @@ def gestionar_grados(headers):
                             st.code(r.text)
     
     # =============================================
-    # ELIMINAR CURSO (CON KEY ÚNICA)
+    # ELIMINAR CURSO
     # =============================================
     if grados:
         st.divider()
         st.write("### 🗑️ Eliminar curso")
         st.caption("⚠️ Solo se puede eliminar si no está en uso (sin estudiantes asignados)")
         
-        # Selector único
         grado_eliminar = st.selectbox(
             "Seleccionar curso para eliminar",
             options=[f"{g.get('id_grado')} - {g.get('curso')}" for g in grados],
-            key="eliminar_grado_select_unique"  # ← CLAVE ÚNICA
+            key="eliminar_grado_select_unique"
         )
         
-        # Botón con key única
         if st.button("🗑️ Eliminar", type="secondary", key="btn_eliminar_grado_unique"):
             if grado_eliminar:
                 grado_id = int(grado_eliminar.split(' - ')[0])
@@ -1493,7 +1491,7 @@ def gestionar_grados(headers):
         curso_seleccionado = st.selectbox(
             "Seleccionar curso",
             opciones_cursos,
-            key="curso_asignacion_docente_unique"  # ← CLAVE ÚNICA
+            key="curso_asignacion_docente_unique"
         )
         
         if curso_seleccionado:
@@ -1534,6 +1532,8 @@ def gestionar_grados(headers):
                     
                     st.write(f"**Asignaciones para {curso_seleccionado}**")
                     
+                    # Usar un contador manual para evitar problemas con enumerate
+                    contador = 0
                     for materia in materias_curso:
                         col1, col2, col3 = st.columns([2, 2, 1])
                         with col1:
@@ -1549,10 +1549,10 @@ def gestionar_grados(headers):
                                 options=opciones_docentes,
                                 index=default_idx,
                                 format_func=lambda x: docentes_dict.get(x, "Seleccionar") if x else "Ninguno",
-                                key=f"asignacion_{curso_seleccionado}_{materia['id']}_{idx}"  # ← CLAVE ÚNICA
+                                key=f"asignacion_{curso_seleccionado}_{materia['id']}_{contador}"
                             )
                         with col3:
-                            if st.button("💾", key=f"save_asignacion_{curso_seleccionado}_{materia['id']}_{idx}"):  # ← CLAVE ÚNICA
+                            if st.button("💾", key=f"save_asignacion_{curso_seleccionado}_{materia['id']}_{contador}"):
                                 data_asignacion = {
                                     "curso": curso_seleccionado,
                                     "asignatura": materia['nombre'],
@@ -1579,6 +1579,7 @@ def gestionar_grados(headers):
                                 
                                 st.success(f"✅ Asignación guardada para {materia['nombre']}")
                                 st.rerun()
+                        contador += 1
                 else:
                     st.info("No hay materias asignadas a este nivel. Ve a 'Gestionar Asignaturas'.")
             else:
