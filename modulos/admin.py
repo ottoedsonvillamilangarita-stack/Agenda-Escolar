@@ -1119,73 +1119,60 @@ def configurar_horario_curso(headers):
     
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    # =============================================
-    # OBTENER CURSOS DESDE estudiantes (SOLO CURSOS CON ESTUDIANTES)
-    # =============================================
-    response_estudiantes = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
+    # 2. Obtener cursos desde grados
+    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=*", headers=headers)
     
-    if response_estudiantes.status_code != 200:
-        st.error(f"Error al consultar estudiantes: {response_estudiantes.status_code}")
-        st.code(response_estudiantes.text)
+    if response_grados.status_code != 200:
+        st.error(f"Error al consultar grados: {response_grados.status_code}")
+        st.code(response_grados.text)
         return
     
-    estudiantes = response_estudiantes.json()
-    cursos_disponibles = list(set([e['curso'] for e in estudiantes if e.get('curso')]))
+    grados = response_grados.json()
+    
+    if not grados:
+        st.warning("⚠️ La tabla 'grados' está vacía")
+        return
+    
+    # Extraer cursos con nivel_id
+    cursos_disponibles = []
+    for g in grados:
+        curso = g.get('curso')
+        nivel_id = g.get('nivel_id')
+        if curso and nivel_id is not None:
+            cursos_disponibles.append(curso)
+    
     cursos_disponibles.sort()
     
     if not cursos_disponibles:
-        st.warning("⚠️ No hay cursos con estudiantes registrados.")
+        st.warning("⚠️ No hay cursos con nivel_id asignado")
         return
     
-    # =============================================
-    # OBTENER nivel_id PARA CADA CURSO desde grados
-    # =============================================
-    response_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
-    grados = response_grados.json() if response_grados.status_code == 200 else []
-    grados_dict = {g['curso']: g['nivel_id'] for g in grados if g.get('curso')}
-    
-    # =============================================
-    # MOSTRAR CURSOS ENCONTRADOS
-    # =============================================
-    st.write("### 📋 Cursos con estudiantes")
-    
-    data = []
-    for curso in cursos_disponibles:
-        nivel_id = grados_dict.get(curso)
-        nivel_nombre = next((n['nombre'] for n in niveles if n['id'] == nivel_id), "Sin nivel")
-        data.append({
-            "Curso": curso,
-            "Nivel": nivel_nombre
-        })
-    
-    if data:
-        df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        st.caption(f"Total: {len(data)} cursos con estudiantes")
-    
-    st.divider()
-    
-    # 3. Selector de curso
+    # Selector de curso
     col1, col2 = st.columns([2, 1])
     with col1:
         curso = st.selectbox("Seleccionar curso", cursos_disponibles, key="curso_select_asignacion")
     
-    # 4. Obtener nivel del curso
-    nivel_id = grados_dict.get(curso)
+    # Obtener nivel del curso
+    nivel_id = None
+    for g in grados:
+        if g.get('curso') == curso:
+            nivel_id = g.get('nivel_id')
+            break
+    
     nivel_curso_nombre = next((n['nombre'] for n in niveles if n['id'] == nivel_id), "Sin nivel")
     
     with col2:
         if nivel_id:
             st.info(f"📌 Nivel: **{nivel_curso_nombre}**")
         else:
-            st.error(f"❌ El curso '{curso}' no tiene nivel asignado en 'grados'.")
+            st.error(f"❌ El curso '{curso}' no tiene nivel asignado.")
             return
     
     if not nivel_id:
         st.error(f"❌ El curso '{curso}' no tiene nivel asignado.")
         return
     
-    # 5. Obtener horas del nivel
+    # Obtener horas del nivel
     url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}&order=orden.asc"
     response_horas = requests.get(url_horas, headers=headers)
     horas = response_horas.json() if response_horas.status_code == 200 else []
@@ -1194,18 +1181,27 @@ def configurar_horario_curso(headers):
         st.warning(f"No hay horas configuradas para el nivel '{nivel_curso_nombre}'.")
         return
     
-    # 6. Obtener horario actual del curso
+    # Obtener horario actual del curso
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
     response_horario = requests.get(url_horario, headers=headers)
     horarios = response_horario.json() if response_horario.status_code == 200 else []
     
-    # 7. Obtener docentes
-    response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
-    docentes = response_docentes.json() if response_docentes.status_code == 200 else []
-    docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
-    lista_docentes = list(docentes_dict.keys())
+    # =============================================
+    # OBTENER ASIGNACIÓN ACADÉMICA PARA ESTE CURSO
+    # =============================================
+    url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso}"
+    response_asignacion = requests.get(url_asignacion, headers=headers)
+    asignacion = response_asignacion.json() if response_asignacion.status_code == 200 else []
     
-    # 8. Obtener materias del nivel
+    # Crear diccionario: materia -> docente
+    docente_por_materia = {}
+    for a in asignacion:
+        materia = a.get('asignatura')
+        docente = a.get('documento_docente')
+        if materia and docente:
+            docente_por_materia[materia] = docente
+    
+    # Obtener materias del nivel
     url_relaciones = f"{SUPABASE_URL}/rest/v1/materias_niveles?nivel_id=eq.{nivel_id}&select=materia_id"
     response_relaciones = requests.get(url_relaciones, headers=headers)
     
@@ -1229,12 +1225,13 @@ def configurar_horario_curso(headers):
     # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    st.info(f"📊 {len(horas)} horas | {len(materias)} materias | {len(docentes)} docentes")
+    st.info(f"📊 {len(horas)} horas | {len(materias)} materias")
+    st.caption("💡 Al seleccionar una materia, el docente se asignará automáticamente desde la asignación académica.")
     
     # =============================================
-    # TABLA CON DROPDOWNS
+    # TABLA CON DROPDOWNS (SOLO MATERIA, DOCENTE AUTOMÁTICO)
     # =============================================
-    st.write("### ✏️ Asignar materias y docentes")
+    st.write("### ✏️ Asignar materias")
     
     with st.form(key=f"horario_form_{curso}"):
         for hora in horas:
@@ -1248,7 +1245,7 @@ def configurar_horario_curso(headers):
                     existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
                     key_base = f"{curso}_{dia_num}_{hora['orden']}_{idx}"
                     
-                    # Materia
+                    # Solo materia (el docente se asigna automáticamente)
                     default_asignatura = existente.get('asignatura', '') if existente else ''
                     default_idx = 0
                     if default_asignatura in opciones_materias:
@@ -1262,31 +1259,20 @@ def configurar_horario_curso(headers):
                         label_visibility="collapsed"
                     )
                     
-                    # Docente
-                    default_docente = existente.get('documento_docente', '') if existente else ''
-                    default_idx_doc = 0
-                    if default_docente and default_docente in lista_docentes:
-                        default_idx_doc = lista_docentes.index(default_docente) + 1
-                    
-                    opciones_docentes = [""] + lista_docentes
-                    docente = st.selectbox(
-                        "Docente",
-                        options=opciones_docentes,
-                        index=default_idx_doc,
-                        format_func=lambda x: docentes_dict.get(x, "Ninguno") if x else "Ninguno",
-                        key=f"doc_{key_base}",
-                        label_visibility="collapsed"
-                    )
-                    
-                    # Salón
-                    default_salon = existente.get('salon', '') if existente else ''
-                    salon = st.text_input(
-                        "Salón",
-                        value=default_salon,
-                        key=f"salon_{key_base}",
-                        label_visibility="collapsed",
-                        placeholder="Salón"
-                    )
+                    # Mostrar el docente asignado (solo información)
+                    docente_asignado = docente_por_materia.get(asignatura, "")
+                    if docente_asignado:
+                        nombre_docente = next((docentes_dict.get(d, "No asignado") for docentes_dict in [{}]), "No asignado")
+                        # Obtener nombre del docente
+                        response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{docente_asignado}", headers=headers)
+                        if response_docentes.status_code == 200 and response_docentes.json():
+                            d = response_docentes.json()[0]
+                            nombre_docente = f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}"
+                        else:
+                            nombre_docente = docente_asignado
+                        st.caption(f"👨‍🏫 {nombre_docente}")
+                    else:
+                        st.caption("👨‍🏫 Sin docente asignado")
             
             st.divider()
         
@@ -1307,8 +1293,9 @@ def configurar_horario_curso(headers):
                     key_base = f"{curso}_{dia_num}_{hora['orden']}_{list(dias.keys()).index(dia_num)}"
                     
                     asignatura = st.session_state.get(f"mat_{key_base}", "")
-                    docente = st.session_state.get(f"doc_{key_base}", "")
-                    salon = st.session_state.get(f"salon_{key_base}", "")
+                    
+                    # Obtener el docente automáticamente desde asignacion_academica
+                    docente_auto = docente_por_materia.get(asignatura, "")
                     
                     existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
                     
@@ -1321,8 +1308,8 @@ def configurar_horario_curso(headers):
                             "hora_inicio": str(hora['hora_inicio']),
                             "hora_fin": str(hora['hora_fin']),
                             "asignatura": asignatura.strip(),
-                            "documento_docente": docente if docente else None,
-                            "salon": salon
+                            "documento_docente": docente_auto if docente_auto else None,
+                            "salon": ""
                         }
                         try:
                             if existente:
