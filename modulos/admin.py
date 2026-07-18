@@ -1078,77 +1078,32 @@ def mostrar_asignacion():
     st.subheader("📚 Asignación Académica")
     headers = get_headers()
     
-    if "asignacion_seccion" not in st.session_state:
-        st.session_state.asignacion_seccion = "horarios"
+    tabs = st.tabs([
+        "📖 Asignar Horarios", 
+        "👨‍🏫 Directores de Grupo",
+        "⏰ Horas por Nivel", 
+        "📅 Días Laborales", 
+        "📚 Niveles", 
+        "📚 Gestionar Asignaturas",
+        "📚 Gestionar Cursos",  # ← NUEVA PESTAÑA
+        "📆 Festivos"
+    ])
     
-    # 8 botones
-    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
-    
-    with col1:
-        if st.button("📖 Horarios", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "horarios" else "secondary"):
-            st.session_state.asignacion_seccion = "horarios"
-            st.rerun()
-    
-    with col2:
-        if st.button("👨‍🏫 Directores", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "directores" else "secondary"):
-            st.session_state.asignacion_seccion = "directores"
-            st.rerun()
-    
-    with col3:
-        if st.button("⏰ Horas", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "horas" else "secondary"):
-            st.session_state.asignacion_seccion = "horas"
-            st.rerun()
-    
-    with col4:
-        if st.button("📅 Días", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "dias" else "secondary"):
-            st.session_state.asignacion_seccion = "dias"
-            st.rerun()
-    
-    with col5:
-        if st.button("📚 Niveles", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "niveles" else "secondary"):
-            st.session_state.asignacion_seccion = "niveles"
-            st.rerun()
-    
-    with col6:
-        if st.button("📚 Materias", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "materias" else "secondary"):
-            st.session_state.asignacion_seccion = "materias"
-            st.rerun()
-    
-    with col7:
-        if st.button("📚 Cursos", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "grados" else "secondary"):
-            st.session_state.asignacion_seccion = "grados"
-            st.rerun()
-    
-    with col8:
-        if st.button("📆 Festivos", use_container_width=True,
-                     type="primary" if st.session_state.asignacion_seccion == "festivos" else "secondary"):
-            st.session_state.asignacion_seccion = "festivos"
-            st.rerun()
-    
-    st.divider()
-    
-    if st.session_state.asignacion_seccion == "horarios":
+    with tabs[0]:
         configurar_horario_curso(headers)
-    elif st.session_state.asignacion_seccion == "directores":
+    with tabs[1]:
         gestion_directores_grupo(headers)
-    elif st.session_state.asignacion_seccion == "horas":
+    with tabs[2]:
         configurar_horas_nivel(headers)
-    elif st.session_state.asignacion_seccion == "dias":
+    with tabs[3]:
         configurar_jornada_nivel(headers)
-    elif st.session_state.asignacion_seccion == "niveles":
+    with tabs[4]:
         configurar_niveles(headers)
-    elif st.session_state.asignacion_seccion == "materias":
+    with tabs[5]:
         gestionar_asignaturas(headers)
-    elif st.session_state.asignacion_seccion == "grados":
-        gestionar_grados(headers)
-    elif st.session_state.asignacion_seccion == "festivos":
+    with tabs[6]:
+        gestionar_grados(headers)  # ← NUEVA FUNCIÓN
+    with tabs[7]:
         gestion_festivos(headers)
 
 def configurar_horario_curso(headers):
