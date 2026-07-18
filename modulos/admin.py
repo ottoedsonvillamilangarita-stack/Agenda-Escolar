@@ -1229,7 +1229,7 @@ def configurar_horario_curso(headers):
     st.caption("💡 Al seleccionar una materia, el docente se asignará automáticamente desde la asignación académica.")
     
     # =============================================
-    # TABLA CON DROPDOWNS (SOLO MATERIA, DOCENTE AUTOMÁTICO)
+    # TABLA CON DROPDOWNS (SOLO MATERIA)
     # =============================================
     st.write("### ✏️ Asignar materias")
     
@@ -1245,34 +1245,19 @@ def configurar_horario_curso(headers):
                     existente = next((h for h in horarios if h['dia_semana'] == dia_num and h['orden_clase'] == hora['orden']), None)
                     key_base = f"{curso}_{dia_num}_{hora['orden']}_{idx}"
                     
-                    # Solo materia (el docente se asigna automáticamente)
+                    # Solo materia
                     default_asignatura = existente.get('asignatura', '') if existente else ''
                     default_idx = 0
                     if default_asignatura in opciones_materias:
                         default_idx = opciones_materias.index(default_asignatura)
                     
-                    asignatura = st.selectbox(
+                    st.selectbox(
                         "Materia",
                         options=opciones_materias,
                         index=default_idx,
                         key=f"mat_{key_base}",
                         label_visibility="collapsed"
                     )
-                    
-                    # Mostrar el docente asignado (solo información)
-                    docente_asignado = docente_por_materia.get(asignatura, "")
-                    if docente_asignado:
-                        nombre_docente = next((docentes_dict.get(d, "No asignado") for docentes_dict in [{}]), "No asignado")
-                        # Obtener nombre del docente
-                        response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{docente_asignado}", headers=headers)
-                        if response_docentes.status_code == 200 and response_docentes.json():
-                            d = response_docentes.json()[0]
-                            nombre_docente = f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}"
-                        else:
-                            nombre_docente = docente_asignado
-                        st.caption(f"👨‍🏫 {nombre_docente}")
-                    else:
-                        st.caption("👨‍🏫 Sin docente asignado")
             
             st.divider()
         
@@ -1342,7 +1327,6 @@ def configurar_horario_curso(headers):
             else:
                 st.success(f"✅ Horario guardado: {guardados} clases, {eliminados} eliminadas.")
                 st.rerun()
-
 def gestionar_grados(headers):
     st.subheader("📚 Gestionar Cursos (Grados)")
     st.caption("Crea, edita o elimina cursos y asígnales un nivel educativo.")
