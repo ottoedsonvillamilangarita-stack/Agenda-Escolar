@@ -387,28 +387,60 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario personal del docente en formato tabla"""
+    """Muestra el horario del docente basado en asignacion_academica"""
     
-    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,hora_inicio.asc"
+    # Obtener cursos y materias del docente desde asignacion_academica
+    url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
+    response_asignacion = requests.get(url_asignacion, headers=headers)
+    
+    if response_asignacion.status_code != 200:
+        st.info("No hay asignaciones para este docente")
+        return
+    
+    asignaciones = response_asignacion.json()
+    
+    if not asignaciones:
+        st.info("No hay asignaciones para este docente")
+        return
+    
+    # Obtener los horarios de los cursos donde el docente tiene asignación
+    cursos = list(set([a.get('curso') for a in asignaciones if a.get('curso')]))
+    
+    if not cursos:
+        st.info("No hay cursos asignados")
+        return
+    
+    # Obtener horario_base para esos cursos
+    cursos_str = ','.join([f"'{c}'" for c in cursos])
+    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=in.({cursos_str})&order=dia_semana.asc,orden_clase.asc"
     response_horario = requests.get(url_horario, headers=headers)
     
     if response_horario.status_code != 200:
-        st.info("No hay horario asignado")
+        st.info("No hay horarios configurados")
         return
     
     horarios = response_horario.json()
     
     if not horarios:
-        st.info("No hay horario asignado para este docente")
+        st.info("No hay horarios configurados")
         return
     
+    # Filtrar solo las materias que el docente dicta
+    materias_docente = [a.get('asignatura') for a in asignaciones if a.get('asignatura')]
+    horarios_filtrados = [h for h in horarios if h.get('asignatura') in materias_docente]
+    
+    if not horarios_filtrados:
+        st.info("No hay horarios para tus materias")
+        return
+    
+    # Organizar por días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
     horario_por_dia = {}
     for dia in dias.values():
         horario_por_dia[dia] = []
     
-    for clase in horarios:
+    for clase in horarios_filtrados:
         dia = dias.get(clase.get('dia_semana'), "Lunes")
         horario_por_dia[dia].append({
             "hora_inicio": clase.get('hora_inicio', '')[:5] if clase.get('hora_inicio') else '',
@@ -418,14 +450,13 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             "salon": clase.get('salon', 'N/A')
         })
     
-    st.markdown("---")
-    
+    # Mostrar tabla
     cols = st.columns(len(dias))
     for idx, dia in enumerate(dias.values()):
         with cols[idx]:
             st.markdown(f"**{dia}**")
     
-    max_clases = max([len(horario_por_dia[dia]) for dia in dias.values()]) if horarios else 0
+    max_clases = max([len(horario_por_dia[dia]) for dia in dias.values()]) if horarios_filtrados else 0
     
     for fila in range(max_clases):
         cols = st.columns(len(dias))
