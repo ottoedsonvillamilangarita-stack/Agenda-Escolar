@@ -45,8 +45,7 @@ def mostrar(data):
     # HORARIO PERSONAL DEL DOCENTE
     # ============================================
     
-    st.subheader("📅 Mi Horario Semanal")
-    mostrar_horario_docente_tabla(documento_docente, headers)
+        mostrar_horario_docente_tabla(documento_docente, headers)
     
     st.divider()
     st.subheader("📌 Funciones disponibles")
