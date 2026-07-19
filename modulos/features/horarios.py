@@ -387,7 +387,7 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario del docente con horas fijas y huecos vacíos"""
+    """Muestra el horario del docente en formato cuadrícula compacta"""
     
     # Obtener horarios del docente
     url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,orden_clase.asc"
@@ -403,26 +403,28 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horario configurado para este docente")
         return
     
-    # Obtener TODAS las horas únicas de los horarios del docente
-    horas_unicas = set()
-    for clase in horarios:
-        hora_inicio = clase.get('hora_inicio', '')[:5] if clase.get('hora_inicio') else ''
-        hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
-        if hora_inicio and hora_fin:
-            horas_unicas.add(f"{hora_inicio} - {hora_fin}")
-    
-    horas_ordenadas = sorted(list(horas_unicas))
-    
-    if not horas_ordenadas:
-        st.info("No hay horas configuradas")
-        return
+    # Definir todas las horas posibles (de 6:50 a 14:45)
+    horas_fijas = [
+        "06:50 - 07:20",
+        "07:20 - 08:00",
+        "08:15 - 08:55",
+        "08:55 - 09:30",
+        "09:30 - 10:00",
+        "10:00 - 10:45",
+        "10:45 - 11:20",
+        "11:20 - 12:10",
+        "12:10 - 12:50",
+        "12:50 - 13:30",
+        "13:30 - 14:00",
+        "14:00 - 14:25"
+    ]
     
     # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
     # Crear estructura de horario
     horario_completo = {}
-    for hora in horas_ordenadas:
+    for hora in horas_fijas:
         horario_completo[hora] = {}
         for dia in dias.values():
             horario_completo[hora][dia] = None
@@ -433,42 +435,107 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
         hora_key = f"{hora_inicio} - {hora_fin}"
         
-        if hora_key in horario_completo:
+        # Buscar la hora fija que coincide
+        hora_encontrada = None
+        for h in horas_fijas:
+            if h.startswith(hora_inicio):
+                hora_encontrada = h
+                break
+        
+        if not hora_encontrada:
+            hora_encontrada = hora_key
+        
+        if hora_encontrada in horario_completo:
             dia = dias.get(clase.get('dia_semana'), "Lunes")
-            horario_completo[hora_key][dia] = {
+            horario_completo[hora_encontrada][dia] = {
                 "asignatura": clase.get('asignatura', '?'),
                 "curso": clase.get('curso'),
-                "salon": clase.get('salon', 'N/A')
+                "salon": clase.get('salon', '')
             }
     
-    # Mostrar tabla
-    st.markdown("---")
+    # =============================================
+    # MOSTRAR HORARIO EN CUADRÍCULA
+    # =============================================
     
-    # Cabecera de días
-    cols = st.columns(len(dias))
-    for idx, dia in enumerate(dias.values()):
-        with cols[idx]:
-            st.markdown(f"**{dia}**")
+    # Usar HTML + CSS para una tabla compacta
+    st.markdown("""
+    <style>
+        .horario-table {
+            font-size: 11px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .horario-table th {
+            background-color: #1a237e;
+            color: white;
+            padding: 4px 6px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 10px;
+        }
+        .horario-table td {
+            border: 1px solid #ddd;
+            padding: 3px 4px;
+            text-align: center;
+            vertical-align: middle;
+            min-height: 30px;
+            min-width: 50px;
+        }
+        .horario-table .hora-col {
+            background-color: #f5f5f5;
+            font-weight: 600;
+            font-size: 9px;
+            white-space: nowrap;
+            min-width: 55px;
+        }
+        .horario-table .clase {
+            font-weight: 500;
+            font-size: 10px;
+        }
+        .horario-table .curso {
+            font-size: 8px;
+            color: #666;
+        }
+        .horario-table .salon {
+            font-size: 8px;
+            color: #999;
+        }
+        .horario-table .vacio {
+            background-color: #fafafa;
+            min-height: 30px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
     
-    # Mostrar cada hora
-    for hora in horas_ordenadas:
-        cols = st.columns(len(dias))
+    # Construir la tabla HTML
+    html = '<table class="horario-table">'
+    
+    # Cabecera
+    html += '<tr><th class="hora-col">Hora</th>'
+    for dia in dias.values():
+        html += f'<th>{dia[:3]}</th>'  # Mostrar solo 3 letras
+    html += '</tr>'
+    
+    # Filas
+    for hora in horas_fijas:
+        html += '<tr>'
+        html += f'<td class="hora-col">{hora}</td>'
         
-        # Columna de hora
-        with cols[0]:
-            st.write(f"**{hora}**")
+        for dia in dias.values():
+            clase = horario_completo[hora].get(dia)
+            if clase:
+                salon = f' 📌{clase["salon"]}' if clase.get('salon') else ''
+                html += f'''
+                <td>
+                    <div class="clase">{clase["asignatura"][:12]}</div>
+                    <div class="curso">{clase["curso"]}{salon}</div>
+                </td>
+                '''
+            else:
+                html += '<td class="vacio"></td>'
         
-        # Columnas de días
-        for idx, dia in enumerate(dias.values()):
-            with cols[idx]:
-                clase = horario_completo[hora].get(dia)
-                if clase:
-                    st.write(f"**{clase['asignatura']}**")
-                    st.write(f"({clase['curso']})")
-                    st.caption(f"📌 {clase['salon']}")
-                else:
-                    st.write("")
-                    st.write("")
-                    st.write("")
+        html += '</tr>'
     
-    st.markdown("---")
+    html += '</table>'
+    
+    st.markdown(html, unsafe_allow_html=True)
