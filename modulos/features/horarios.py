@@ -466,95 +466,73 @@ def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal", tipo_v
         st.info("No hay horario configurado")
         return
     
-    # CSS para estilos
-    st.markdown("""
-    <style>
-        .horario-celda {
-            border: 1px solid #ddd;
-            padding: 4px 2px;
-            text-align: center;
-            min-height: 52px;
-            height: 52px;
-            max-height: 52px;
-            background-color: white;
-            border-radius: 4px;
-            font-size: 11px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            box-sizing: border-box;
-            overflow: hidden;
-        }
-        .horario-celda.vacia {
-            background-color: #f9f9f9;
-            min-height: 52px;
-            height: 52px;
-            max-height: 52px;
-        }
-        .horario-celda .asignatura {
-            font-weight: 600;
-            font-size: 12px;
-            line-height: 1.2;
-            color: #1a237e;
-        }
-        .horario-celda .curso {
-            font-size: 10px;
-            color: #444;
-            line-height: 1.2;
-        }
-        .horario-celda .docente {
-            font-size: 9px;
-            color: #666;
-            line-height: 1.2;
-        }
-        .horario-celda .salon {
-            font-size: 8px;
-            color: #777;
-        }
-        .horario-header {
-            background-color: #1a237e;
-            color: white;
-            padding: 6px 2px;
-            text-align: center;
-            font-weight: 700;
-            font-size: 11px;
-            border-radius: 4px;
-            width: 100%;
-            min-height: 52px;
-            height: 52px;
-            max-height: 52px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .horario-hora {
-            background-color: #f0f0f0;
-            padding: 6px 2px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 10px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-            color: #333;
-            width: 100%;
-            min-height: 52px;
-            height: 52px;
-            max-height: 52px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-sizing: border-box;
-        }
-        .stColumn {
-            padding: 0 2px !important;
-        }
-        .row-widget.stColumns {
-            gap: 2px !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    import streamlit as st
+import requests
+import pandas as pd
+from utils import SUPABASE_URL, get_headers
+from modulos.features.calificaciones import mostrar_notas_estudiante
+from modulos.features.asistencia import mostrar_asistencia_estudiante
+from modulos.features.horarios import mostrar_horario_unificado
+
+
+def mostrar(data):
+    st.title("👨‍🎓 Panel del Estudiante")
+    
+    documento_estudiante = data.get('documento')
+    st.write(f"Bienvenido, {data.get('username', 'Estudiante')}")
+    
+    headers = get_headers()
+    
+    # Obtener datos del estudiante
+    url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_estudiante}"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200 or not response.json():
+        st.error("No se encontró el estudiante")
+        return
+    
+    estudiante = response.json()[0]
+    nombre = estudiante.get('nombre_estudiante')
+    curso = estudiante.get('curso')
+    
+    st.success(f"📌 Estudiante: {nombre} - Curso: {curso}")
+    
+    # =============================================
+    # HORARIO DEL ESTUDIANTE
+    # =============================================
+    if curso:
+        url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+        response_horario = requests.get(url_horario, headers=headers)
+        
+        if response_horario.status_code == 200:
+            horarios = response_horario.json()
+            if horarios:
+                mostrar_horario_unificado(horarios, f"📅 Mi Horario ({curso})", "estudiante")
+            else:
+                st.info("No hay horario configurado para tu curso")
+        else:
+            st.info("No se pudo cargar el horario")
+    
+    st.divider()
+    st.subheader("📌 Funciones disponibles")
+    
+    opcion = st.selectbox(
+        "Seleccionar función",
+        [
+            "📖 Mis Notas",
+            "📋 Mi Asistencia",
+            "📊 Mi Rendimiento"
+        ]
+    )
+    
+    st.divider()
+    
+    if opcion == "📖 Mis Notas":
+        mostrar_notas_estudiante(data)
+    elif opcion == "📋 Mi Asistencia":
+        mostrar_asistencia_estudiante(data)
+    else:
+        st.info("🚧 Módulo en desarrollo")
     
     # Mostrar título
     st.subheader(titulo)
