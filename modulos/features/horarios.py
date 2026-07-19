@@ -387,7 +387,7 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario del docente usando las horas configuradas por nivel"""
+    """Muestra el horario del docente en formato tabla compacta (solo horas con clase)"""
     
     # 1. Obtener las asignaciones del docente
     url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
@@ -477,29 +477,69 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             }
     
     # =============================================
-    # MOSTRAR HORARIO EN CUADRÍCULA (CON PANDAS)
+    # MOSTRAR HORARIO EN TABLA COMPACTA (SOLO HORAS CON CLASE)
     # =============================================
     import pandas as pd
     
-    # Crear DataFrame
+    # Identificar qué horas tienen al menos una clase
+    horas_con_clase = set()
+    for hora in horas_fijas:
+        for dia in dias.values():
+            if horario_completo[hora].get(dia):
+                horas_con_clase.add(hora)
+                break
+    
+    # Construir el DataFrame SOLO con horas que tienen clase
     data = []
     for hora in horas_fijas:
+        if hora not in horas_con_clase:
+            continue  # Saltar horas vacías
         fila = {"Hora": hora}
         for dia in dias.values():
             clase = horario_completo[hora].get(dia)
             if clase:
                 salon = f" 📌{clase['salon']}" if clase.get('salon') else ''
-                fila[dia] = f"{clase['asignatura'][:12]}\n{clase['curso']}{salon}"
+                fila[dia] = f"{clase['asignatura'][:15]}\n({clase['curso']})"
             else:
                 fila[dia] = ""
         data.append(fila)
     
+    if not data:
+        st.info("No hay horarios con clase para este docente")
+        return
+    
     df = pd.DataFrame(data)
     
-    # Mostrar tabla con pandas
+    # Estilos para la tabla
+    st.markdown("""
+    <style>
+        .dataframe {
+            font-size: 10px !important;
+        }
+        .dataframe td, .dataframe th {
+            padding: 2px 4px !important;
+            text-align: center !important;
+            vertical-align: middle !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+        }
+        .dataframe th {
+            background-color: #1a237e !important;
+            color: white !important;
+            font-weight: 600 !important;
+            font-size: 10px !important;
+        }
+        .dataframe td {
+            background-color: white !important;
+            border: 1px solid #ddd !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Mostrar tabla
     st.dataframe(
         df,
         use_container_width=True,
         hide_index=True,
-        height=400
+        height=min(350, len(data) * 35 + 40)
     )
