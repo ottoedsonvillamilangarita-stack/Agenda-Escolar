@@ -405,8 +405,15 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
     
     # Usar la función unificada
     mostrar_horario_unificado(horarios, "📅 Mi Horario Semanal")
-def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal"):
-    """Muestra un horario en formato tabla con st.columns (reutilizable)"""
+def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal", tipo_vista="docente"):
+    """
+    Muestra un horario en formato tabla con st.columns
+    
+    Parámetros:
+    - horarios: lista de horarios (diccionarios)
+    - titulo: título a mostrar
+    - tipo_vista: "docente" (muestra curso) o "estudiante" (muestra docente)
+    """
     
     if not horarios:
         st.info("No hay horario disponible")
@@ -428,10 +435,28 @@ def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal"):
                 horas_dict[hora_key][dia] = None
         
         dia = dias.get(clase.get('dia_semana'), "Lunes")
+        
+        # Obtener nombre del docente si es vista de estudiante
+        docente_nombre = ""
+        if tipo_vista == "estudiante":
+            doc_documento = clase.get('documento_docente')
+            if doc_documento:
+                # Buscar el nombre del docente en la sesión o hacer consulta
+                # Por ahora usamos una consulta simple
+                try:
+                    url_doc = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{doc_documento}"
+                    response_doc = requests.get(url_doc, headers=get_headers())
+                    if response_doc.status_code == 200 and response_doc.json():
+                        d = response_doc.json()[0]
+                        docente_nombre = f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip()
+                except:
+                    docente_nombre = doc_documento
+        
         horas_dict[hora_key][dia] = {
             "asignatura": clase.get('asignatura', '?'),
             "curso": clase.get('curso'),
-            "salon": clase.get('salon', '')
+            "salon": clase.get('salon', ''),
+            "docente": docente_nombre if docente_nombre else clase.get('documento_docente', '')
         }
     
     # Ordenar horas
@@ -477,6 +502,11 @@ def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal"):
         .horario-celda .curso {
             font-size: 10px;
             color: #444;
+            line-height: 1.2;
+        }
+        .horario-celda .docente {
+            font-size: 9px;
+            color: #666;
             line-height: 1.2;
         }
         .horario-celda .salon {
@@ -549,12 +579,24 @@ def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal"):
                 clase = horas_dict[hora].get(dia)
                 if clase:
                     salon = f'<div class="salon">📌 {clase["salon"]}</div>' if clase.get('salon') else ''
-                    st.markdown(f'''
-                    <div class="horario-celda">
-                        <span class="asignatura">{clase["asignatura"]}</span>
-                        <span class="curso">({clase["curso"]})</span>
-                        {salon}
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    
+                    if tipo_vista == "docente":
+                        # Docente ve: Asignatura + Curso
+                        st.markdown(f'''
+                        <div class="horario-celda">
+                            <span class="asignatura">{clase["asignatura"]}</span>
+                            <span class="curso">({clase["curso"]})</span>
+                            {salon}
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    else:
+                        # Estudiante/Acudiente ve: Asignatura + Docente
+                        st.markdown(f'''
+                        <div class="horario-celda">
+                            <span class="asignatura">{clase["asignatura"]}</span>
+                            <span class="docente">👨‍🏫 {clase["docente"]}</span>
+                            {salon}
+                        </div>
+                        ''', unsafe_allow_html=True)
                 else:
                     st.markdown('<div class="horario-celda vacia"></div>', unsafe_allow_html=True)
