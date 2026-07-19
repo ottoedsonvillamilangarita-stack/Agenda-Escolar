@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from utils import SUPABASE_URL, get_headers
-from modulos.features.horarios import mostrar_horario_tabla
+from modulos.features.horarios import mostrar_horario_unificado
 
 def mostrar(data):
     st.title("📋 Panel de Coordinador")
