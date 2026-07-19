@@ -79,10 +79,17 @@ def mostrar_horario_acudiente(documento_acudiente, headers):
     
     hijos = response_hijos.json()
     
+    if not hijos:
+        st.info("No hay hijos asociados")
+        return
+    
     for hijo in hijos:
         nombre = hijo.get('nombre_estudiante')
         curso = hijo.get('curso')
-        doc_hijo = hijo.get('documento_estudiante')
+        
+        if not curso:
+            st.info(f"{nombre} - Sin curso asignado")
+            continue
         
         # Obtener horarios del curso del hijo
         url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
@@ -91,7 +98,8 @@ def mostrar_horario_acudiente(documento_acudiente, headers):
         if response_horario.status_code == 200:
             horarios = response_horario.json()
             if horarios:
-                mostrar_horario_unificado(horarios, f"📅 Horario de {nombre} ({curso})")
+                # Usar la función unificada con tipo "estudiante"
+                mostrar_horario_unificado(horarios, f"📅 Horario de {nombre} ({curso})", "estudiante")
             else:
                 st.info(f"📅 {nombre} ({curso}) - Sin horario configurado")
         else:
