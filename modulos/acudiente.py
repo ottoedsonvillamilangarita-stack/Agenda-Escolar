@@ -3,7 +3,7 @@ import requests
 from utils import SUPABASE_URL, get_headers
 from modulos.features.calificaciones import mostrar_notas_acudiente
 from modulos.features.asistencia import mostrar_asistencia_acudiente
-from modulos.features.horarios import mostrar_horario_tabla
+from modulos.features.horarios import mostrar_horario_unificado
 
 def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
@@ -28,8 +28,17 @@ def mostrar(data):
                 hijo = hijos[0]
                 curso = hijo.get('curso')
                 nombre = hijo.get('nombre_estudiante')
-                st.subheader(f"📅 Horario Semanal - {nombre}")
-                mostrar_horario_tabla(curso, headers)
+                # Obtener horarios del curso
+                url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+                response_horario = requests.get(url_horario, headers=headers)
+                if response_horario.status_code == 200:
+                    horarios = response_horario.json()
+                    if horarios:
+                        mostrar_horario_unificado(horarios, f"📅 Horario de {nombre} ({curso})", "estudiante")
+                    else:
+                        st.info(f"📅 {nombre} ({curso}) - Sin horario configurado")
+                else:
+                    st.info(f"📅 {nombre} ({curso}) - Sin horario configurado")
             else:
                 hijo_seleccionado = st.selectbox(
                     "Seleccionar hijo",
@@ -38,8 +47,17 @@ def mostrar(data):
                 idx = [f"{h.get('nombre_estudiante')} - {h.get('curso')}" for h in hijos].index(hijo_seleccionado)
                 curso = hijos[idx].get('curso')
                 nombre = hijos[idx].get('nombre_estudiante')
-                st.subheader(f"📅 Horario Semanal - {nombre}")
-                mostrar_horario_tabla(curso, headers)
+                # Obtener horarios del curso
+                url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+                response_horario = requests.get(url_horario, headers=headers)
+                if response_horario.status_code == 200:
+                    horarios = response_horario.json()
+                    if horarios:
+                        mostrar_horario_unificado(horarios, f"📅 Horario de {nombre} ({curso})", "estudiante")
+                    else:
+                        st.info(f"📅 {nombre} ({curso}) - Sin horario configurado")
+                else:
+                    st.info(f"📅 {nombre} ({curso}) - Sin horario configurado")
         else:
             st.info("No hay hijos asociados")
     
@@ -65,42 +83,3 @@ def mostrar(data):
         mostrar_notas_acudiente(data)
     elif opcion == "📋 Asistencia de mis hijos":
         mostrar_asistencia_acudiente(data)
-
-def mostrar_horario_acudiente(documento_acudiente, headers):
-    """Muestra el horario de los hijos del acudiente usando la función unificada"""
-    
-    # Obtener hijos del acudiente
-    url_hijos = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_acudiente=eq.{documento_acudiente}"
-    response_hijos = requests.get(url_hijos, headers=headers)
-    
-    if response_hijos.status_code != 200 or not response_hijos.json():
-        st.info("No hay estudiantes asociados a este acudiente")
-        return
-    
-    hijos = response_hijos.json()
-    
-    if not hijos:
-        st.info("No hay hijos asociados")
-        return
-    
-    for hijo in hijos:
-        nombre = hijo.get('nombre_estudiante')
-        curso = hijo.get('curso')
-        
-        if not curso:
-            st.info(f"{nombre} - Sin curso asignado")
-            continue
-        
-        # Obtener horarios del curso del hijo
-        url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
-        response_horario = requests.get(url_horario, headers=headers)
-        
-        if response_horario.status_code == 200:
-            horarios = response_horario.json()
-            if horarios:
-                # Usar la función unificada con tipo "estudiante"
-                mostrar_horario_unificado(horarios, f"📅 Horario de {nombre} ({curso})", "estudiante")
-            else:
-                st.info(f"📅 {nombre} ({curso}) - Sin horario configurado")
-        else:
-            st.info(f"📅 {nombre} ({curso}) - Sin horario configurado")
