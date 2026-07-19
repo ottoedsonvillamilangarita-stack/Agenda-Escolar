@@ -387,7 +387,7 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario del docente en formato tabla compacta"""
+    """Muestra el horario del docente en tabla HTML con dos renglones por celda"""
     
     # 1. Obtener las asignaciones del docente
     url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
@@ -477,9 +477,8 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             }
     
     # =============================================
-    # MOSTRAR HORARIO EN TABLA CON DOS RENGLONES
+    # MOSTRAR HORARIO EN TABLA HTML
     # =============================================
-    import pandas as pd
     
     # Identificar qué horas tienen al menos una clase
     horas_con_clase = set()
@@ -489,67 +488,108 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
                 horas_con_clase.add(hora)
                 break
     
-    # Construir el DataFrame SOLO con horas que tienen clase
-    data = []
-    for hora in horas_fijas:
-        if hora not in horas_con_clase:
-            continue
-        fila = {"Hora": hora}
-        for dia in dias.values():
-            clase = horario_completo[hora].get(dia)
-            if clase:
-                # Dos líneas: asignatura y curso
-                fila[dia] = f"{clase['asignatura']}\n({clase['curso']})"
-            else:
-                fila[dia] = ""
-        data.append(fila)
+    # Filtrar horas sin clase
+    horas_filtradas = [h for h in horas_fijas if h in horas_con_clase]
     
-    if not data:
+    if not horas_filtradas:
         st.info("No hay horarios con clase para este docente")
         return
     
-    df = pd.DataFrame(data)
-    
-    # Estilos para la tabla (con dos líneas por celda)
+    # CSS para la tabla
     st.markdown("""
     <style>
-        .dataframe {
-            font-size: 9px !important;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        .horario-table {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 10px;
         }
-        .dataframe td, .dataframe th {
-            padding: 4px 2px !important;
-            text-align: center !important;
-            vertical-align: middle !important;
-            white-space: pre-line !important;
-            line-height: 1.3 !important;
-            min-height: 40px !important;
-            height: auto !important;
+        .horario-table th {
+            background-color: #1a237e;
+            color: white;
+            padding: 6px 4px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 10px;
+            border: 1px solid #0d1442;
         }
-        .dataframe th {
-            background-color: #1a237e !important;
-            color: white !important;
-            font-weight: 600 !important;
-            font-size: 9px !important;
+        .horario-table td {
+            border: 1px solid #ddd;
+            padding: 4px 3px;
+            text-align: center;
+            vertical-align: middle;
+            min-height: 42px;
+            height: 42px;
         }
-        .dataframe td {
-            background-color: white !important;
-            border: 1px solid #ddd !important;
-            min-width: 60px !important;
+        .horario-table .hora-col {
+            background-color: #f5f5f5;
+            font-weight: 600;
+            font-size: 9px;
+            white-space: nowrap;
+            min-width: 60px;
+            width: 60px;
         }
-        .dataframe .col_heading {
-            background-color: #1a237e !important;
+        .horario-table .asignatura {
+            font-weight: 500;
+            font-size: 10px;
+            line-height: 1.3;
+            display: block;
         }
-        .dataframe .blank {
-            background-color: #f9f9f9 !important;
+        .horario-table .curso {
+            font-size: 8px;
+            color: #555;
+            display: block;
+            margin-top: 1px;
+        }
+        .horario-table .salon {
+            font-size: 7px;
+            color: #999;
+            display: block;
+        }
+        .horario-table .vacio {
+            background-color: #fafafa;
+            min-height: 42px;
+            height: 42px;
+        }
+        .horario-table .celda-clase {
+            background-color: #ffffff;
+            min-height: 42px;
+            height: 42px;
+            padding: 2px 3px;
         }
     </style>
     """, unsafe_allow_html=True)
     
-    # Mostrar tabla
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        height=min(400, len(data) * 42 + 40)
-    )
+    # Construir la tabla HTML
+    html = '<table class="horario-table">'
+    
+    # Cabecera
+    html += '<tr><th class="hora-col">Hora</th>'
+    for dia in dias.values():
+        html += f'<th>{dia[:3]}</th>'
+    html += '</tr>'
+    
+    # Filas (solo horas con clase)
+    for hora in horas_filtradas:
+        html += '<tr>'
+        html += f'<td class="hora-col">{hora}</td>'
+        
+        for dia in dias.values():
+            clase = horario_completo[hora].get(dia)
+            if clase:
+                salon_html = f'<span class="salon">📌 {clase["salon"]}</span>' if clase.get('salon') else ''
+                html += f'''
+                <td class="celda-clase">
+                    <span class="asignatura">{clase["asignatura"]}</span>
+                    <span class="curso">({clase["curso"]})</span>
+                    {salon_html}
+                </td>
+                '''
+            else:
+                html += '<td class="vacio"></td>'
+        
+        html += '</tr>'
+    
+    html += '</table>'
+    
+    st.markdown(html, unsafe_allow_html=True)
