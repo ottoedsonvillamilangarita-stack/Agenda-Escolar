@@ -50,3 +50,37 @@ def mostrar(data):
         mostrar_asistencia_estudiante(data)
     elif opcion == "👤 Mi Perfil":
         st.info("🚧 Módulo en desarrollo")
+
+def mostrar_horario_estudiante(documento_estudiante, headers):
+    """Muestra el horario del estudiante usando la función unificada"""
+    
+    # Obtener el curso del estudiante
+    url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_estudiante}"
+    response_est = requests.get(url_est, headers=headers)
+    
+    if response_est.status_code != 200 or not response_est.json():
+        st.info("No se encontró el estudiante")
+        return
+    
+    curso = response_est.json()[0].get('curso')
+    
+    if not curso:
+        st.info("El estudiante no tiene curso asignado")
+        return
+    
+    # Obtener horarios del curso
+    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+    response_horario = requests.get(url_horario, headers=headers)
+    
+    if response_horario.status_code != 200:
+        st.info("No hay horario configurado para este curso")
+        return
+    
+    horarios = response_horario.json()
+    
+    if not horarios:
+        st.info("No hay horario configurado para este curso")
+        return
+    
+    # Usar la función unificada
+    mostrar_horario_unificado(horarios, f"📅 Horario de {curso}")
