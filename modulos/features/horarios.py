@@ -476,7 +476,7 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             }
     
     # =============================================
-    # MOSTRAR TABLA CON st.columns
+    # MOSTRAR TABLA CON st.columns (TODAS LAS CELDAS CON MISMA ALTURA)
     # =============================================
     
     # Identificar horas con clase
@@ -493,15 +493,17 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horarios con clase para este docente")
         return
     
-    # CSS para estilos (con letra más grande)
+    # CSS para estilos - TODAS LAS CELDAS CON MISMA ALTURA
     st.markdown("""
     <style>
+        /* Contenedor de cada celda */
         .horario-celda {
             border: 1px solid #ddd;
-            padding: 6px 4px;
+            padding: 4px 2px;
             text-align: center;
-            min-height: 55px;
-            height: 55px;
+            min-height: 52px;
+            height: 52px;
+            max-height: 52px;
             background-color: white;
             border-radius: 4px;
             font-size: 11px;
@@ -509,49 +511,78 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
         .horario-celda.vacia {
             background-color: #f9f9f9;
+            min-height: 52px;
+            height: 52px;
+            max-height: 52px;
         }
         .horario-celda .asignatura {
             font-weight: 600;
             font-size: 12px;
-            line-height: 1.3;
+            line-height: 1.2;
             color: #1a237e;
         }
         .horario-celda .curso {
             font-size: 10px;
             color: #444;
-            line-height: 1.3;
+            line-height: 1.2;
         }
         .horario-celda .salon {
-            font-size: 9px;
+            font-size: 8px;
             color: #777;
         }
         .horario-header {
             background-color: #1a237e;
             color: white;
-            padding: 8px 4px;
+            padding: 6px 2px;
             text-align: center;
             font-weight: 700;
-            font-size: 12px;
+            font-size: 11px;
             border-radius: 4px;
+            width: 100%;
+            min-height: 52px;
+            height: 52px;
+            max-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .horario-hora {
             background-color: #f0f0f0;
-            padding: 8px 4px;
+            padding: 6px 2px;
             text-align: center;
             font-weight: 600;
             font-size: 10px;
             border-radius: 4px;
             border: 1px solid #ddd;
             color: #333;
+            width: 100%;
+            min-height: 52px;
+            height: 52px;
+            max-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+        /* Reducir espacio entre columnas */
+        .stColumn {
+            padding: 0 2px !important;
+        }
+        /* Asegurar que todas las columnas tengan el mismo ancho */
+        .row-widget.stColumns {
+            gap: 2px !important;
         }
     </style>
     """, unsafe_allow_html=True)
     
-    # Cabecera: Hora + Días
-    cols = st.columns(len(dias) + 1)
+    # Cabecera: Hora + Días (con menos espacio entre columnas)
+    cols = st.columns(len(dias) + 1, gap="small")
     with cols[0]:
         st.markdown('<div class="horario-header">Hora</div>', unsafe_allow_html=True)
     for idx, dia in enumerate(dias.values()):
@@ -560,7 +591,7 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
     
     # Filas
     for hora in horas_filtradas:
-        cols = st.columns(len(dias) + 1)
+        cols = st.columns(len(dias) + 1, gap="small")
         
         with cols[0]:
             st.markdown(f'<div class="horario-hora">{hora}</div>', unsafe_allow_html=True)
