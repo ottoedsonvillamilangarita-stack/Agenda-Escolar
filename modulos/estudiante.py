@@ -62,7 +62,9 @@ def mostrar_horario_estudiante(documento_estudiante, headers):
         st.info("No se encontró el estudiante")
         return
     
-    curso = response_est.json()[0].get('curso')
+    estudiante = response_est.json()[0]
+    curso = estudiante.get('curso')
+    nombre = estudiante.get('nombre_estudiante')
     
     if not curso:
         st.info("El estudiante no tiene curso asignado")
@@ -82,5 +84,5 @@ def mostrar_horario_estudiante(documento_estudiante, headers):
         st.info("No hay horario configurado para este curso")
         return
     
-    # Usar la función unificada
-    mostrar_horario_unificado(horarios, f"📅 Horario de {curso}")
+    # Usar la función unificada con tipo "estudiante"
+    mostrar_horario_unificado(horarios, f"📅 Horario de {nombre} ({curso})", "estudiante")cado(horarios, f"📅 Horario de {curso}")
