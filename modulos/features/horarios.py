@@ -403,28 +403,26 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horario configurado para este docente")
         return
     
-    # Definir las horas fijas (basadas en el PDF original)
-    horas_fijas = [
-        "06:50 - 07:20",
-        "07:20 - 08:00",
-        "08:15 - 08:55",
-        "08:55 - 09:30",
-        "09:30 - 10:00",
-        "10:00 - 10:45",
-        "10:45 - 11:20",
-        "11:20 - 12:10",
-        "12:10 - 12:50",
-        "12:50 - 13:30",
-        "13:30 - 14:00",
-        "14:00 - 14:25"
-    ]
+    # Obtener TODAS las horas únicas de los horarios del docente
+    horas_unicas = set()
+    for clase in horarios:
+        hora_inicio = clase.get('hora_inicio', '')[:5] if clase.get('hora_inicio') else ''
+        hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
+        if hora_inicio and hora_fin:
+            horas_unicas.add(f"{hora_inicio} - {hora_fin}")
+    
+    horas_ordenadas = sorted(list(horas_unicas))
+    
+    if not horas_ordenadas:
+        st.info("No hay horas configuradas")
+        return
     
     # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    # Crear estructura de horario con horas fijas
+    # Crear estructura de horario
     horario_completo = {}
-    for hora in horas_fijas:
+    for hora in horas_ordenadas:
         horario_completo[hora] = {}
         for dia in dias.values():
             horario_completo[hora][dia] = None
@@ -435,26 +433,15 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
         hora_key = f"{hora_inicio} - {hora_fin}"
         
-        # Buscar la hora fija más cercana
-        hora_encontrada = None
-        for h in horas_fijas:
-            if h.startswith(hora_inicio):
-                hora_encontrada = h
-                break
-        
-        if not hora_encontrada:
-            # Si no coincide exactamente, usar la hora exacta
-            hora_encontrada = hora_key
-        
-        dia = dias.get(clase.get('dia_semana'), "Lunes")
-        
-        horario_completo[hora_encontrada][dia] = {
-            "asignatura": clase.get('asignatura', '?'),
-            "curso": clase.get('curso'),
-            "salon": clase.get('salon', 'N/A')
-        }
+        if hora_key in horario_completo:
+            dia = dias.get(clase.get('dia_semana'), "Lunes")
+            horario_completo[hora_key][dia] = {
+                "asignatura": clase.get('asignatura', '?'),
+                "curso": clase.get('curso'),
+                "salon": clase.get('salon', 'N/A')
+            }
     
-    # Mostrar tabla con horas fijas
+    # Mostrar tabla
     st.markdown("---")
     
     # Cabecera de días
@@ -464,7 +451,7 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             st.markdown(f"**{dia}**")
     
     # Mostrar cada hora
-    for hora in horas_fijas:
+    for hora in horas_ordenadas:
         cols = st.columns(len(dias))
         
         # Columna de hora
@@ -483,7 +470,5 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
                     st.write("")
                     st.write("")
                     st.write("")
-    
-    st.markdown("---")
     
     st.markdown("---")
