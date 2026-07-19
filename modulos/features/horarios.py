@@ -387,7 +387,7 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario del docente en formato tabla compacta (solo horas con clase)"""
+    """Muestra el horario del docente en formato tabla compacta"""
     
     # 1. Obtener las asignaciones del docente
     url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
@@ -477,7 +477,7 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             }
     
     # =============================================
-    # MOSTRAR HORARIO EN TABLA COMPACTA (SOLO HORAS CON CLASE)
+    # MOSTRAR HORARIO EN TABLA CON DOS RENGLONES
     # =============================================
     import pandas as pd
     
@@ -493,13 +493,13 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
     data = []
     for hora in horas_fijas:
         if hora not in horas_con_clase:
-            continue  # Saltar horas vacías
+            continue
         fila = {"Hora": hora}
         for dia in dias.values():
             clase = horario_completo[hora].get(dia)
             if clase:
-                salon = f" 📌{clase['salon']}" if clase.get('salon') else ''
-                fila[dia] = f"{clase['asignatura'][:15]}\n({clase['curso']})"
+                # Dos líneas: asignatura y curso
+                fila[dia] = f"{clase['asignatura']}\n({clase['curso']})"
             else:
                 fila[dia] = ""
         data.append(fila)
@@ -510,28 +510,38 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
     
     df = pd.DataFrame(data)
     
-    # Estilos para la tabla
+    # Estilos para la tabla (con dos líneas por celda)
     st.markdown("""
     <style>
         .dataframe {
-            font-size: 10px !important;
+            font-size: 9px !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
         .dataframe td, .dataframe th {
-            padding: 2px 4px !important;
+            padding: 4px 2px !important;
             text-align: center !important;
             vertical-align: middle !important;
-            white-space: normal !important;
-            word-wrap: break-word !important;
+            white-space: pre-line !important;
+            line-height: 1.3 !important;
+            min-height: 40px !important;
+            height: auto !important;
         }
         .dataframe th {
             background-color: #1a237e !important;
             color: white !important;
             font-weight: 600 !important;
-            font-size: 10px !important;
+            font-size: 9px !important;
         }
         .dataframe td {
             background-color: white !important;
             border: 1px solid #ddd !important;
+            min-width: 60px !important;
+        }
+        .dataframe .col_heading {
+            background-color: #1a237e !important;
+        }
+        .dataframe .blank {
+            background-color: #f9f9f9 !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -541,5 +551,5 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         df,
         use_container_width=True,
         hide_index=True,
-        height=min(350, len(data) * 35 + 40)
+        height=min(400, len(data) * 42 + 40)
     )
