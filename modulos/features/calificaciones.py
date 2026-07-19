@@ -131,7 +131,7 @@ def mostrar_ingreso_notas(data):
     
     if not tipos_nota:
         st.warning(f"No hay tipos de nota configurados para este período y corte")
-        # Botón para ir a configuración de notas (siempre visible)
+        st.info("🔧 Configura los tipos de nota desde la opción '⚙️ Configurar Notas' en el menú principal.")
         return
     
     # Obtener estudiantes
