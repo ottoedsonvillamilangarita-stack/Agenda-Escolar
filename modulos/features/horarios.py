@@ -387,37 +387,63 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario del docente en formato cuadrícula compacta"""
+    """Muestra el horario del docente usando las horas configuradas por nivel"""
     
-    # Obtener horarios del docente
-    url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,orden_clase.asc"
-    response = requests.get(url, headers=headers)
+    # 1. Obtener las asignaciones del docente
+    url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
+    response_asignacion = requests.get(url_asignacion, headers=headers)
     
-    if response.status_code != 200:
-        st.info("No hay horario configurado para este docente")
+    if response_asignacion.status_code != 200:
+        st.info("No hay asignaciones para este docente")
         return
     
-    horarios = response.json()
+    asignaciones = response_asignacion.json()
     
-    if not horarios:
-        st.info("No hay horario configurado para este docente")
+    if not asignaciones:
+        st.info("No hay asignaciones para este docente")
         return
     
-        # Definir todas las horas posibles (basadas en el PDF)
-    horas_fijas = [
-        "06:50 - 07:25",
-        "07:25 - 08:05",
-        "08:05 - 08:40",
-        "08:40 - 09:20",
-        "09:20 - 10:00",
-        "10:00 - 10:35",
-        "10:35 - 11:15",
-        "11:15 - 12:00",
-        "12:00 - 12:45",
-        "12:45 - 13:30",
-        "13:30 - 14:05",
-        "14:05 - 14:45"
-    ]
+    # 2. Obtener el nivel del primer curso (todos los cursos del docente deben tener el mismo nivel)
+    primer_curso = asignaciones[0].get('curso')
+    url_grado = f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{primer_curso}"
+    response_grado = requests.get(url_grado, headers=headers)
+    
+    nivel_id = None
+    if response_grado.status_code == 200 and response_grado.json():
+        nivel_id = response_grado.json()[0].get('nivel_id')
+    
+    if not nivel_id:
+        st.info("No se pudo determinar el nivel del curso")
+        return
+    
+    # 3. Obtener las horas del nivel
+    url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}&order=orden.asc"
+    response_horas = requests.get(url_horas, headers=headers)
+    
+    if response_horas.status_code != 200:
+        st.info("No hay horas configuradas para este nivel")
+        return
+    
+    horas_nivel = response_horas.json()
+    
+    if not horas_nivel:
+        st.info("No hay horas configuradas para este nivel")
+        return
+    
+    # Crear lista de horas en formato "HH:MM - HH:MM"
+    horas_fijas = []
+    for h in horas_nivel:
+        hora_inicio = str(h['hora_inicio'])[:5]
+        hora_fin = str(h['hora_fin'])[:5]
+        horas_fijas.append(f"{hora_inicio} - {hora_fin}")
+    
+    # 4. Obtener los horarios del docente
+    url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,orden_clase.asc"
+    response_horario = requests.get(url_horario, headers=headers)
+    
+    horarios = []
+    if response_horario.status_code == 200:
+        horarios = response_horario.json()
     
     # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
@@ -442,10 +468,7 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
                 hora_encontrada = h
                 break
         
-        if not hora_encontrada:
-            hora_encontrada = hora_key
-        
-        if hora_encontrada in horario_completo:
+        if hora_encontrada and hora_encontrada in horario_completo:
             dia = dias.get(clase.get('dia_semana'), "Lunes")
             horario_completo[hora_encontrada][dia] = {
                 "asignatura": clase.get('asignatura', '?'),
@@ -457,7 +480,6 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
     # MOSTRAR HORARIO EN CUADRÍCULA
     # =============================================
     
-    # Usar HTML + CSS para una tabla compacta
     st.markdown("""
     <style>
         .horario-table {
@@ -513,10 +535,10 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
     # Cabecera
     html += '<tr><th class="hora-col">Hora</th>'
     for dia in dias.values():
-        html += f'<th>{dia[:3]}</th>'  # Mostrar solo 3 letras
+        html += f'<th>{dia[:3]}</th>'
     html += '</tr>'
     
-    # Filas
+    # Filas (usando las horas del nivel)
     for hora in horas_fijas:
         html += '<tr>'
         html += f'<td class="hora-col">{hora}</td>'
