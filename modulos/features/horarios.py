@@ -403,7 +403,7 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay asignaciones para este docente")
         return
     
-    # 2. Obtener el nivel del primer curso (todos los cursos del docente deben tener el mismo nivel)
+    # 2. Obtener el nivel del primer curso
     primer_curso = asignaciones[0].get('curso')
     url_grado = f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{primer_curso}"
     response_grado = requests.get(url_grado, headers=headers)
@@ -477,87 +477,29 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             }
     
     # =============================================
-    # MOSTRAR HORARIO EN CUADRÍCULA
+    # MOSTRAR HORARIO EN CUADRÍCULA (CON PANDAS)
     # =============================================
+    import pandas as pd
     
-    st.markdown("""
-    <style>
-        .horario-table {
-            font-size: 11px;
-            border-collapse: collapse;
-            width: 100%;
-        }
-        .horario-table th {
-            background-color: #1a237e;
-            color: white;
-            padding: 4px 6px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 10px;
-        }
-        .horario-table td {
-            border: 1px solid #ddd;
-            padding: 3px 4px;
-            text-align: center;
-            vertical-align: middle;
-            min-height: 30px;
-            min-width: 50px;
-        }
-        .horario-table .hora-col {
-            background-color: #f5f5f5;
-            font-weight: 600;
-            font-size: 9px;
-            white-space: nowrap;
-            min-width: 55px;
-        }
-        .horario-table .clase {
-            font-weight: 500;
-            font-size: 10px;
-        }
-        .horario-table .curso {
-            font-size: 8px;
-            color: #666;
-        }
-        .horario-table .salon {
-            font-size: 8px;
-            color: #999;
-        }
-        .horario-table .vacio {
-            background-color: #fafafa;
-            min-height: 30px;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Construir la tabla HTML
-    html = '<table class="horario-table">'
-    
-    # Cabecera
-    html += '<tr><th class="hora-col">Hora</th>'
-    for dia in dias.values():
-        html += f'<th>{dia[:3]}</th>'
-    html += '</tr>'
-    
-    # Filas (usando las horas del nivel)
+    # Crear DataFrame
+    data = []
     for hora in horas_fijas:
-        html += '<tr>'
-        html += f'<td class="hora-col">{hora}</td>'
-        
+        fila = {"Hora": hora}
         for dia in dias.values():
             clase = horario_completo[hora].get(dia)
             if clase:
-                salon = f' 📌{clase["salon"]}' if clase.get('salon') else ''
-                html += f'''
-                <td>
-                    <div class="clase">{clase["asignatura"][:12]}</div>
-                    <div class="curso">{clase["curso"]}{salon}</div>
-                </td>
-                '''
+                salon = f" 📌{clase['salon']}" if clase.get('salon') else ''
+                fila[dia] = f"{clase['asignatura'][:12]}\n{clase['curso']}{salon}"
             else:
-                html += '<td class="vacio"></td>'
-        
-        html += '</tr>'
+                fila[dia] = ""
+        data.append(fila)
     
-    html += '</table>'
+    df = pd.DataFrame(data)
     
-    st.markdown(html, unsafe_allow_html=True)
+    # Mostrar tabla con pandas
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        height=400
+    )
