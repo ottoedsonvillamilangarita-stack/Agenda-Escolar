@@ -387,9 +387,9 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario del docente basado en documento_docente"""
+    """Muestra el horario del docente con horas fijas y huecos vacíos"""
     
-    # Obtener horarios directamente del docente
+    # Obtener horarios del docente
     url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,orden_clase.asc"
     response = requests.get(url, headers=headers)
     
@@ -403,43 +403,87 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horario configurado para este docente")
         return
     
-    # Organizar por días
+    # Definir las horas fijas (basadas en el PDF original)
+    horas_fijas = [
+        "06:50 - 07:20",
+        "07:20 - 08:00",
+        "08:15 - 08:55",
+        "08:55 - 09:30",
+        "09:30 - 10:00",
+        "10:00 - 10:45",
+        "10:45 - 11:20",
+        "11:20 - 12:10",
+        "12:10 - 12:50",
+        "12:50 - 13:30",
+        "13:30 - 14:00",
+        "14:00 - 14:25"
+    ]
+    
+    # Días
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
     
-    horario_por_dia = {}
-    for dia in dias.values():
-        horario_por_dia[dia] = []
+    # Crear estructura de horario con horas fijas
+    horario_completo = {}
+    for hora in horas_fijas:
+        horario_completo[hora] = {}
+        for dia in dias.values():
+            horario_completo[hora][dia] = None
     
+    # Llenar con los horarios existentes
     for clase in horarios:
+        hora_inicio = clase.get('hora_inicio', '')[:5] if clase.get('hora_inicio') else ''
+        hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
+        hora_key = f"{hora_inicio} - {hora_fin}"
+        
+        # Buscar la hora fija más cercana
+        hora_encontrada = None
+        for h in horas_fijas:
+            if h.startswith(hora_inicio):
+                hora_encontrada = h
+                break
+        
+        if not hora_encontrada:
+            # Si no coincide exactamente, usar la hora exacta
+            hora_encontrada = hora_key
+        
         dia = dias.get(clase.get('dia_semana'), "Lunes")
-        horario_por_dia[dia].append({
-            "hora_inicio": clase.get('hora_inicio', '')[:5] if clase.get('hora_inicio') else '',
-            "hora_fin": clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else '',
+        
+        horario_completo[hora_encontrada][dia] = {
             "asignatura": clase.get('asignatura', '?'),
             "curso": clase.get('curso'),
             "salon": clase.get('salon', 'N/A')
-        })
+        }
     
-    # Mostrar tabla
+    # Mostrar tabla con horas fijas
+    st.markdown("---")
+    
+    # Cabecera de días
     cols = st.columns(len(dias))
     for idx, dia in enumerate(dias.values()):
         with cols[idx]:
             st.markdown(f"**{dia}**")
     
-    max_clases = max([len(horario_por_dia[dia]) for dia in dias.values()]) if horarios else 0
-    
-    for fila in range(max_clases):
+    # Mostrar cada hora
+    for hora in horas_fijas:
         cols = st.columns(len(dias))
+        
+        # Columna de hora
+        with cols[0]:
+            st.write(f"**{hora}**")
+        
+        # Columnas de días
         for idx, dia in enumerate(dias.values()):
             with cols[idx]:
-                if fila < len(horario_por_dia[dia]):
-                    clase = horario_por_dia[dia][fila]
-                    st.write(f"**{clase['hora_inicio']} - {clase['hora_fin']}**")
-                    st.write(f"{clase['asignatura']} ({clase['curso']})")
+                clase = horario_completo[hora].get(dia)
+                if clase:
+                    st.write(f"**{clase['asignatura']}**")
+                    st.write(f"({clase['curso']})")
                     st.caption(f"📌 {clase['salon']}")
                 else:
                     st.write("")
                     st.write("")
                     st.write("")
+    
+    st.markdown("---")
     
     st.markdown("---")
