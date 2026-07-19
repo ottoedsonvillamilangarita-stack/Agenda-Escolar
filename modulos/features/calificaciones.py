@@ -131,9 +131,22 @@ def mostrar_ingreso_notas(data):
     
     if not tipos_nota:
         st.warning(f"No hay tipos de nota configurados para este período y corte")
-        if st.button("Ir a Configurar"):
-            st.session_state.menu_docente = "⚙️ Configurar Notas"
-            st.rerun()
+        # Botón para ir a configuración de notas (siempre visible)
+if st.button("⚙️ Configurar Notas", type="primary"):
+    # Mostrar la configuración directamente aquí
+    st.session_state.mostrar_configuracion = not st.session_state.get('mostrar_configuracion', False)
+
+# Si el usuario activó la configuración, mostrarla
+if st.session_state.get('mostrar_configuracion', False):
+    st.divider()
+    st.subheader("⚙️ Configuración de Notas")
+    
+    # Aquí va el código de configuración de notas
+    mostrar_configuracion_notas(data)
+    
+    if st.button("🔙 Volver a Ingresar Notas"):
+        st.session_state.mostrar_configuracion = False
+        st.rerun()
         return
     
     # Obtener estudiantes
