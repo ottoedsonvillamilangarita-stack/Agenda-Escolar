@@ -387,7 +387,7 @@ def mostrar_horario_tabla(curso, headers):
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers):
-    """Muestra el horario del docente en tabla HTML con dos renglones por celda"""
+    """Muestra el horario del docente en tabla con st.columns"""
     
     # 1. Obtener las asignaciones del docente
     url_asignacion = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}"
@@ -430,7 +430,7 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horas configuradas para este nivel")
         return
     
-    # Crear lista de horas en formato "HH:MM - HH:MM"
+    # Crear lista de horas
     horas_fijas = []
     for h in horas_nivel:
         hora_inicio = str(h['hora_inicio'])[:5]
@@ -461,7 +461,6 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
         hora_key = f"{hora_inicio} - {hora_fin}"
         
-        # Buscar la hora fija que coincide
         hora_encontrada = None
         for h in horas_fijas:
             if h.startswith(hora_inicio):
@@ -477,10 +476,10 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             }
     
     # =============================================
-    # MOSTRAR HORARIO EN TABLA HTML
+    # MOSTRAR TABLA CON st.columns
     # =============================================
     
-    # Identificar qué horas tienen al menos una clase
+    # Identificar horas con clase
     horas_con_clase = set()
     for hora in horas_fijas:
         for dia in dias.values():
@@ -488,108 +487,93 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
                 horas_con_clase.add(hora)
                 break
     
-    # Filtrar horas sin clase
     horas_filtradas = [h for h in horas_fijas if h in horas_con_clase]
     
     if not horas_filtradas:
         st.info("No hay horarios con clase para este docente")
         return
     
-    # CSS para la tabla
+    # CSS para estilos
     st.markdown("""
     <style>
-        .horario-table {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            border-collapse: collapse;
-            width: 100%;
-            font-size: 10px;
-        }
-        .horario-table th {
-            background-color: #1a237e;
-            color: white;
-            padding: 6px 4px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 10px;
-            border: 1px solid #0d1442;
-        }
-        .horario-table td {
+        .horario-celda {
             border: 1px solid #ddd;
-            padding: 4px 3px;
+            padding: 4px 2px;
             text-align: center;
-            vertical-align: middle;
-            min-height: 42px;
-            height: 42px;
-        }
-        .horario-table .hora-col {
-            background-color: #f5f5f5;
-            font-weight: 600;
+            min-height: 45px;
+            height: 45px;
+            background-color: white;
+            border-radius: 2px;
             font-size: 9px;
-            white-space: nowrap;
-            min-width: 60px;
-            width: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
-        .horario-table .asignatura {
+        .horario-celda.vacia {
+            background-color: #f9f9f9;
+        }
+        .horario-celda .asignatura {
             font-weight: 500;
             font-size: 10px;
-            line-height: 1.3;
-            display: block;
+            line-height: 1.2;
         }
-        .horario-table .curso {
+        .horario-celda .curso {
             font-size: 8px;
             color: #555;
-            display: block;
-            margin-top: 1px;
+            line-height: 1.2;
         }
-        .horario-table .salon {
+        .horario-celda .salon {
             font-size: 7px;
             color: #999;
-            display: block;
         }
-        .horario-table .vacio {
-            background-color: #fafafa;
-            min-height: 42px;
-            height: 42px;
+        .horario-header {
+            background-color: #1a237e;
+            color: white;
+            padding: 6px 2px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 10px;
+            border-radius: 2px;
         }
-        .horario-table .celda-clase {
-            background-color: #ffffff;
-            min-height: 42px;
-            height: 42px;
-            padding: 2px 3px;
+        .horario-hora {
+            background-color: #f5f5f5;
+            padding: 6px 2px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 9px;
+            border-radius: 2px;
+            border: 1px solid #ddd;
         }
     </style>
     """, unsafe_allow_html=True)
     
-    # Construir la tabla HTML
-    html = '<table class="horario-table">'
+    # Cabecera: Hora + Días
+    cols = st.columns(len(dias) + 1)
+    with cols[0]:
+        st.markdown('<div class="horario-header">Hora</div>', unsafe_allow_html=True)
+    for idx, dia in enumerate(dias.values()):
+        with cols[idx + 1]:
+            st.markdown(f'<div class="horario-header">{dia[:3]}</div>', unsafe_allow_html=True)
     
-    # Cabecera
-    html += '<tr><th class="hora-col">Hora</th>'
-    for dia in dias.values():
-        html += f'<th>{dia[:3]}</th>'
-    html += '</tr>'
-    
-    # Filas (solo horas con clase)
+    # Filas
     for hora in horas_filtradas:
-        html += '<tr>'
-        html += f'<td class="hora-col">{hora}</td>'
+        cols = st.columns(len(dias) + 1)
         
-        for dia in dias.values():
-            clase = horario_completo[hora].get(dia)
-            if clase:
-                salon_html = f'<span class="salon">📌 {clase["salon"]}</span>' if clase.get('salon') else ''
-                html += f'''
-                <td class="celda-clase">
-                    <span class="asignatura">{clase["asignatura"]}</span>
-                    <span class="curso">({clase["curso"]})</span>
-                    {salon_html}
-                </td>
-                '''
-            else:
-                html += '<td class="vacio"></td>'
+        with cols[0]:
+            st.markdown(f'<div class="horario-hora">{hora}</div>', unsafe_allow_html=True)
         
-        html += '</tr>'
-    
-    html += '</table>'
-    
-    st.markdown(html, unsafe_allow_html=True)
+        for idx, dia in enumerate(dias.values()):
+            with cols[idx + 1]:
+                clase = horario_completo[hora].get(dia)
+                if clase:
+                    salon = f'<div class="salon">📌 {clase["salon"]}</div>' if clase.get('salon') else ''
+                    st.markdown(f'''
+                    <div class="horario-celda">
+                        <span class="asignatura">{clase["asignatura"]}</span>
+                        <span class="curso">({clase["curso"]})</span>
+                        {salon}
+                    </div>
+                    ''', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="horario-celda vacia"></div>', unsafe_allow_html=True)
