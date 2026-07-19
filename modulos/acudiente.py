@@ -5,6 +5,7 @@ from modulos.features.calificaciones import mostrar_notas_acudiente
 from modulos.features.asistencia import mostrar_asistencia_acudiente
 from modulos.features.horarios import mostrar_horario_unificado
 
+
 def mostrar(data):
     st.title("👨‍👩‍👧 Panel del Acudiente")
     
