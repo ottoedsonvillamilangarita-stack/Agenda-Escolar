@@ -56,6 +56,7 @@ def mostrar(data):
         [
             "📚 Mis Cursos",
             "📝 Ingresar Notas",
+            "⚙️ Configurar Notas",
             "📋 Asistencia",
             "📊 Reportes",
             "🤝 Convivencia",
