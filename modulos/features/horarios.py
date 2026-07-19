@@ -403,20 +403,20 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horario configurado para este docente")
         return
     
-    # Definir todas las horas posibles (de 6:50 a 14:45)
+        # Definir todas las horas posibles (basadas en el PDF)
     horas_fijas = [
-        "06:50 - 07:20",
-        "07:20 - 08:00",
-        "08:15 - 08:55",
-        "08:55 - 09:30",
-        "09:30 - 10:00",
-        "10:00 - 10:45",
-        "10:45 - 11:20",
-        "11:20 - 12:10",
-        "12:10 - 12:50",
-        "12:50 - 13:30",
-        "13:30 - 14:00",
-        "14:00 - 14:25"
+        "06:50 - 07:25",
+        "07:25 - 08:05",
+        "08:05 - 08:40",
+        "08:40 - 09:20",
+        "09:20 - 10:00",
+        "10:00 - 10:35",
+        "10:35 - 11:15",
+        "11:15 - 12:00",
+        "12:00 - 12:45",
+        "12:45 - 13:30",
+        "13:30 - 14:05",
+        "14:05 - 14:45"
     ]
     
     # Días
