@@ -493,18 +493,18 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
         st.info("No hay horarios con clase para este docente")
         return
     
-    # CSS para estilos
+    # CSS para estilos (con letra más grande)
     st.markdown("""
     <style>
         .horario-celda {
             border: 1px solid #ddd;
-            padding: 4px 2px;
+            padding: 6px 4px;
             text-align: center;
-            min-height: 45px;
-            height: 45px;
+            min-height: 55px;
+            height: 55px;
             background-color: white;
-            border-radius: 2px;
-            font-size: 9px;
+            border-radius: 4px;
+            font-size: 11px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -514,36 +514,38 @@ def mostrar_horario_docente_tabla(documento_docente, headers):
             background-color: #f9f9f9;
         }
         .horario-celda .asignatura {
-            font-weight: 500;
-            font-size: 10px;
-            line-height: 1.2;
+            font-weight: 600;
+            font-size: 12px;
+            line-height: 1.3;
+            color: #1a237e;
         }
         .horario-celda .curso {
-            font-size: 8px;
-            color: #555;
-            line-height: 1.2;
+            font-size: 10px;
+            color: #444;
+            line-height: 1.3;
         }
         .horario-celda .salon {
-            font-size: 7px;
-            color: #999;
+            font-size: 9px;
+            color: #777;
         }
         .horario-header {
             background-color: #1a237e;
             color: white;
-            padding: 6px 2px;
+            padding: 8px 4px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+        .horario-hora {
+            background-color: #f0f0f0;
+            padding: 8px 4px;
             text-align: center;
             font-weight: 600;
             font-size: 10px;
-            border-radius: 2px;
-        }
-        .horario-hora {
-            background-color: #f5f5f5;
-            padding: 6px 2px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 9px;
-            border-radius: 2px;
+            border-radius: 4px;
             border: 1px solid #ddd;
+            color: #333;
         }
     </style>
     """, unsafe_allow_html=True)
