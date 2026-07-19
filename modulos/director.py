@@ -19,7 +19,7 @@ def mostrar(data):
     # 1. BUSCAR CURSO QUE DIRIGE
     # =============================================
     # Usar el texto exacto: 'DIRECCION DE CURSO' (mayúsculas)
-    url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=eq.DIRECCION DE CURSO"
+    url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?documento_docente=eq.{documento_docente}&asignatura=ilike.%direccion%"
     response = requests.get(url, headers=headers)
     
     if response.status_code != 200:
