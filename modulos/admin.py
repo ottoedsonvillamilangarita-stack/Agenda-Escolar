@@ -960,18 +960,17 @@ def gestion_directores_grupo(headers):
     docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
     opciones_docentes = [""] + list(docentes_dict.keys())
     
-    # 3. Obtener directores desde asignacion_academica
+    # 3. Obtener directores actuales desde asignacion_academica
     response_asignaciones = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers)
+    asignaciones = response_asignaciones.json() if response_asignaciones.status_code == 200 else []
     
     directores_por_curso = {}
-    if response_asignaciones.status_code == 200:
-        asignaciones = response_asignaciones.json()
-        for a in asignaciones:
-            if a.get('asignatura') == 'Dirección de Curso':
-                curso = a.get('curso')
-                docente_documento = a.get('documento_docente')
-                if curso and docente_documento:
-                    directores_por_curso[curso] = docente_documento
+    for a in asignaciones:
+        if a.get('asignatura') == 'DIRECCION DE CURSO' or a.get('asignatura') == 'Dirección de Curso':
+            curso = a.get('curso')
+            docente = a.get('documento_docente')
+            if curso:
+                directores_por_curso[curso] = docente
     
     # 4. Mostrar tabla
     st.write("### 📋 Directores por curso")
@@ -992,7 +991,7 @@ def gestion_directores_grupo(headers):
     
     st.divider()
     
-    # 5. Asignar director
+    # 5. Asignar/Editar director
     st.write("### ✏️ Asignar director de grupo")
     
     col1, col2 = st.columns(2)
@@ -1017,60 +1016,175 @@ def gestion_directores_grupo(headers):
             key=f"director_docente_edit_{curso_seleccionado}"
         )
     
-    if st.button("💾 Asignar director", type="primary", key="btn_asignar_director"):
-        if not docente_seleccionado:
-            st.error("❌ Selecciona un docente")
-        else:
-            data_director = {
-                "curso": curso_seleccionado,
-                "asignatura": "Dirección de Curso",
-                "documento_docente": docente_seleccionado,
-                "anio": 2025
-            }
-            
-            check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.Dirección de Curso"
+    col_btn1, col_btn2 = st.columns(2)
+    
+    with col_btn1:
+        if st.button("💾 Asignar director", type="primary", key="btn_asignar_director"):
+            if not docente_seleccionado:
+                st.error("❌ Selecciona un docente")
+            else:
+                # 1. ACTUALIZAR asignacion_academica
+                data_director = {
+                    "curso": curso_seleccionado,
+                    "asignatura": "DIRECCION DE CURSO",
+                    "documento_docente": docente_seleccionado,
+                    "anio": 2025
+                }
+                
+                check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.DIRECCION DE CURSO"
+                check_resp = requests.get(check_url, headers=headers)
+                
+                if check_resp.status_code == 200 and check_resp.json():
+                    dir_id = check_resp.json()[0]['id']
+                    r = requests.patch(
+                        f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{dir_id}",
+                        headers=headers,
+                        json=data_director
+                    )
+                else:
+                    r = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/asignacion_academica",
+                        headers=headers,
+                        json=data_director
+                    )
+                
+                if r.status_code not in [200, 201, 204]:
+                    st.error(f"❌ Error al asignar director: {r.status_code}")
+                    st.code(r.text)
+                    return
+                
+                # 2. ACTUALIZAR usuarios_login (roles)
+                # Agregar rol director_grupo al docente
+                username = None
+                for d in docentes:
+                    if d['documento_docente'] == docente_seleccionado:
+                        user_resp = requests.get(
+                            f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{docente_seleccionado}",
+                            headers=headers
+                        )
+                        if user_resp.status_code == 200 and user_resp.json():
+                            username = user_resp.json()[0].get('username')
+                        break
+                
+                if username:
+                    # Agregar rol director_grupo
+                    requests.patch(
+                        f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{username}",
+                        headers=headers,
+                        json={"roles": f'{{"docente","director_grupo"}}'}  # Simplificado
+                    )
+                    # O mejor, consultar roles actuales y agregar
+                    user_check = requests.get(
+                        f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{username}",
+                        headers=headers
+                    )
+                    if user_check.status_code == 200 and user_check.json():
+                        roles_actuales = user_check.json()[0].get('roles', [])
+                        if 'director_grupo' not in roles_actuales:
+                            roles_actuales.append('director_grupo')
+                            requests.patch(
+                                f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{username}",
+                                headers=headers,
+                                json={"roles": roles_actuales}
+                            )
+                
+                # 3. Si había un director anterior, quitarle el rol
+                if documento_actual and documento_actual != docente_seleccionado:
+                    old_username = None
+                    for d in docentes:
+                        if d['documento_docente'] == documento_actual:
+                            user_resp = requests.get(
+                                f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_actual}",
+                                headers=headers
+                            )
+                            if user_resp.status_code == 200 and user_resp.json():
+                                old_username = user_resp.json()[0].get('username')
+                            break
+                    
+                    if old_username:
+                        # Verificar si tiene otras direcciones
+                        otras_dir = [
+                            a for a in asignaciones 
+                            if a.get('documento_docente') == documento_actual 
+                            and a.get('asignatura') in ['DIRECCION DE CURSO', 'Dirección de Curso']
+                            and a.get('curso') != curso_seleccionado
+                        ]
+                        if not otras_dir:
+                            # Quitar rol director_grupo
+                            user_check = requests.get(
+                                f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{old_username}",
+                                headers=headers
+                            )
+                            if user_check.status_code == 200 and user_check.json():
+                                roles_actuales = user_check.json()[0].get('roles', [])
+                                if 'director_grupo' in roles_actuales:
+                                    roles_actuales.remove('director_grupo')
+                                    requests.patch(
+                                        f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{old_username}",
+                                        headers=headers,
+                                        json={"roles": roles_actuales}
+                                    )
+                
+                st.success(f"✅ Director asignado para {curso_seleccionado}")
+                st.rerun()
+    
+    with col_btn2:
+        if st.button("🗑️ Eliminar director", type="secondary", key="btn_eliminar_director"):
+            # 1. ELIMINAR de asignacion_academica
+            check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.DIRECCION DE CURSO"
             check_resp = requests.get(check_url, headers=headers)
             
             if check_resp.status_code == 200 and check_resp.json():
                 dir_id = check_resp.json()[0]['id']
-                r = requests.patch(
+                r = requests.delete(
                     f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{dir_id}",
-                    headers=headers,
-                    json=data_director
+                    headers=headers
                 )
-            else:
-                r = requests.post(
-                    f"{SUPABASE_URL}/rest/v1/asignacion_academica",
-                    headers=headers,
-                    json=data_director
-                )
-            
-            if r.status_code in [200, 201, 204]:
-                st.success(f"✅ Director asignado para {curso_seleccionado}")
-                st.rerun()
-            else:
-                st.error(f"❌ Error: {r.status_code}")
-                st.code(r.text)
-    
-    # 6. Eliminar director
-    if st.button("🗑️ Eliminar director", type="secondary", key="btn_eliminar_director"):
-        check_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=eq.Dirección de Curso"
-        check_resp = requests.get(check_url, headers=headers)
-        
-        if check_resp.status_code == 200 and check_resp.json():
-            dir_id = check_resp.json()[0]['id']
-            r = requests.delete(
-                f"{SUPABASE_URL}/rest/v1/asignacion_academica?id=eq.{dir_id}",
-                headers=headers
-            )
-            if r.status_code == 204:
+                if r.status_code != 204:
+                    st.error(f"❌ Error al eliminar director: {r.status_code}")
+                    return
+                
+                # 2. QUITAR ROL director_grupo de usuarios_login
+                if documento_actual:
+                    old_username = None
+                    for d in docentes:
+                        if d['documento_docente'] == documento_actual:
+                            user_resp = requests.get(
+                                f"{SUPABASE_URL}/rest/v1/usuarios_login?documento=eq.{documento_actual}",
+                                headers=headers
+                            )
+                            if user_resp.status_code == 200 and user_resp.json():
+                                old_username = user_resp.json()[0].get('username')
+                            break
+                    
+                    if old_username:
+                        # Verificar si tiene otras direcciones
+                        otras_dir = [
+                            a for a in asignaciones 
+                            if a.get('documento_docente') == documento_actual 
+                            and a.get('asignatura') in ['DIRECCION DE CURSO', 'Dirección de Curso']
+                            and a.get('curso') != curso_seleccionado
+                        ]
+                        if not otras_dir:
+                            # Quitar rol director_grupo
+                            user_check = requests.get(
+                                f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{old_username}",
+                                headers=headers
+                            )
+                            if user_check.status_code == 200 and user_check.json():
+                                roles_actuales = user_check.json()[0].get('roles', [])
+                                if 'director_grupo' in roles_actuales:
+                                    roles_actuales.remove('director_grupo')
+                                    requests.patch(
+                                        f"{SUPABASE_URL}/rest/v1/usuarios_login?username=eq.{old_username}",
+                                        headers=headers,
+                                        json={"roles": roles_actuales}
+                                    )
+                
                 st.success(f"✅ Director eliminado para {curso_seleccionado}")
                 st.rerun()
             else:
-                st.error(f"❌ Error: {r.status_code}")
-        else:
-            st.warning("⚠️ No hay director asignado para este curso")
-            
+                st.warning("⚠️ No hay director asignado para este curso")            
 # ============================================
 # FUNCIÓN 13: MOSTRAR ASIGNACIÓN
 # ============================================
