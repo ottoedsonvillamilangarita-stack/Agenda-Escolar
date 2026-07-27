@@ -1,9 +1,4 @@
-from . import login
-from . import estudiante
-from . import docente
-from . import acudiente
-from . import director
-from . import coordinador
-from . import secretaria
-from . import supervisor
-from . import admin
+# modulos/__init__.py
+from .paneles import admin, docente, estudiante, acudiente, director, coordinador, secretaria, supervisor
+from .compartido import auth
+from .features import horarios, mensajeria
