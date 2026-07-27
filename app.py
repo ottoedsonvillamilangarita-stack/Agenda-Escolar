@@ -1,8 +1,9 @@
 import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
-from modulos import login, estudiante, docente, acudiente, director, coordinador, secretaria, supervisor, admin
-from modulos.mobile_utils import es_movil, aplicar_css_movil
+# app.py
+from modulos.paneles import admin, docente, estudiante, acudiente, director, coordinador, secretaria, supervisor
+from modulos.compartido import auth as login
 
 # Configuración según dispositivo
 ES_MOVIL = es_movil()
