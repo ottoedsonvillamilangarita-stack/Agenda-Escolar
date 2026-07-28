@@ -2,8 +2,8 @@ import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
 from modulos.paneles import admin, docente, estudiante, acudiente, director, coordinador, secretaria, supervisor
-from modulos.compartido import auth as login
-from modulos.compartido.mobile_utils import es_movil, aplicar_css_movil 
+from modulos.shared import auth as login
+from modulos.shared.mobile_utils import es_movil, aplicar_css_movil 
 # app.py
 # app.py
 import modulos.paneles.admin as admin
@@ -14,7 +14,7 @@ import modulos.paneles.director as director
 import modulos.paneles.coordinador as coordinador
 import modulos.paneles.secretaria as secretaria
 import modulos.paneles.supervisor as supervisor
-from modulos.compartido import auth as login
+from modulos.shared import auth as login
 
 # Configuración según dispositivo
 ES_MOVIL = es_movil()
@@ -110,3 +110,5 @@ else:
         if st.button("Volver a login"):
             st.session_state.logged_in = False
             st.rerun()
+
+
