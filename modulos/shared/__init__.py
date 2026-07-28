@@ -1,2 +1,2 @@
-# modulos/compartido/__init__.py
-from . import auth
+# modulos/features/__init__.py
+# (vacío por ahora, o con importaciones futuras)
