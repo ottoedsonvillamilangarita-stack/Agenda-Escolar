@@ -2,7 +2,15 @@ import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
 # app.py
-from modulos.paneles import admin, docente, estudiante, acudiente, director, coordinador, secretaria, supervisor
+# app.py
+import modulos.paneles.admin as admin
+import modulos.paneles.docente as docente
+import modulos.paneles.estudiante as estudiante
+import modulos.paneles.acudiente as acudiente
+import modulos.paneles.director as director
+import modulos.paneles.coordinador as coordinador
+import modulos.paneles.secretaria as secretaria
+import modulos.paneles.supervisor as supervisor
 from modulos.compartido import auth as login
 
 # Configuración según dispositivo
