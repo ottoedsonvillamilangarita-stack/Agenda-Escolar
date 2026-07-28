@@ -6,8 +6,7 @@ from modulos.features.calificaciones import mostrar_configuracion_notas, mostrar
 from modulos.features.asistencia import mostrar_asistencia_docente
 from modulos.features.reportes import mostrar_reportes_docente
 from modulos.features.horarios import mostrar_horario_docente_tabla
-from modulos import mensajeria
-
+from modulos.compartido import mensajeria
 
 def mostrar(data):
     st.title("👨‍🏫 Panel del Docente")
