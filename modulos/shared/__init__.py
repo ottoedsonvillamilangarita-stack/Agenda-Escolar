@@ -1,2 +1,3 @@
-# modulos/features/__init__.py
-# (vacío por ahora, o con importaciones futuras)
+# modulos/shared/__init__.py
+from . import mensajeria
+from . import auth
