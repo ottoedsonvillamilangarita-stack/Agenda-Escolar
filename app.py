@@ -71,9 +71,12 @@ else:
                 st.rerun()
            st.sidebar.write("---")
     if st.sidebar.button("Cerrar sesión", use_container_width=True):
+           if st.sidebar.button("Cerrar sesión", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
     
+    # Redirección por rol (CONVERSIÓN DE NOMBRES)
+    ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor', 'admin']
     # Redirección por rol (CONVERSIÓN DE NOMBRES)
     ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor', 'admin']
     
