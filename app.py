@@ -38,40 +38,18 @@ else:
         if st.session_state.get('rol_actual') not in st.session_state.user_data['roles']:
             st.session_state.rol_actual = st.session_state.user_data['roles'][0] if st.session_state.user_data['roles'] else ''
     
-    # Barra lateral
-    st.sidebar.title("📚 Plataforma Escolar")
-    st.sidebar.write(f"👤 {st.session_state.usuario}")
-    
-    user_roles = st.session_state.user_data.get('roles', [])
-    user_roles = [r for r in user_roles if r]
-    
+    # =============================================
+    # MENÚ DEL ADMINISTRADOR (ANTES DE REDIRIGIR)
+    # =============================================
     rol_actual = st.session_state.get('rol_actual', st.session_state.user_data.get('rol'))
     
-    if len(user_roles) > 1:
-        st.sidebar.write("---")
-        st.sidebar.write("🔄 **Cambiar perfil:**")
-        for rol in user_roles:
-            nombre_mostrar = rol.replace('_grupo', '')
-            if st.sidebar.button(f"🔁 {nombre_mostrar.upper()}", key=f"cambiar_{rol}", 
-                                 disabled=(rol == rol_actual),
-                                 use_container_width=True):
-                st.session_state.rol_actual = rol
-                st.rerun()
-        st.sidebar.write("---")
-        st.sidebar.write(f"**Perfil actual:** {rol_actual.replace('_grupo', '').upper()}")
-    else:
-        st.sidebar.write(f"📌 Rol: {rol_actual.replace('_grupo', '').upper()}")
-    
-    st.sidebar.write("---")
-    if st.sidebar.button("Cerrar sesión", use_container_width=True):
-        st.session_state.logged_in = False
-        st.rerun()
-    
-    # =============================================
-    # MENÚ ESPECÍFICO PARA ADMINISTRADOR
-    # =============================================
+    # Mostrar el menú específico para administrador
     if rol_actual == 'admin':
+        st.sidebar.title("📚 Plataforma Escolar")
+        st.sidebar.write(f"👤 {st.session_state.usuario}")
+        st.sidebar.write(f"📌 Rol: ADMIN")
         st.sidebar.markdown("---")
+        
         st.sidebar.subheader("📊 General")
         if st.sidebar.button("Dashboard", use_container_width=True):
             admin.mostrar_dashboard()
@@ -113,37 +91,68 @@ else:
         st.sidebar.subheader("📊 Reportes")
         if st.sidebar.button("Reportes Académicos", use_container_width=True):
             admin.reportes_academicos()
-    
-    # =============================================
-    # Redirección por rol (CONVERSIÓN DE NOMBRES)
-    # =============================================
-    ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor', 'admin']
-    
-    # Convertir director_grupo a director para el módulo
-    if rol_actual == 'director_grupo':
-        rol_actual = 'director'
-        st.session_state.rol_actual = 'director'
-    
-    if rol_actual in ROLES_VALIDOS:
-        if rol_actual == 'estudiante':
-            estudiante.mostrar(st.session_state.user_data)
-        elif rol_actual == 'docente':
-            docente.mostrar(st.session_state.user_data)
-        elif rol_actual == 'acudiente':
-            acudiente.mostrar(st.session_state.user_data)
-        elif rol_actual == 'director':
-            director.mostrar(st.session_state.user_data)
-        elif rol_actual == 'coordinador':
-            coordinador.mostrar(st.session_state.user_data)
-        elif rol_actual == 'secretaria':
-            secretaria.mostrar(st.session_state.user_data)
-        elif rol_actual == 'supervisor':
-            supervisor.mostrar(st.session_state.user_data)
-        elif rol_actual == 'admin':
-            admin.mostrar(st.session_state.user_data)
-    else:
-        st.error(f"⚠️ Rol no reconocido: {rol_actual}")
-        st.info("📌 Roles disponibles: " + ", ".join(ROLES_VALIDOS))
-        if st.button("Volver a login"):
+        
+        st.sidebar.markdown("---")
+        if st.sidebar.button("Cerrar sesión", use_container_width=True):
             st.session_state.logged_in = False
             st.rerun()
+        
+        # Mostrar el panel del administrador (sin redirigir)
+        admin.mostrar(st.session_state.user_data)
+    
+    # =============================================
+    # MENÚ PARA OTROS ROLES
+    # =============================================
+    else:
+        st.sidebar.title("📚 Plataforma Escolar")
+        st.sidebar.write(f"👤 {st.session_state.usuario}")
+        
+        user_roles = st.session_state.user_data.get('roles', [])
+        user_roles = [r for r in user_roles if r]
+        
+        if len(user_roles) > 1:
+            st.sidebar.write("---")
+            st.sidebar.write("🔄 **Cambiar perfil:**")
+            for rol in user_roles:
+                nombre_mostrar = rol.replace('_grupo', '')
+                if st.sidebar.button(f"🔁 {nombre_mostrar.upper()}", key=f"cambiar_{rol}", 
+                                     disabled=(rol == rol_actual),
+                                     use_container_width=True):
+                    st.session_state.rol_actual = rol
+                    st.rerun()
+            st.sidebar.write("---")
+            st.sidebar.write(f"**Perfil actual:** {rol_actual.replace('_grupo', '').upper()}")
+        else:
+            st.sidebar.write(f"📌 Rol: {rol_actual.replace('_grupo', '').upper()}")
+        
+        st.sidebar.write("---")
+        if st.sidebar.button("Cerrar sesión", use_container_width=True):
+            st.session_state.logged_in = False
+            st.rerun()
+        
+        # =============================================
+        # REDIRECCIÓN POR ROL (PARA NO ADMINISTRADORES)
+        # =============================================
+        ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor']
+        
+        if rol_actual in ROLES_VALIDOS:
+            if rol_actual == 'estudiante':
+                estudiante.mostrar(st.session_state.user_data)
+            elif rol_actual == 'docente':
+                docente.mostrar(st.session_state.user_data)
+            elif rol_actual == 'acudiente':
+                acudiente.mostrar(st.session_state.user_data)
+            elif rol_actual == 'director':
+                director.mostrar(st.session_state.user_data)
+            elif rol_actual == 'coordinador':
+                coordinador.mostrar(st.session_state.user_data)
+            elif rol_actual == 'secretaria':
+                secretaria.mostrar(st.session_state.user_data)
+            elif rol_actual == 'supervisor':
+                supervisor.mostrar(st.session_state.user_data)
+        else:
+            st.error(f"⚠️ Rol no reconocido: {rol_actual}")
+            st.info("📌 Roles disponibles: " + ", ".join(ROLES_VALIDOS))
+            if st.button("Volver a login"):
+                st.session_state.logged_in = False
+                st.rerun()
