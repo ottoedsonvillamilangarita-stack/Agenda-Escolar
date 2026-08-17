@@ -69,13 +69,42 @@ else:
                                  use_container_width=True):
                 st.session_state.rol_actual = rol
                 st.rerun()
-        st.sidebar.write("---")
-        st.sidebar.write(f"**Perfil actual:** {rol_actual.replace('_grupo', '').upper()}")
-    else:
-        st.sidebar.write(f"📌 Rol: {rol_actual.replace('_grupo', '').upper()}")
-    
-    st.sidebar.write("---")
+           st.sidebar.write("---")
     if st.sidebar.button("Cerrar sesión", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
+    
+    # Redirección por rol (CONVERSIÓN DE NOMBRES)
+    ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor', 'admin']
+    
+    # Convertir director_grupo a director para el módulo
+    if rol_actual == 'director_grupo':
+        rol_actual = 'director'
+        st.session_state.rol_actual = 'director'
+    
+    if rol_actual in ROLES_VALIDOS:
+        if rol_actual == 'estudiante':
+            estudiante.mostrar(st.session_state.user_data)
+        elif rol_actual == 'docente':
+            docente.mostrar(st.session_state.user_data)
+        elif rol_actual == 'acudiente':
+            acudiente.mostrar(st.session_state.user_data)
+        elif rol_actual == 'director':
+            director.mostrar(st.session_state.user_data)
+        elif rol_actual == 'coordinador':
+            coordinador.mostrar(st.session_state.user_data)
+        elif rol_actual == 'secretaria':
+            secretaria.mostrar(st.session_state.user_data)
+        elif rol_actual == 'supervisor':
+            supervisor.mostrar(st.session_state.user_data)
+        elif rol_actual == 'admin':
+            admin.mostrar(st.session_state.user_data)
+    else:
+        st.error(f"⚠️ Rol no reconocido: {rol_actual}")
+        st.info("📌 Roles disponibles: " + ", ".join(ROLES_VALIDOS))
+        if st.button("Volver a login"):
+            st.session_state.logged_in = False
+            st.rerun()
         st.session_state.logged_in = False
         st.rerun()
     
