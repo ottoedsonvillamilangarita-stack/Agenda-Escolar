@@ -3,18 +3,7 @@ import requests
 from utils import SUPABASE_URL, get_headers
 from modulos.paneles import admin, docente, estudiante, acudiente, director, coordinador, secretaria, supervisor
 from modulos.shared import auth as login
-from modulos.shared.mobile_utils import es_movil, aplicar_css_movil 
-# app.py
-# app.py
-import modulos.paneles.admin as admin
-import modulos.paneles.docente as docente
-import modulos.paneles.estudiante as estudiante
-import modulos.paneles.acudiente as acudiente
-import modulos.paneles.director as director
-import modulos.paneles.coordinador as coordinador
-import modulos.paneles.secretaria as secretaria
-import modulos.paneles.supervisor as supervisor
-from modulos.shared import auth as login
+from modulos.shared.mobile_utils import es_movil, aplicar_css_movil
 
 # Configuración según dispositivo
 ES_MOVIL = es_movil()
@@ -62,17 +51,23 @@ else:
         st.sidebar.write("---")
         st.sidebar.write("🔄 **Cambiar perfil:**")
         for rol in user_roles:
-            # Mostrar el rol con un nombre más amigable
             nombre_mostrar = rol.replace('_grupo', '')
             if st.sidebar.button(f"🔁 {nombre_mostrar.upper()}", key=f"cambiar_{rol}", 
                                  disabled=(rol == rol_actual),
                                  use_container_width=True):
                 st.session_state.rol_actual = rol
                 st.rerun()
-           st.sidebar.write("---")
+        st.sidebar.write("---")
+        st.sidebar.write(f"**Perfil actual:** {rol_actual.replace('_grupo', '').upper()}")
+    else:
+        st.sidebar.write(f"📌 Rol: {rol_actual.replace('_grupo', '').upper()}")
+    
+    st.sidebar.write("---")
     if st.sidebar.button("Cerrar sesión", use_container_width=True):
-           if st.sidebar.button("Cerrar sesión", use_container_width=True):
-           # =============================================
+        st.session_state.logged_in = False
+        st.rerun()
+    
+    # =============================================
     # MENÚ ESPECÍFICO PARA ADMINISTRADOR
     # =============================================
     if rol_actual == 'admin':
@@ -119,43 +114,9 @@ else:
         if st.sidebar.button("Reportes Académicos", use_container_width=True):
             admin.reportes_academicos()
     
+    # =============================================
     # Redirección por rol (CONVERSIÓN DE NOMBRES)
-    ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor', 'admin']
-    # Redirección por rol (CONVERSIÓN DE NOMBRES)
-    ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor', 'admin']
-    
-    # Convertir director_grupo a director para el módulo
-    if rol_actual == 'director_grupo':
-        rol_actual = 'director'
-        st.session_state.rol_actual = 'director'
-    
-    if rol_actual in ROLES_VALIDOS:
-        if rol_actual == 'estudiante':
-            estudiante.mostrar(st.session_state.user_data)
-        elif rol_actual == 'docente':
-            docente.mostrar(st.session_state.user_data)
-        elif rol_actual == 'acudiente':
-            acudiente.mostrar(st.session_state.user_data)
-        elif rol_actual == 'director':
-            director.mostrar(st.session_state.user_data)
-        elif rol_actual == 'coordinador':
-            coordinador.mostrar(st.session_state.user_data)
-        elif rol_actual == 'secretaria':
-            secretaria.mostrar(st.session_state.user_data)
-        elif rol_actual == 'supervisor':
-            supervisor.mostrar(st.session_state.user_data)
-        elif rol_actual == 'admin':
-            admin.mostrar(st.session_state.user_data)
-    else:
-        st.error(f"⚠️ Rol no reconocido: {rol_actual}")
-        st.info("📌 Roles disponibles: " + ", ".join(ROLES_VALIDOS))
-        if st.button("Volver a login"):
-            st.session_state.logged_in = False
-            st.rerun()
-        st.session_state.logged_in = False
-        st.rerun()
-    
-    # Redirección por rol (CONVERSIÓN DE NOMBRES)
+    # =============================================
     ROLES_VALIDOS = ['estudiante', 'docente', 'acudiente', 'director', 'coordinador', 'secretaria', 'supervisor', 'admin']
     
     # Convertir director_grupo a director para el módulo
@@ -186,5 +147,3 @@ else:
         if st.button("Volver a login"):
             st.session_state.logged_in = False
             st.rerun()
-
-
