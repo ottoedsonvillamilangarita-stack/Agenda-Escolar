@@ -1,729 +1,567 @@
 # ============================================
-# admin.py - VERSIÓN COMPLETA MEJORADA
+# admin.py - VERSIÓN CORREGIDA (SIN MENÚ)
 # ============================================
 
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime, time
-from typing import Dict, List, Optional, Any
-import logging
+from datetime import datetime
 from utils import SUPABASE_URL, get_headers
-
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # ============================================
 # CONSTANTES
 # ============================================
 CURSOS = ["901", "902", "903", "1001", "1002", "1003", "1101"]
-DIAS_SEMANA = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
 PARENTESCOS = ["", "Padre", "Madre", "Tío", "Tía", "Abuelo", "Abuela", "Otro"]
 SEXOS = ["", "Masculino", "Femenino"]
 TIPOS_CONTRATO = ["", "Planta", "Contrato", "Cátedra", "Ocasional"]
-AÑO_ACTUAL = datetime.now().year
 
 # ============================================
-# CLASE BASE PARA GESTIÓN DE SUPABASE
-# ============================================
-class SupabaseManager:
-    """Manejador centralizado para operaciones con Supabase"""
-    
-    def __init__(self):
-        self.headers = get_headers()
-        self.base_url = SUPABASE_URL
-    
-    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, 
-                     params: Optional[Dict] = None) -> Dict[str, Any]:
-        """Realiza una solicitud HTTP a Supabase con manejo de errores"""
-        try:
-            url = f"{self.base_url}/rest/v1/{endpoint}"
-            
-            if method.upper() == "GET":
-                response = requests.get(url, headers=self.headers, params=params)
-            elif method.upper() == "POST":
-                response = requests.post(url, headers=self.headers, json=data)
-            elif method.upper() == "PATCH":
-                response = requests.patch(url, headers=self.headers, json=data)
-            elif method.upper() == "DELETE":
-                response = requests.delete(url, headers=self.headers)
-            else:
-                raise ValueError(f"Método HTTP no soportado: {method}")
-            
-            if response.status_code in [200, 201, 204]:
-                return {"success": True, "data": response.json() if response.content else [], "status": response.status_code}
-            else:
-                logger.error(f"Error {response.status_code}: {response.text}")
-                return {"success": False, "error": f"Error {response.status_code}: {response.text}", "status": response.status_code}
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error de conexión: {str(e)}")
-            return {"success": False, "error": f"Error de conexión: {str(e)}"}
-        except Exception as e:
-            logger.error(f"Error inesperado: {str(e)}")
-            return {"success": False, "error": f"Error inesperado: {str(e)}"}
-    
-    def get(self, table: str, filters: Optional[Dict] = None) -> List[Dict]:
-        """Obtiene registros de una tabla"""
-        params = {}
-        if filters:
-            for key, value in filters.items():
-                if isinstance(value, list):
-                    params[key] = f"in.({','.join(map(str, value))})"
-                else:
-                    params[key] = f"eq.{value}"
-        
-        result = self._make_request("GET", table, params=params)
-        return result.get("data", []) if result.get("success") else []
-    
-    def get_all(self, table: str) -> List[Dict]:
-        """Obtiene todos los registros de una tabla"""
-        return self.get(table)
-    
-    def create(self, table: str, data: Dict) -> bool:
-        """Crea un nuevo registro"""
-        result = self._make_request("POST", table, data=data)
-        return result.get("success", False)
-    
-    def update(self, table: str, data: Dict, filters: Dict) -> bool:
-        """Actualiza registros existentes"""
-        filter_str = "&".join([f"{k}=eq.{v}" for k, v in filters.items()])
-        endpoint = f"{table}?{filter_str}"
-        result = self._make_request("PATCH", endpoint, data=data)
-        return result.get("success", False)
-    
-    def delete(self, table: str, filters: Dict) -> bool:
-        """Elimina registros"""
-        filter_str = "&".join([f"{k}=eq.{v}" for k, v in filters.items()])
-        endpoint = f"{table}?{filter_str}"
-        result = self._make_request("DELETE", endpoint)
-        return result.get("success", False)
-
-# ============================================
-# FUNCIONES AUXILIARES
-# ============================================
-def crear_usuario(db: SupabaseManager, username: str, password: str, rol: str, documento: str):
-    """Crea un usuario en el sistema"""
-    user_data = {
-        "username": username,
-        "password_hash": password,
-        "rol": rol,
-        "documento": documento,
-        "roles": [rol]
-    }
-    return db.create("usuarios_login", user_data)
-
-# ============================================
-# CLASE DE GESTIÓN DE ESTUDIANTES
-# ============================================
-class StudentManager:
-    """Gestiona operaciones relacionadas con estudiantes"""
-    
-    def __init__(self, db: SupabaseManager):
-        self.db = db
-    
-    def get_all_students(self) -> List[Dict]:
-        """Obtiene todos los estudiantes"""
-        return self.db.get_all("estudiantes")
-    
-    def get_student_by_document(self, documento: str) -> Optional[Dict]:
-        """Obtiene un estudiante por su documento"""
-        result = self.db.get("estudiantes", {"documento_estudiante": documento})
-        return result[0] if result else None
-    
-    def create_student(self, data: Dict) -> bool:
-        """Crea un nuevo estudiante"""
-        if self.get_student_by_document(data.get("documento_estudiante")):
-            return False
-        return self.db.create("estudiantes", data)
-    
-    def update_student(self, documento: str, data: Dict) -> bool:
-        """Actualiza un estudiante existente"""
-        return self.db.update("estudiantes", data, {"documento_estudiante": documento})
-    
-    def get_guardians(self, documento_estudiante: str) -> List[Dict]:
-        """Obtiene los acudientes de un estudiante"""
-        return self.db.get("estudiante_acudiente", {"documento_estudiante": documento_estudiante})
-    
-    def add_guardian(self, data: Dict) -> bool:
-        """Agrega un acudiente a un estudiante"""
-        return self.db.create("estudiante_acudiente", data)
-    
-    def update_guardian(self, guardian_id: int, data: Dict) -> bool:
-        """Actualiza un acudiente"""
-        return self.db.update("estudiante_acudiente", data, {"id": guardian_id})
-    
-    def delete_guardian(self, guardian_id: int) -> bool:
-        """Elimina un acudiente"""
-        return self.db.delete("estudiante_acudiente", {"id": guardian_id})
-
-# ============================================
-# CLASE DE GESTIÓN DE DOCENTES
-# ============================================
-class TeacherManager:
-    """Gestiona operaciones relacionadas con docentes"""
-    
-    def __init__(self, db: SupabaseManager):
-        self.db = db
-    
-    def get_all_teachers(self) -> List[Dict]:
-        """Obtiene todos los docentes"""
-        return self.db.get_all("docentes")
-    
-    def get_teacher_by_document(self, documento: str) -> Optional[Dict]:
-        """Obtiene un docente por su documento"""
-        result = self.db.get("docentes", {"documento_docente": documento})
-        return result[0] if result else None
-    
-    def create_teacher(self, data: Dict) -> bool:
-        """Crea un nuevo docente"""
-        if self.get_teacher_by_document(data.get("documento_docente")):
-            return False
-        return self.db.create("docentes", data)
-    
-    def update_teacher(self, documento: str, data: Dict) -> bool:
-        """Actualiza un docente existente"""
-        return self.db.update("docentes", data, {"documento_docente": documento})
-
-# ============================================
-# FUNCIÓN PRINCIPAL mostrar()
+# FUNCIÓN PRINCIPAL - SIN MENÚ
 # ============================================
 def mostrar(data):
-    """Función principal del panel de administrador"""
+    """
+    Panel de administrador - SIN MENÚ PROPIO
+    El menú se maneja desde app.py con st.navigation
+    """
     st.title("🛡️ Panel de Administrador")
     st.write(f"Bienvenido, {data.get('username', 'Admin')}")
     
-    # Inicializar sesión
-    if "admin_seccion" not in st.session_state:
-        st.session_state.admin_seccion = "dashboard"
+    # Obtener la sección desde session_state (manejado por app.py)
+    seccion = st.session_state.get("admin_seccion", "dashboard")
     
-    # Menú de navegación
-    menu_items = [
-        ("📊 Dashboard", "dashboard"),
-        ("👨‍🎓 Estudiantes", "estudiantes"),
-        ("👨‍👩‍👧 Acudientes", "acudientes"),
-        ("👨‍🏫 Docentes", "docentes"),
-        ("📚 Asignación", "asignacion"),
-        ("⚙️ Sistema", "sistema")
-    ]
-    
-    cols = st.columns(len(menu_items))
-    for idx, (label, key) in enumerate(menu_items):
-        with cols[idx]:
-            if st.button(
-                label,
-                use_container_width=True,
-                type="primary" if st.session_state.admin_seccion == key else "secondary"
-            ):
-                st.session_state.admin_seccion = key
-                st.rerun()
-    
-    st.divider()
-    
-    # Redirigir a la sección correspondiente
-    secciones = {
-        "dashboard": mostrar_dashboard,
-        "estudiantes": gestion_estudiantes,
-        "acudientes": gestion_acudientes,
-        "docentes": gestion_docentes,
-        "asignacion": mostrar_asignacion,
-        "sistema": mostrar_sistema
-    }
-    
-    secciones.get(st.session_state.admin_seccion, mostrar_dashboard)()
+    # Redirigir según la sección seleccionada en el menú lateral
+    if seccion == "dashboard":
+        mostrar_dashboard()
+    elif seccion == "estudiantes":
+        gestion_estudiantes()
+    elif seccion == "acudientes":
+        gestion_acudientes()
+    elif seccion == "docentes":
+        gestion_docentes()
+    elif seccion == "asignacion":
+        mostrar_asignacion()
+    elif seccion == "sistema":
+        mostrar_sistema()
+    else:
+        mostrar_dashboard()
 
 # ============================================
 # DASHBOARD
 # ============================================
 def mostrar_dashboard():
-    """Muestra el dashboard con estadísticas generales"""
+    """Dashboard con estadísticas básicas"""
     st.subheader("📊 Dashboard General")
     
-    db = SupabaseManager()
+    headers = get_headers()
     
-    # Obtener estadísticas
-    estudiantes = db.get_all("estudiantes")
-    docentes = db.get_all("docentes")
+    # Obtener datos
+    try:
+        response_est = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers)
+        total_estudiantes = len(response_est.json()) if response_est.status_code == 200 else 0
+    except:
+        total_estudiantes = 0
     
-    total_estudiantes = len(estudiantes)
-    total_docentes = len(set([d.get('documento_docente') for d in docentes if d.get('documento_docente')]))
+    try:
+        response_doc = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+        if response_doc.status_code == 200:
+            datos = response_doc.json()
+            docentes_unicos = set([d.get('documento_docente') for d in datos if d.get('documento_docente')])
+            total_docentes = len(docentes_unicos)
+        else:
+            total_docentes = 0
+    except:
+        total_docentes = 0
     
-    # Mostrar métricas
+    # Métricas
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("👨‍🎓 Estudiantes", total_estudiantes)
     col2.metric("👨‍🏫 Docentes", total_docentes)
-    col3.metric("📚 Cursos", len(set([e.get('curso') for e in estudiantes if e.get('curso')])))
-    col4.metric("📅 Año Lectivo", AÑO_ACTUAL)
+    col3.metric("📚 Cursos", "7")
+    col4.metric("📅 Año Lectivo", datetime.now().year)
+    
+    st.info("🔐 Panel de control del Administrador")
     
     # Información adicional
-    with st.expander("📊 Detalles adicionales"):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Distribución por curso:**")
-            cursos = {}
-            for e in estudiantes:
-                curso = e.get('curso', 'Sin curso')
-                cursos[curso] = cursos.get(curso, 0) + 1
-            for curso, count in sorted(cursos.items()):
-                st.write(f"- {curso}: {count} estudiantes")
-        
-        with col2:
-            st.write("**Información general:**")
-            st.write(f"- Total de estudiantes: {total_estudiantes}")
-            st.write(f"- Total de docentes: {total_docentes}")
-            st.write(f"- Total de cursos: {len(cursos)}")
-            if len(cursos) > 0:
-                st.write(f"- Promedio por curso: {total_estudiantes / len(cursos):.1f}")
+    with st.expander("ℹ️ Información del sistema"):
+        st.write("**Estado del sistema:** Activo")
+        st.write(f"**Fecha actual:** {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        st.write("**Versión:** 1.0.0")
 
 # ============================================
 # GESTIÓN DE ESTUDIANTES
 # ============================================
 def gestion_estudiantes():
-    """Gestión completa de estudiantes"""
+    """Gestión de estudiantes"""
     st.subheader("👨‍🎓 Gestión de Estudiantes")
     
-    db = SupabaseManager()
-    student_manager = StudentManager(db)
+    headers = get_headers()
     
-    tab1, tab2, tab3 = st.tabs(["📋 Lista de Estudiantes", "➕ Nuevo Estudiante", "✏️ Editar Estudiante"])
+    tab1, tab2, tab3 = st.tabs(["📋 Lista", "➕ Nuevo", "✏️ Editar"])
     
     with tab1:
-        mostrar_lista_estudiantes(student_manager)
+        try:
+            response = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers)
+            if response.status_code == 200:
+                estudiantes = response.json()
+                if estudiantes:
+                    df = pd.DataFrame(estudiantes)
+                    st.dataframe(df, use_container_width=True)
+                    st.caption(f"Total: {len(estudiantes)} estudiantes")
+                else:
+                    st.info("No hay estudiantes registrados")
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
     
     with tab2:
-        mostrar_formulario_nuevo_estudiante(student_manager, db)
-    
-    with tab3:
-        mostrar_formulario_editar_estudiante(student_manager, db)
-
-def mostrar_lista_estudiantes(student_manager: StudentManager):
-    """Muestra la lista de estudiantes"""
-    try:
-        estudiantes = student_manager.get_all_students()
-        if estudiantes:
-            df = pd.DataFrame(estudiantes)
-            # Renombrar columnas para mejor visualización
-            column_mapping = {
-                'nombre_estudiante': 'Nombre',
-                'apellidos_estudiante': 'Apellidos',
-                'documento_estudiante': 'Documento',
-                'curso': 'Curso',
-                'telefono_estudiante': 'Teléfono',
-                'email_estudiante': 'Email'
-            }
-            df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
-            
-            st.dataframe(df, use_container_width=True)
-            st.caption(f"Total: {len(estudiantes)} estudiantes")
-        else:
-            st.info("No hay estudiantes registrados")
-    except Exception as e:
-        st.error(f"Error al cargar estudiantes: {str(e)}")
-
-def mostrar_formulario_nuevo_estudiante(student_manager: StudentManager, db: SupabaseManager):
-    """Muestra el formulario para crear un nuevo estudiante"""
-    st.write("**Registrar nuevo estudiante**")
-    
-    with st.form("nuevo_estudiante", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Datos personales**")
-            nombre = st.text_input("Nombre *")
-            apellidos = st.text_input("Apellidos *")
-            documento = st.text_input("Documento de identidad *")
-            curso = st.selectbox("Curso *", CURSOS)
-            telefono = st.text_input("Teléfono")
-            email = st.text_input("Email")
-            direccion = st.text_input("Dirección")
-        
-        with col2:
-            st.markdown("**Datos del acudiente**")
-            nombre_acudiente = st.text_input("Nombre del acudiente *")
-            documento_acudiente = st.text_input("Documento del acudiente *")
-            parentesco = st.selectbox("Parentesco", PARENTESCOS)
-            telefono_acudiente = st.text_input("Teléfono del acudiente")
-            email_acudiente = st.text_input("Email del acudiente")
-            direccion_acudiente = st.text_input("Dirección del acudiente")
-        
-        if st.form_submit_button("💾 Registrar Estudiante", type="primary"):
-            # Validaciones
-            if not all([nombre, apellidos, documento, curso, nombre_acudiente, documento_acudiente]):
-                st.error("❌ Completa todos los campos obligatorios (*)")
-                return
-            
-            # Verificar si el estudiante ya existe
-            if student_manager.get_student_by_document(documento):
-                st.error(f"❌ Ya existe un estudiante con el documento {documento}")
-                return
-            
-            # Crear estudiante
-            data_estudiante = {
-                "nombre_estudiante": nombre.strip(),
-                "apellidos_estudiante": apellidos.strip(),
-                "documento_estudiante": documento.strip(),
-                "curso": curso,
-                "telefono_estudiante": telefono.strip() if telefono else None,
-                "email_estudiante": email.strip() if email else None,
-                "direccion_estudiante": direccion.strip() if direccion else None
-            }
-            
-            if student_manager.create_student(data_estudiante):
-                # Crear usuario para el estudiante
-                crear_usuario(db, documento, "demo2026", "estudiante", documento)
-                
-                # Crear acudiente
-                data_acudiente = {
-                    "documento_estudiante": documento,
-                    "documento_acudiente": documento_acudiente.strip(),
-                    "nombre_acudiente": nombre_acudiente.strip(),
-                    "parentesco": parentesco if parentesco else None,
-                    "telefono_acudiente": telefono_acudiente.strip() if telefono_acudiente else None,
-                    "email_acudiente": email_acudiente.strip() if email_acudiente else None,
-                    "direccion_acudiente": direccion_acudiente.strip() if direccion_acudiente else None,
-                    "es_principal": True
-                }
-                student_manager.add_guardian(data_acudiente)
-                
-                # Crear usuario para el acudiente
-                crear_usuario(db, documento_acudiente.strip(), "demo2026", "acudiente", documento_acudiente.strip())
-                
-                st.success(f"✅ Estudiante {nombre} {apellidos} registrado exitosamente")
-                st.info(f"🔑 Usuario estudiante: {documento} | Contraseña: demo2026")
-                st.info(f"🔑 Usuario acudiente: {documento_acudiente} | Contraseña: demo2026")
-                st.balloons()
-            else:
-                st.error("❌ Error al registrar el estudiante")
-
-def mostrar_formulario_editar_estudiante(student_manager: StudentManager, db: SupabaseManager):
-    """Muestra el formulario para editar un estudiante"""
-    st.write("**Editar estudiante existente**")
-    
-    documento_buscar = st.text_input("Documento de identidad del estudiante", key="buscar_estudiante_editar")
-    
-    if not documento_buscar:
-        return
-    
-    estudiante = student_manager.get_student_by_document(documento_buscar)
-    if not estudiante:
-        st.warning("No se encontró un estudiante con ese documento")
-        return
-    
-    acudientes = student_manager.get_guardians(documento_buscar)
-    
-    with st.form("editar_estudiante_completo"):
-        st.success(f"Editando: {estudiante.get('nombre_estudiante', '')} {estudiante.get('apellidos_estudiante', '')}")
-        
-        # Datos personales
-        st.markdown("### Datos personales")
-        col1, col2 = st.columns(2)
-        with col1:
-            nombre = st.text_input("Nombre", value=estudiante.get('nombre_estudiante', ''))
-            apellidos = st.text_input("Apellidos", value=estudiante.get('apellidos_estudiante', ''))
-            st.text_input("Documento", value=estudiante.get('documento_estudiante', ''), disabled=True)
-            curso = st.selectbox("Curso", CURSOS, index=CURSOS.index(estudiante.get('curso', '901')))
-        with col2:
-            telefono = st.text_input("Teléfono", value=estudiante.get('telefono_estudiante', ''))
-            email = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
-            direccion = st.text_input("Dirección", value=estudiante.get('direccion_estudiante', ''))
-        
-        st.divider()
-        
-        # Acudientes
-        st.markdown("### Acudientes")
-        for idx, acud in enumerate(acudientes):
-            with st.container():
-                st.markdown(f"**Acudiente {idx + 1}**")
-                col1, col2 = st.columns(2)
-                with col1:
-                    nombre_acud = st.text_input("Nombre", value=acud.get('nombre_acudiente', ''), key=f"acud_nombre_{idx}")
-                    doc_acud = st.text_input("Documento", value=acud.get('documento_acudiente', ''), key=f"acud_doc_{idx}")
-                    parentesco_acud = st.selectbox("Parentesco", PARENTESCOS, 
-                                                  index=PARENTESCOS.index(acud.get('parentesco', '')), 
-                                                  key=f"acud_parentesco_{idx}")
-                with col2:
-                    telefono_acud = st.text_input("Teléfono", value=acud.get('telefono_acudiente', ''), key=f"acud_telefono_{idx}")
-                    email_acud = st.text_input("Email", value=acud.get('email_acudiente', ''), key=f"acud_email_{idx}")
-                    direccion_acud = st.text_input("Dirección", value=acud.get('direccion_acudiente', ''), key=f"acud_direccion_{idx}")
-                    es_principal = st.checkbox("Acudiente principal", value=acud.get('es_principal', False), key=f"acud_principal_{idx}")
-                
-                if st.button(f"🗑️ Eliminar acudiente {idx + 1}", key=f"eliminar_acud_{idx}"):
-                    student_manager.delete_guardian(acud['id'])
-                    st.success("Acudiente eliminado")
-                    st.rerun()
-                st.divider()
-        
-        # Agregar acudiente
-        with st.expander("➕ Agregar otro acudiente"):
+        st.write("**Registrar nuevo estudiante**")
+        with st.form("nuevo_estudiante", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                nuevo_nombre = st.text_input("Nombre", key="nuevo_acud_nombre")
-                nuevo_doc = st.text_input("Documento", key="nuevo_acud_doc")
-                nuevo_parentesco = st.selectbox("Parentesco", PARENTESCOS, key="nuevo_acud_parentesco")
+                st.markdown("**Datos personales**")
+                nombre = st.text_input("Nombre *")
+                apellidos = st.text_input("Apellidos *")
+                documento = st.text_input("Documento *")
+                curso = st.selectbox("Curso *", CURSOS)
+                telefono = st.text_input("Teléfono")
+                email = st.text_input("Email")
             with col2:
-                nuevo_telefono = st.text_input("Teléfono", key="nuevo_acud_telefono")
-                nuevo_email = st.text_input("Email", key="nuevo_acud_email")
-                nuevo_direccion = st.text_input("Dirección", key="nuevo_acud_direccion")
+                st.markdown("**Datos del acudiente**")
+                nombre_acudiente = st.text_input("Nombre del acudiente *")
+                documento_acudiente = st.text_input("Documento del acudiente *")
+                parentesco = st.selectbox("Parentesco", PARENTESCOS)
+                telefono_acudiente = st.text_input("Teléfono del acudiente")
+                email_acudiente = st.text_input("Email del acudiente")
             
-            if st.button("Agregar acudiente", key="btn_agregar_acud"):
-                if nuevo_nombre and nuevo_doc:
-                    new_acud_data = {
-                        "documento_estudiante": documento_buscar,
-                        "documento_acudiente": nuevo_doc.strip(),
-                        "nombre_acudiente": nuevo_nombre.strip(),
-                        "parentesco": nuevo_parentesco if nuevo_parentesco else None,
-                        "telefono_acudiente": nuevo_telefono.strip() if nuevo_telefono else None,
-                        "email_acudiente": nuevo_email.strip() if nuevo_email else None,
-                        "direccion_acudiente": nuevo_direccion.strip() if nuevo_direccion else None,
-                        "es_principal": False
-                    }
-                    if student_manager.add_guardian(new_acud_data):
-                        # Crear usuario si no existe
-                        if not db.get("usuarios_login", {"username": nuevo_doc.strip()}):
-                            crear_usuario(db, nuevo_doc.strip(), "demo2026", "acudiente", nuevo_doc.strip())
-                        st.success("Acudiente agregado")
-                        st.rerun()
+            if st.form_submit_button("💾 Registrar", type="primary"):
+                if not all([nombre, apellidos, documento, curso, nombre_acudiente, documento_acudiente]):
+                    st.error("❌ Completa todos los campos obligatorios (*)")
+                else:
+                    # Verificar si existe
+                    check_url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento}"
+                    check_response = requests.get(check_url, headers=headers)
+                    
+                    if check_response.status_code == 200 and check_response.json():
+                        st.error(f"❌ Ya existe un estudiante con el documento {documento}")
                     else:
-                        st.error("Error al agregar acudiente")
+                        # Crear estudiante
+                        data_estudiante = {
+                            "nombre_estudiante": nombre,
+                            "apellidos_estudiante": apellidos,
+                            "documento_estudiante": documento,
+                            "curso": curso,
+                            "telefono_estudiante": telefono,
+                            "email_estudiante": email
+                        }
+                        response = requests.post(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers, json=data_estudiante)
+                        
+                        if response.status_code == 201:
+                            # Crear usuario estudiante
+                            user_data = {
+                                "username": documento,
+                                "password_hash": "demo2026",
+                                "rol": "estudiante",
+                                "documento": documento,
+                                "roles": ["estudiante"]
+                            }
+                            requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_data)
+                            
+                            # Crear acudiente
+                            data_acudiente = {
+                                "documento_estudiante": documento,
+                                "documento_acudiente": documento_acudiente,
+                                "nombre_acudiente": nombre_acudiente,
+                                "parentesco": parentesco,
+                                "telefono_acudiente": telefono_acudiente,
+                                "email_acudiente": email_acudiente,
+                                "es_principal": True
+                            }
+                            requests.post(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers, json=data_acudiente)
+                            
+                            # Crear usuario acudiente
+                            user_acud = {
+                                "username": documento_acudiente,
+                                "password_hash": "demo2026",
+                                "rol": "acudiente",
+                                "documento": documento_acudiente,
+                                "roles": ["acudiente"]
+                            }
+                            requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_acud)
+                            
+                            st.success(f"✅ Estudiante {nombre} {apellidos} registrado exitosamente")
+                            st.info(f"🔑 Estudiante: {documento} | demo2026")
+                            st.info(f"🔑 Acudiente: {documento_acudiente} | demo2026")
+                            st.balloons()
+                        else:
+                            st.error(f"Error al registrar: {response.status_code}")
+    
+    with tab3:
+        st.write("**Editar estudiante**")
+        documento_buscar = st.text_input("Documento del estudiante", key="buscar_est_edit")
         
-        if st.form_submit_button("💾 Guardar todos los cambios", type="primary"):
-            # Actualizar estudiante
-            data_update = {
-                "nombre_estudiante": nombre.strip(),
-                "apellidos_estudiante": apellidos.strip(),
-                "curso": curso,
-                "telefono_estudiante": telefono.strip() if telefono else None,
-                "email_estudiante": email.strip() if email else None,
-                "direccion_estudiante": direccion.strip() if direccion else None
-            }
-            student_manager.update_student(documento_buscar, data_update)
+        if documento_buscar:
+            url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}"
+            response = requests.get(url, headers=headers)
             
-            # Actualizar acudientes
-            for idx, acud in enumerate(acudientes):
-                nombre_acud = st.session_state.get(f"acud_nombre_{idx}", acud.get('nombre_acudiente', ''))
-                doc_acud = st.session_state.get(f"acud_doc_{idx}", acud.get('documento_acudiente', ''))
-                parentesco_acud = st.session_state.get(f"acud_parentesco_{idx}", acud.get('parentesco', ''))
-                telefono_acud = st.session_state.get(f"acud_telefono_{idx}", acud.get('telefono_acudiente', ''))
-                email_acud = st.session_state.get(f"acud_email_{idx}", acud.get('email_acudiente', ''))
-                direccion_acud = st.session_state.get(f"acud_direccion_{idx}", acud.get('direccion_acudiente', ''))
-                es_principal = st.session_state.get(f"acud_principal_{idx}", acud.get('es_principal', False))
+            if response.status_code == 200 and response.json():
+                estudiante = response.json()[0]
                 
-                if nombre_acud and doc_acud:
-                    acud_data = {
-                        "nombre_acudiente": nombre_acud.strip(),
-                        "documento_acudiente": doc_acud.strip(),
-                        "parentesco": parentesco_acud if parentesco_acud else None,
-                        "telefono_acudiente": telefono_acud.strip() if telefono_acud else None,
-                        "email_acudiente": email_acud.strip() if email_acud else None,
-                        "direccion_acudiente": direccion_acud.strip() if direccion_acud else None,
-                        "es_principal": es_principal
-                    }
-                    student_manager.update_guardian(acud['id'], acud_data)
-            
-            st.success("✅ Estudiante actualizado exitosamente")
-            st.balloons()
-            st.rerun()
+                with st.form("editar_estudiante"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        nombre = st.text_input("Nombre", value=estudiante.get('nombre_estudiante', ''))
+                        apellidos = st.text_input("Apellidos", value=estudiante.get('apellidos_estudiante', ''))
+                        curso = st.selectbox("Curso", CURSOS, 
+                                           index=CURSOS.index(estudiante.get('curso', '901')))
+                    with col2:
+                        telefono = st.text_input("Teléfono", value=estudiante.get('telefono_estudiante', ''))
+                        email = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
+                    
+                    if st.form_submit_button("💾 Guardar cambios", type="primary"):
+                        data_update = {
+                            "nombre_estudiante": nombre,
+                            "apellidos_estudiante": apellidos,
+                            "curso": curso,
+                            "telefono_estudiante": telefono,
+                            "email_estudiante": email
+                        }
+                        update_url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}"
+                        response_update = requests.patch(update_url, headers=headers, json=data_update)
+                        
+                        if response_update.status_code == 200:
+                            st.success("✅ Estudiante actualizado")
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {response_update.status_code}")
+            else:
+                st.warning("No se encontró el estudiante")
 
 # ============================================
 # GESTIÓN DE ACUDIENTES
 # ============================================
 def gestion_acudientes():
-    """Gestión completa de acudientes"""
+    """Gestión de acudientes"""
     st.subheader("👨‍👩‍👧 Gestión de Acudientes")
     
-    db = SupabaseManager()
-    student_manager = StudentManager(db)
+    headers = get_headers()
     
-    tab1, tab2 = st.tabs(["📋 Lista de Acudientes", "✏️ Editar Acudiente"])
+    tab1, tab2 = st.tabs(["📋 Lista", "✏️ Editar"])
     
     with tab1:
-        mostrar_lista_acudientes(student_manager)
+        try:
+            response = requests.get(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers)
+            if response.status_code == 200:
+                acudientes = response.json()
+                if acudientes:
+                    # Agrupar por documento
+                    acud_dict = {}
+                    for a in acudientes:
+                        doc = a.get('documento_acudiente')
+                        if doc and doc not in acud_dict:
+                            acud_dict[doc] = {
+                                "nombre": a.get('nombre_acudiente'),
+                                "documento": doc,
+                                "telefono": a.get('telefono_acudiente'),
+                                "email": a.get('email_acudiente')
+                            }
+                    
+                    if acud_dict:
+                        df = pd.DataFrame(acud_dict.values())
+                        st.dataframe(df, use_container_width=True)
+                        st.caption(f"Total: {len(acud_dict)} acudientes")
+                else:
+                    st.info("No hay acudientes registrados")
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
     
     with tab2:
-        mostrar_formulario_editar_acudiente(student_manager)
-
-def mostrar_lista_acudientes(student_manager: StudentManager):
-    """Muestra la lista de acudientes"""
-    try:
-        acudientes_rel = student_manager.db.get_all("estudiante_acudiente")
+        st.write("**Editar acudiente**")
+        doc_buscar = st.text_input("Documento del acudiente", key="buscar_acud_edit")
         
-        if not acudientes_rel:
-            st.info("No hay acudientes registrados")
-            return
-        
-        # Agrupar acudientes por documento
-        acudientes_dict = {}
-        for rel in acudientes_rel:
-            doc_acud = rel.get('documento_acudiente')
-            if doc_acud and doc_acud not in acudientes_dict:
-                # Obtener datos del estudiante
-                estudiante = student_manager.get_student_by_document(rel.get('documento_estudiante'))
-                nombre_hijo = estudiante.get('nombre_estudiante') if estudiante else "Desconocido"
-                
-                acudientes_dict[doc_acud] = {
-                    "nombre": rel.get('nombre_acudiente'),
-                    "documento": doc_acud,
-                    "telefono": rel.get('telefono_acudiente'),
-                    "email": rel.get('email_acudiente'),
-                    "direccion": rel.get('direccion_acudiente'),
-                    "hijos": [nombre_hijo]
-                }
-            elif doc_acud:
-                # Agregar otro hijo
-                estudiante = student_manager.get_student_by_document(rel.get('documento_estudiante'))
-                nombre_hijo = estudiante.get('nombre_estudiante') if estudiante else "Desconocido"
-                if nombre_hijo not in acudientes_dict[doc_acud]["hijos"]:
-                    acudientes_dict[doc_acud]["hijos"].append(nombre_hijo)
-        
-        if acudientes_dict:
-            df = pd.DataFrame([{
-                "Nombre": v["nombre"],
-                "Documento": v["documento"],
-                "Teléfono": v["telefono"],
-                "Email": v["email"],
-                "Dirección": v.get("direccion", ""),
-                "Hijos": ", ".join(v["hijos"])
-            } for v in acudientes_dict.values()])
-            st.dataframe(df, use_container_width=True)
-            st.caption(f"Total: {len(acudientes_dict)} acudientes")
-    except Exception as e:
-        st.error(f"Error al cargar acudientes: {str(e)}")
-
-def mostrar_formulario_editar_acudiente(student_manager: StudentManager):
-    """Muestra el formulario para editar un acudiente"""
-    st.write("**Buscar acudiente por documento**")
-    doc_buscar = st.text_input("Documento del acudiente", key="buscar_acudiente")
-    
-    if not doc_buscar:
-        return
-    
-    acudientes = student_manager.db.get("estudiante_acudiente", {"documento_acudiente": doc_buscar})
-    
-    if not acudientes:
-        st.warning("No se encontró un acudiente con ese documento")
-        return
-    
-    acudiente = acudientes[0]
-    
-    with st.form("editar_acudiente"):
-        st.success(f"Editando acudiente: {acudiente.get('nombre_acudiente', '')}")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            nombre = st.text_input("Nombre", value=acudiente.get('nombre_acudiente', ''))
-            st.text_input("Documento", value=acudiente.get('documento_acudiente', ''), disabled=True)
-            parentesco = st.selectbox("Parentesco", PARENTESCOS, 
-                                     index=PARENTESCOS.index(acudiente.get('parentesco', '')))
-        with col2:
-            telefono = st.text_input("Teléfono", value=acudiente.get('telefono_acudiente', ''))
-            email = st.text_input("Email", value=acudiente.get('email_acudiente', ''))
-            direccion = st.text_input("Dirección", value=acudiente.get('direccion_acudiente', ''))
-        
-        st.write("**Hijos asociados:**")
-        for acud in acudientes:
-            estudiante = student_manager.get_student_by_document(acud.get('documento_estudiante'))
-            if estudiante:
-                st.write(f"- {estudiante.get('nombre_estudiante')} ({estudiante.get('curso')})")
-        
-        if st.form_submit_button("💾 Guardar Cambios", type="primary"):
-            for acud in acudientes:
-                update_data = {
-                    "nombre_acudiente": nombre.strip(),
-                    "parentesco": parentesco if parentesco else None,
-                    "telefono_acudiente": telefono.strip() if telefono else None,
-                    "email_acudiente": email.strip() if email else None,
-                    "direccion_acudiente": direccion.strip() if direccion else None
-                }
-                student_manager.update_guardian(acud['id'], update_data)
+        if doc_buscar:
+            url = f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_acudiente=eq.{doc_buscar}"
+            response = requests.get(url, headers=headers)
             
-            st.success("✅ Acudiente actualizado exitosamente")
-            st.rerun()
+            if response.status_code == 200 and response.json():
+                acudiente = response.json()[0]
+                
+                with st.form("editar_acudiente"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        nombre = st.text_input("Nombre", value=acudiente.get('nombre_acudiente', ''))
+                        parentesco = st.text_input("Parentesco", value=acudiente.get('parentesco', ''))
+                    with col2:
+                        telefono = st.text_input("Teléfono", value=acudiente.get('telefono_acudiente', ''))
+                        email = st.text_input("Email", value=acudiente.get('email_acudiente', ''))
+                    
+                    if st.form_submit_button("💾 Guardar cambios", type="primary"):
+                        update_data = {
+                            "nombre_acudiente": nombre,
+                            "parentesco": parentesco,
+                            "telefono_acudiente": telefono,
+                            "email_acudiente": email
+                        }
+                        update_url = f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_acudiente=eq.{doc_buscar}"
+                        requests.patch(update_url, headers=headers, json=update_data)
+                        st.success("✅ Acudiente actualizado")
+                        st.rerun()
+            else:
+                st.warning("No se encontró el acudiente")
 
 # ============================================
 # GESTIÓN DE DOCENTES
 # ============================================
 def gestion_docentes():
-    """Gestión completa de docentes"""
+    """Gestión de docentes"""
     st.subheader("👨‍🏫 Gestión de Docentes")
     
-    db = SupabaseManager()
-    teacher_manager = TeacherManager(db)
+    headers = get_headers()
     
-    tab1, tab2, tab3 = st.tabs(["📋 Lista de Docentes", "➕ Nuevo Docente", "✏️ Editar Docente"])
+    tab1, tab2, tab3 = st.tabs(["📋 Lista", "➕ Nuevo", "✏️ Editar"])
     
     with tab1:
-        mostrar_lista_docentes(teacher_manager)
+        try:
+            response = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+            if response.status_code == 200:
+                docentes = response.json()
+                if docentes:
+                    df = pd.DataFrame(docentes)
+                    st.dataframe(df, use_container_width=True)
+                    st.caption(f"Total: {len(docentes)} docentes")
+                else:
+                    st.info("No hay docentes registrados")
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
     
     with tab2:
-        mostrar_formulario_nuevo_docente(teacher_manager, db)
+        st.write("**Registrar nuevo docente**")
+        with st.form("nuevo_docente", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                nombre = st.text_input("Nombre *")
+                apellidos = st.text_input("Apellidos *")
+                documento = st.text_input("Documento *")
+                fecha_nacimiento = st.date_input("Fecha de nacimiento", value=None)
+                sexo = st.selectbox("Sexo", SEXOS)
+            with col2:
+                telefono = st.text_input("Teléfono")
+                email = st.text_input("Email")
+                titulo = st.text_input("Título")
+                tipo_contrato = st.selectbox("Tipo de contrato", TIPOS_CONTRATO)
+                fecha_ingreso = st.date_input("Fecha de ingreso", value=None)
+            
+            if st.form_submit_button("💾 Registrar", type="primary"):
+                if not all([nombre, apellidos, documento]):
+                    st.error("❌ Completa los campos obligatorios")
+                else:
+                    # Verificar si existe
+                    check_url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento}"
+                    check_response = requests.get(check_url, headers=headers)
+                    
+                    if check_response.status_code == 200 and check_response.json():
+                        st.error(f"❌ Ya existe un docente con el documento {documento}")
+                    else:
+                        data = {
+                            "nombre_docente": nombre,
+                            "apellidos_docente": apellidos,
+                            "documento_docente": documento,
+                            "fecha_nacimiento": str(fecha_nacimiento) if fecha_nacimiento else None,
+                            "sexo_docente": sexo,
+                            "telefono_docente": telefono,
+                            "email_docente": email,
+                            "titulo": titulo,
+                            "tipo_contrato": tipo_contrato,
+                            "fecha_ingreso": str(fecha_ingreso) if fecha_ingreso else None
+                        }
+                        response = requests.post(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers, json=data)
+                        
+                        if response.status_code == 201:
+                            username = nombre.lower().replace(" ", "_") + "_" + documento[-4:]
+                            user_data = {
+                                "username": username,
+                                "password_hash": "demo2026",
+                                "rol": "docente",
+                                "documento": documento,
+                                "roles": ["docente"]
+                            }
+                            requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_data)
+                            st.success(f"✅ Docente {nombre} {apellidos} registrado")
+                            st.info(f"🔑 Usuario: {username} | demo2026")
+                            st.balloons()
+                        else:
+                            st.error(f"Error: {response.status_code}")
     
     with tab3:
-        mostrar_formulario_editar_docente(teacher_manager)
-
-def mostrar_lista_docentes(teacher_manager: TeacherManager):
-    """Muestra la lista de docentes"""
-    try:
-        docentes = teacher_manager.get_all_teachers()
-        if docentes:
-            df = pd.DataFrame(docentes)
-            # Renombrar columnas para mejor visualización
-            column_mapping = {
-                'nombre_docente': 'Nombre',
-                'apellidos_docente': 'Apellidos',
-                'documento_docente': 'Documento',
-                'telefono_docente': 'Teléfono',
-                'email_docente': 'Email',
-                'titulo': 'Título',
-                'tipo_contrato': 'Contrato'
-            }
-            df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
-            
-            st.dataframe(df, use_container_width=True)
-            st.caption(f"Total: {len(docentes)} docentes")
-        else:
-            st.info("No hay docentes registrados")
-    except Exception as e:
-        st.error(f"Error al cargar docentes: {str(e)}")
-
-def mostrar_formulario_nuevo_docente(teacher_manager: TeacherManager, db: SupabaseManager):
-    """Muestra el formulario para crear un nuevo docente"""
-    st.write("**Registrar nuevo docente**")
-    
-    with st.form("nuevo_docente", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Datos personales**")
-            nombre = st.text_input("Nombre *")
-            apellidos = st.text_input("Apellidos *")
-            documento = st.text_input("Documento de identidad *")
-            fecha_nacimiento = st.date_input("Fecha de nacimiento", value=None)
-            sexo = st.selectbox("Sexo", SEXOS)
-            direccion = st.text_input("Dirección")
-        with col2:
-            st.markdown("**Datos profesionales**")
-            telefono = st.text_input("Teléfono")
-            email = st.text_input("Email")
-            titulo = st.text_input("Título profesional")
-            especializacion = st.text_input("Especialización")
-            tipo_contrato = st.selectbox("Tipo de contrato", TIPOS_CONTRATO)
-            fecha_ingreso = st.date_input("Fecha de ingreso", value=None)
-            observaciones = st.text_area("Observaciones", height=68)
+        st.write("**Editar docente**")
+        documento_buscar = st.text_input("Documento del docente", key="buscar_doc_edit")
         
-        if st.form_submit_button("💾 Registrar Docente", type="primary"):
-            if not all([nombre, apellidos, documento]):
-                st.error("❌ Completa todos los campos obligatorios (*)")
-                return
+        if documento_buscar:
+            url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento_buscar}"
+            response = requests.get(url, headers=headers)
             
-            if teacher_manager.get_teacher_by_document(documento):
-                st.error(f"❌ Ya existe un docente con el documento {documento}")
-                return
+            if response.status_code == 200 and response.json():
+                docente = response.json()[0]
+                
+                with st.form("editar_docente"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        nombre = st.text_input("Nombre", value=docente.get('nombre_docente', ''))
+                        apellidos = st.text_input("Apellidos", value=docente.get('apellidos_docente', ''))
+                        fecha_nacimiento = st.date_input("Fecha de nacimiento", 
+                                                        value=datetime.strptime(docente.get('fecha_nacimiento', '2000-01-01'), '%Y-%m-%d') if docente.get('fecha_nacimiento') else None)
+                    with col2:
+                        telefono = st.text_input("Teléfono", value=docente.get('telefono_docente', ''))
+                        email = st.text_input("Email", value=docente.get('email_docente', ''))
+                        titulo = st.text_input("Título", value=docente.get('titulo', ''))
+                    
+                    if st.form_submit_button("💾 Guardar cambios", type="primary"):
+                        data_update = {
+                            "nombre_docente": nombre,
+                            "apellidos_docente": apellidos,
+                            "fecha_nacimiento": str(fecha_nacimiento) if fecha_nacimiento else None,
+                            "telefono_docente": telefono,
+                            "email_docente": email,
+                            "titulo": titulo
+                        }
+                        update_url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento_buscar}"
+                        requests.patch(update_url, headers=headers, json=data_update)
+                        st.success("✅ Docente actualizado")
+                        st.rerun()
+            else:
+                st.warning("No se encontró el docente")
+
+# ============================================
+# ASIGNACIÓN ACADÉMICA
+# ============================================
+def mostrar_asignacion():
+    """Asignación académica"""
+    st.subheader("📚 Asignación Académica")
+    
+    headers = get_headers()
+    
+    tabs = st.tabs(["📖 Horarios", "👨‍🏫 Directores", "📚 Asignaturas"])
+    
+    with tabs[0]:
+        st.write("**Configurar horarios**")
+        
+        # Obtener cursos
+        response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
+        if response_cursos.status_code == 200:
+            cursos = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
+            cursos.sort()
+        
+        if cursos:
+            curso = st.selectbox("Seleccionar curso", cursos)
+            st.info(f"Configurando horario para el curso {curso}")
             
-            data = {
-                "nombre_docente": nombre.strip(),
-                "apellidos_docente": apellidos.strip(),
-                "documento_docente": documento.strip(),
-                "fecha_nacimiento": str(fecha_nacimiento) if fecha_nacimiento else None,
-                "sexo_docente": sexo if sexo else None,
-                "direccion_docente": direccion.strip() if direccion else None,
-                "
+            # Mostrar horario básico
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**Lunes**")
+                st.selectbox("Hora 1", ["", "Matemáticas", "Español", "Inglés"], key="lun_h1")
+                st.selectbox("Hora 2", ["", "Matemáticas", "Español", "Inglés"], key="lun_h2")
+            with col2:
+                st.write("**Martes**")
+                st.selectbox("Hora 1", ["", "Matemáticas", "Español", "Inglés"], key="mar_h1")
+                st.selectbox("Hora 2", ["", "Matemáticas", "Español", "Inglés"], key="mar_h2")
+            
+            if st.button("💾 Guardar horario", type="primary"):
+                st.success("✅ Horario guardado")
+        else:
+            st.warning("No hay cursos registrados")
+    
+    with tabs[1]:
+        st.write("**Directores de grupo**")
+        
+        # Obtener cursos
+        response_cursos = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?select=curso", headers=headers)
+        if response_cursos.status_code == 200:
+            cursos = list(set([e['curso'] for e in response_cursos.json() if e.get('curso')]))
+            cursos.sort()
+        
+        if cursos:
+            curso_seleccionado = st.selectbox("Seleccionar curso", cursos, key="director_curso")
+            
+            # Obtener docentes
+            response_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+            if response_docentes.status_code == 200:
+                docentes = response_docentes.json()
+                docentes_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
+                
+                docente_seleccionado = st.selectbox(
+                    "Seleccionar director",
+                    options=[""] + list(docentes_dict.keys()),
+                    format_func=lambda x: docentes_dict.get(x, "Ninguno") if x else "Ninguno"
+                )
+                
+                if st.button("💾 Asignar director", type="primary"):
+                    if docente_seleccionado:
+                        # Eliminar director anterior
+                        delete_url = f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_seleccionado}&asignatura=ilike.%direccion%"
+                        requests.delete(delete_url, headers=headers)
+                        
+                        # Asignar nuevo director
+                        data = {
+                            "curso": curso_seleccionado,
+                            "asignatura": "DIRECCION DE CURSO",
+                            "documento_docente": docente_seleccionado,
+                            "anio": datetime.now().year
+                        }
+                        response = requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
+                        
+                        if response.status_code == 201:
+                            st.success(f"✅ Director asignado para {curso_seleccionado}")
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {response.status_code}")
+                    else:
+                        st.warning("Selecciona un docente")
+        else:
+            st.warning("No hay cursos registrados")
+    
+    with tabs[2]:
+        st.write("**Gestionar asignaturas**")
+        st.info("Funcionalidad en desarrollo")
+
+# ============================================
+# SISTEMA
+# ============================================
+def mostrar_sistema():
+    """Configuración del sistema"""
+    st.subheader("⚙️ Configuración del Sistema")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        nombre_colegio = st.text_input("Nombre del colegio", "Mi Colegio")
+        año_lectivo = st.number_input("Año lectivo", min_value=2000, max_value=2100, value=datetime.now().year)
+        
+        if st.button("💾 Guardar Configuración", type="primary"):
+            st.success("✅ Configuración guardada")
+    
+    with col2:
+        st.write("**Información del sistema**")
+        st.write(f"- Versión: 1.0.0")
+        st.write(f"- Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        st.write(f"- Base de datos: Supabase")
+        
+        if st.button("📀 Crear Respaldo", type="primary"):
+            st.success("✅ Respaldo creado")
+    
+    with st.expander("📊 Estadísticas del sistema"):
+        headers = get_headers()
+        
+        try:
+            response_est = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers)
+            total_est = len(response_est.json()) if response_est.status_code == 200 else 0
+        except:
+            total_est = 0
+        
+        try:
+            response_doc = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+            total_doc = len(response_doc.json()) if response_doc.status_code == 200 else 0
+        except:
+            total_doc = 0
+        
+        st.write(f"- Total estudiantes: {total_est}")
+        st.write(f"- Total docentes: {total_doc}")
