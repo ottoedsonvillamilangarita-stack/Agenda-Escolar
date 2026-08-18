@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 from utils import SUPABASE_URL, get_headers
-from modulos.paneles import admin, docente, estudiante, acudiente, director, coordinador, secretaria, supervisor
+from modulos.paneles import docente, estudiante, acudiente, director, coordinador, secretaria, supervisor
 from modulos.shared import auth as login
 from modulos.shared.mobile_utils import es_movil, aplicar_css_movil
 
