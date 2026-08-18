@@ -3,7 +3,7 @@ import requests
 from utils import SUPABASE_URL, get_headers
 
 # =============================================
-# IMPORTAR MÓDULOS - IMPORTS DIRECTOS (SIN __init__)
+# IMPORTAR MÓDULOS - IMPORTS DIRECTOS
 # =============================================
 import modulos.paneles.admin as admin
 import modulos.paneles.docente as docente
@@ -17,16 +17,28 @@ import modulos.paneles.supervisor as supervisor
 from modulos.shared import auth as login
 from modulos.shared.mobile_utils import es_movil, aplicar_css_movil
 
-# Configuración según dispositivo
+# =============================================
+# CONFIGURACIÓN DE PÁGINA
+# =============================================
 ES_MOVIL = es_movil()
 
 if ES_MOVIL:
-    st.set_page_config(page_title="Plataforma Escolar", layout="centered", initial_sidebar_state="collapsed")
+    st.set_page_config(
+        page_title="Plataforma Escolar", 
+        layout="centered", 
+        initial_sidebar_state="expanded"  # ← FORZAR EXPANDIDO
+    )
     aplicar_css_movil()
 else:
-    st.set_page_config(page_title="Plataforma Escolar", layout="wide")
+    st.set_page_config(
+        page_title="Plataforma Escolar", 
+        layout="wide",
+        initial_sidebar_state="expanded"  # ← FORZAR EXPANDIDO
+    )
 
-# Inicializar session_state
+# =============================================
+# INICIALIZAR SESSION_STATE
+# =============================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -51,9 +63,18 @@ else:
             st.session_state.rol_actual = st.session_state.user_data['roles'][0] if st.session_state.user_data['roles'] else ''
     
     # =============================================
-    # DEFINIR rol_actual ANTES DE USARLO
+    # DEFINIR rol_actual
     # =============================================
     rol_actual = st.session_state.get('rol_actual', st.session_state.user_data.get('rol'))
+    
+    # =============================================
+    # DEBUG - Mostrar información en el sidebar
+    # =============================================
+    st.sidebar.write("🔍 **DEBUG**")
+    st.sidebar.write(f"rol_actual: {rol_actual}")
+    st.sidebar.write(f"logged_in: {st.session_state.logged_in}")
+    st.sidebar.write(f"usuario: {st.session_state.usuario}")
+    st.sidebar.divider()
     
     # =============================================
     # MENÚ PARA ADMINISTRADOR
