@@ -1,5 +1,5 @@
 # ============================================
-# modulos/paneles/admin.py - VERSIÓN COMPLETA Y CORREGIDA
+# modulos/paneles/admin.py - VERSIÓN COMPLETA UNIFICADA
 # ============================================
 
 import streamlit as st
@@ -7,6 +7,16 @@ import requests
 import pandas as pd
 from datetime import datetime, time
 from utils import SUPABASE_URL, get_headers
+
+# ============================================
+# IMPORTAR FUNCIONES DE HORARIOS
+# ============================================
+from modulos.features.horarios import (
+    configurar_horas_nivel as horarios_configurar_horas,
+    configurar_jornada_nivel as horarios_configurar_jornada,
+    configurar_horario_curso as horarios_configurar_horario,
+    gestion_festivos as horarios_gestion_festivos
+)
 
 # ============================================
 # CONSTANTES
@@ -57,6 +67,7 @@ def mostrar(data):
     
     st.divider()
     st.caption("📌 Panel de control del Administrador")
+
 
 # ============================================
 # GESTIÓN DE ESTUDIANTES
@@ -200,6 +211,7 @@ def gestion_estudiantes():
             else:
                 st.warning("No se encontró el estudiante")
 
+
 # ============================================
 # GESTIÓN DE DOCENTES
 # ============================================
@@ -317,6 +329,7 @@ def gestion_docentes():
             else:
                 st.warning("No se encontró el docente")
 
+
 # ============================================
 # CONFIGURAR NIVELES
 # ============================================
@@ -343,6 +356,7 @@ def configurar_niveles():
                 if r.status_code == 201:
                     st.success(f"✅ Nivel '{nuevo_nivel}' agregado")
                     st.rerun()
+
 
 # ============================================
 # GESTIONAR ASIGNATURAS
@@ -445,6 +459,7 @@ def gestionar_asignaturas():
                     st.success(f"✅ Asignatura '{nombre}' creada")
                     st.rerun()
 
+
 # ============================================
 # ASIGNAR PÉNSUM POR NIVEL
 # ============================================
@@ -452,6 +467,7 @@ def asignar_pensum_nivel():
     """Asignar pénsum por nivel"""
     st.subheader("📚 Asignar Pénsum por Nivel")
     st.info("Funcionalidad en desarrollo")
+
 
 # ============================================
 # ASIGNAR DOCENTES A CURSO
@@ -473,6 +489,7 @@ def asignar_docentes_curso():
     
     curso_seleccionado = st.selectbox("Seleccionar curso", cursos)
     st.info(f"Funcionalidad en desarrollo para el curso {curso_seleccionado}")
+
 
 # ============================================
 # GESTIONAR GRADOS
@@ -531,6 +548,7 @@ def gestionar_grados():
                 if r.status_code == 201:
                     st.success(f"✅ Curso '{nombre}' creado")
                     st.rerun()
+
 
 # ============================================
 # GESTIONAR DIRECTORES DE GRUPO
@@ -599,54 +617,33 @@ def gestion_directores_grupo():
         else:
             st.warning("Selecciona un docente")
 
+
 # ============================================
-# CONFIGURAR HORAS POR NIVEL
+# CONFIGURAR HORAS POR NIVEL (COMPLETO DESDE HORARIOS)
 # ============================================
 def configurar_horas_nivel():
-    """Configurar horas por nivel"""
-    st.subheader("⏰ Configurar Horas por Nivel")
+    """Configurar horas por nivel - Versión completa desde horarios.py"""
     headers = get_headers()
-    
-    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
-    if response_niveles.status_code != 200:
-        st.error("Error al cargar niveles")
-        return
-    
-    niveles = response_niveles.json()
-    if not niveles:
-        st.warning("No hay niveles configurados")
-        return
-    
-    nivel_nombres = [n['nombre'] for n in niveles]
-    nivel_seleccionado = st.selectbox("Seleccionar nivel", nivel_nombres)
-    nivel_id = next(n['id'] for n in niveles if n['nombre'] == nivel_seleccionado)
-    
-    url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}&order=orden.asc"
-    response_horas = requests.get(url_horas, headers=headers)
-    horas = response_horas.json() if response_horas.status_code == 200 else []
-    
-    st.write(f"**Horas configuradas para {nivel_seleccionado}:**")
-    if horas:
-        for h in horas:
-            st.write(f"- Hora {h['orden']}: {h['hora_inicio'][:5]} - {h['hora_fin'][:5]}")
-    else:
-        st.info("No hay horas configuradas para este nivel.")
+    horarios_configurar_horas(headers)
+
 
 # ============================================
-# CONFIGURAR JORNADA POR NIVEL
+# CONFIGURAR JORNADA POR NIVEL (COMPLETO DESDE HORARIOS)
 # ============================================
 def configurar_jornada_nivel():
-    """Configurar jornada por nivel"""
-    st.subheader("📅 Configurar Días Laborales por Nivel")
-    st.info("Funcionalidad en desarrollo")
+    """Configurar jornada por nivel - Versión completa desde horarios.py"""
+    headers = get_headers()
+    horarios_configurar_jornada(headers)
+
 
 # ============================================
-# CONFIGURAR HORARIO DE CURSO
+# CONFIGURAR HORARIO DE CURSO (COMPLETO DESDE HORARIOS)
 # ============================================
 def configurar_horario_curso():
-    """Configurar horario de curso"""
-    st.subheader("📖 Asignar Horarios por Curso")
-    st.info("Funcionalidad en desarrollo")
+    """Configurar horario de curso - Versión completa desde horarios.py"""
+    headers = get_headers()
+    horarios_configurar_horario(headers)
+
 
 # ============================================
 # MOSTRAR SISTEMA
@@ -669,46 +666,15 @@ def mostrar_sistema():
         if st.button("📀 Crear Respaldo", type="primary"):
             st.success("✅ Respaldo creado")
 
+
 # ============================================
-# GESTIONAR FESTIVOS
+# GESTIONAR FESTIVOS (COMPLETO DESDE HORARIOS)
 # ============================================
 def gestion_festivos():
-    """Gestionar festivos"""
-    st.subheader("📆 Festivos")
+    """Gestionar festivos - Versión completa desde horarios.py"""
     headers = get_headers()
-    
-    year = st.selectbox("Año", [2024, 2025, 2026], key="festivos_year")
-    
-    url_festivos = f"{SUPABASE_URL}/rest/v1/festivos?year=eq.{year}&order=fecha.asc"
-    response_festivos = requests.get(url_festivos, headers=headers)
-    
-    if response_festivos.status_code == 200:
-        festivos = response_festivos.json()
-        if festivos:
-            st.write("**Festivos registrados:**")
-            for f in festivos:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"{f['fecha']} - {f.get('descripcion', 'Sin descripción')}")
-                with col2:
-                    if st.button("🗑️", key=f"del_festivo_{f['id']}"):
-                        requests.delete(f"{SUPABASE_URL}/rest/v1/festivos?id=eq.{f['id']}", headers=headers)
-                        st.rerun()
-        else:
-            st.info("No hay festivos registrados")
-    
-    with st.expander("➕ Agregar festivo"):
-        col1, col2 = st.columns(2)
-        with col1:
-            fecha = st.date_input("Fecha", key="festivo_fecha")
-        with col2:
-            descripcion = st.text_input("Descripción", key="festivo_desc")
-        
-        if st.button("Agregar", key="agregar_festivo_btn"):
-            data = {"fecha": str(fecha), "descripcion": descripcion, "year": fecha.year}
-            requests.post(f"{SUPABASE_URL}/rest/v1/festivos", headers=headers, json=data)
-            st.success("✅ Festivo agregado")
-            st.rerun()
+    horarios_gestion_festivos(headers)
+
 
 # ============================================
 # REPORTES ACADÉMICOS
