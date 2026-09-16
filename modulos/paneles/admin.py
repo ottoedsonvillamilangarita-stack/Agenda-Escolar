@@ -124,31 +124,46 @@ def mostrar(data):
 
 
 # ============================================
-# GESTIÓN DE ESTUDIANTES & NÚCLEO FAMILIAR (COMPACTO)
+# GESTIÓN DE ESTUDIANTES & NÚCLEO FAMILIAR (COMPLETA)
 # ============================================
 def gestion_estudiantes():
     st.subheader("👨‍🎓 Gestión de Estudiantes y Familias")
     headers = get_headers()
     
-    tab1, tab2, tab3 = st.tabs(["📋 Lista de Matriculados", "➕ Matricular Estudiante", "✏️ Editar Estudiante"])
+    tab1, tab2, tab3 = st.tabs(["📋 Directorio de Alumnos", "➕ Matricular Estudiante", "✏️ Ficha del Estudiante & Familia"])
     
-    # ---------------- TAB 1: LISTA ----------------
+    # ---------------- TAB 1: DIRECTORIO ----------------
     with tab1:
+        col_filtro1, col_filtro2 = st.columns([2, 2])
+        with col_filtro1:
+            filtro_estado = st.selectbox("Filtrar por estado:", ["Activo", "Retirado", "Todos"], index=0)
+        with col_filtro2:
+            filtro_curso = st.selectbox("Filtrar por curso:", ["Todos"] + CURSOS, index=0)
+
+        query = f"{SUPABASE_URL}/rest/v1/estudiantes?order=curso.asc,apellidos_estudiante.asc"
+        if filtro_estado != "Todos":
+            query += f"&estado=eq.{filtro_estado}"
+        if filtro_curso != "Todos":
+            query += f"&curso=eq.{filtro_curso}"
+
         try:
-            response = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes?order=curso.asc,apellidos_estudiante.asc", headers=headers)
+            response = requests.get(query, headers=headers)
             if response.status_code == 200:
                 estudiantes = response.json()
                 if estudiantes:
                     df = pd.DataFrame(estudiantes)
-                    cols_mostrar = ['documento_estudiante', 'nombre_estudiante', 'apellidos_estudiante', 'curso', 'telefono_estudiante', 'email_estudiante']
-                    df_final = df[[c for c in cols_mostrar if c in df.columns]]
+                    # Asegurar columna estado
+                    if 'estado' not in df.columns:
+                        df['estado'] = 'Activo'
+                    cols = ['documento_estudiante', 'nombre_estudiante', 'apellidos_estudiante', 'curso', 'estado', 'telefono_estudiante', 'email_estudiante']
+                    df_final = df[[c for c in cols if c in df.columns]]
                     df_final.columns = [c.replace('_estudiante', '').capitalize() for c in df_final.columns]
-                    st.dataframe(df_final, use_container_width=True, height=380)
-                    st.caption(f"Total matriculados: {len(estudiantes)} alumnos")
+                    st.dataframe(df_final, use_container_width=True, height=360)
+                    st.caption(f"Mostrando {len(estudiantes)} alumno(s)")
                 else:
-                    st.info("No hay estudiantes registrados")
+                    st.info("No se encontraron estudiantes con los filtros seleccionados.")
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f"Error al cargar estudiantes: {str(e)}")
     
     # ---------------- TAB 2: MATRICULAR ----------------
     with tab2:
@@ -169,32 +184,33 @@ def gestion_estudiantes():
                 documento_acudiente = st.text_input("Documento del acudiente *")
                 parentesco = st.selectbox("Parentesco *", PARENTESCOS)
                 telefono_acudiente = st.text_input("Teléfono acudiente")
-                email_acudiente = st.text_input("Correo acudiente")
+                email_acudiente = st.text_input("Correo acudiente (para notificaciones)")
             
             if st.form_submit_button("💾 Completar Matrícula", type="primary", use_container_width=True):
                 if not all([nombre, apellidos, documento, curso, nombre_acudiente, documento_acudiente]):
                     st.error("❌ Completa todos los campos obligatorios (*)")
                 else:
                     check_url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento}"
-                    check_response = requests.get(check_url, headers=headers)
-                    if check_response.status_code == 200 and check_response.json():
-                        st.error(f"❌ Ya existe un estudiante registrado con el documento {documento}")
+                    check_res = requests.get(check_url, headers=headers)
+                    if check_res.status_code == 200 and check_res.json():
+                        st.error(f"❌ Ya existe un alumno con el documento {documento}")
                     else:
                         data_est = {
                             "nombre_estudiante": nombre,
                             "apellidos_estudiante": apellidos,
                             "documento_estudiante": documento,
                             "curso": curso,
+                            "estado": "Activo",
                             "telefono_estudiante": telefono,
                             "email_estudiante": email
                         }
                         res_est = requests.post(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers, json=data_est)
                         if res_est.status_code == 201:
-                            # 1. Login Estudiante
+                            # 1. Login Alumno
                             requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json={
                                 "username": documento, "password_hash": "demo2026", "rol": "estudiante", "documento": documento, "roles": ["estudiante"]
                             })
-                            # 2. Relación Acudiente
+                            # 2. Vínculo Familiar
                             requests.post(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers, json={
                                 "documento_estudiante": documento, "documento_acudiente": documento_acudiente,
                                 "nombre_acudiente": nombre_acudiente, "parentesco": parentesco,
@@ -205,15 +221,15 @@ def gestion_estudiantes():
                                 "username": documento_acudiente, "password_hash": "demo2026", "rol": "acudiente", "documento": documento_acudiente, "roles": ["acudiente"]
                             })
                             st.success(f"✅ Matrícula exitosa: Alumno {nombre} {apellidos}")
-                            st.info(f"🔑 Credenciales: Alumno: `{documento}` | Acudiente: `{documento_acudiente}` (Clave: `demo2026`)")
+                            st.info(f"🔑 Credenciales creadas: Alumno: `{documento}` | Acudiente: `{documento_acudiente}` (Clave: `demo2026`)")
                         else:
                             st.error(f"Error al matricular: {res_est.status_code}")
-    
-    # ---------------- TAB 3: EDITAR ESTUDIANTE Y ACUDIENTES (DOS COLUMNAS) ----------------
+
+    # ---------------- TAB 3: GESTIÓN INTEGRAL (DOS COLUMNAS) ----------------
     with tab3:
-        col_busq, _ = st.columns([2, 2])
-        with col_busq:
-            documento_buscar = st.text_input("🔍 Buscar estudiante por documento", placeholder="Ingresa el documento y presiona Enter", key="buscar_est_edit")
+        col_b1, col_b2 = st.columns([3, 1])
+        with col_b1:
+            documento_buscar = st.text_input("🔍 Buscar expediente por documento del estudiante", placeholder="Ingresa documento y presiona Enter", key="buscar_est_integral")
         
         if documento_buscar:
             url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}"
@@ -221,53 +237,66 @@ def gestion_estudiantes():
             
             if res_est.status_code == 200 and res_est.json():
                 estudiante = res_est.json()[0]
+                estado_actual = estudiante.get('estado', 'Activo')
                 
-                # CONTENEDOR PARALELO DE 2 COLUMNAS (TODO EN LA MISMA PANTALLA)
+                # DOS COLUMNAS EN LA LÍNEA DE VISIÓN
                 col_izq, col_der = st.columns([1, 1], gap="medium")
                 
-                # COLUMNA IZQUIERDA: DATOS DEL ESTUDIANTE
+                # === COLUMNA IZQUIERDA: EXPEDIENTE Y ESTADO DEL ESTUDIANTE ===
                 with col_izq:
-                    st.markdown("""
-                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-                        <b style="color: #0F172A; font-size: 14px;">👤 Expediente del Alumno</b>
+                    # Encabezado con estado visual
+                    color_estado = "#16A34A" if estado_actual == "Activo" else "#DC2626"
+                    bg_estado = "#DCFCE7" if estado_actual == "Activo" else "#FEE2E2"
+                    
+                    st.markdown(f"""
+                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <b style="color: #0F172A; font-size: 14px;">👤 Datos del Alumno</b>
+                        <span style="font-size: 11px; font-weight: 700; color: {color_estado}; background: {bg_estado}; padding: 2px 8px; border-radius: 6px;">
+                            {estado_actual.upper()}
+                        </span>
                     </div>
                     """, unsafe_allow_html=True)
                     
                     with st.form("form_editar_alumno"):
-                        c_n1, c_n2 = st.columns(2)
-                        with c_n1:
+                        c1, c2 = st.columns(2)
+                        with c1:
                             nombre_upd = st.text_input("Nombre(s)", value=estudiante.get('nombre_estudiante', ''))
-                        with c_n2:
+                        with c2:
                             apellidos_upd = st.text_input("Apellidos", value=estudiante.get('apellidos_estudiante', ''))
                             
-                        c_c1, c_c2 = st.columns(2)
-                        with c_c1:
+                        c3, c4 = st.columns(2)
+                        with c3:
                             curso_actual = estudiante.get('curso', '901')
                             curso_idx = CURSOS.index(curso_actual) if curso_actual in CURSOS else 0
                             curso_upd = st.selectbox("Curso", CURSOS, index=curso_idx)
-                        with c_c2:
-                            telefono_upd = st.text_input("Teléfono", value=estudiante.get('telefono_estudiante', ''))
+                        with c4:
+                            estados_disp = ["Activo", "Retirado", "Graduado"]
+                            est_idx = estados_disp.index(estado_actual) if estado_actual in estados_disp else 0
+                            estado_upd = st.selectbox("Estado del Estudiante", estados_disp, index=est_idx)
                             
-                        email_upd = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
+                        c5, c6 = st.columns(2)
+                        with c5:
+                            telefono_upd = st.text_input("Teléfono", value=estudiante.get('telefono_estudiante', ''))
+                        with c6:
+                            email_upd = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
+                            
                         direccion_upd = st.text_input("Dirección residencial", value=estudiante.get('direccion_estudiante', ''))
                         
-                        if st.form_submit_button("💾 Guardar Datos del Alumno", type="primary", use_container_width=True):
+                        if st.form_submit_button("💾 Guardar Cambios del Alumno", type="primary", use_container_width=True):
                             payload = {
                                 "nombre_estudiante": nombre_upd,
                                 "apellidos_estudiante": apellidos_upd,
                                 "curso": curso_upd,
+                                "estado": estado_upd,
                                 "telefono_estudiante": telefono_upd,
                                 "email_estudiante": email_upd,
                                 "direccion_estudiante": direccion_upd
                             }
-                            r_patch = requests.patch(f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}", headers=headers, json=payload)
-                            if r_patch.status_code == 200:
-                                st.success("✅ Alumno actualizado")
-                                st.rerun()
-                            else:
-                                st.error("Error al actualizar")
+                            requests.patch(f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}", headers=headers, json=payload)
+                            st.success("✅ Datos y estado actualizados")
+                            st.rerun()
 
-                # COLUMNA DERECHA: NÚCLEO FAMILIAR (ACUDIENTES)
+                # === COLUMNA DERECHA: GESTIÓN Y EDICIÓN DE ACUDIENTES ===
                 with col_der:
                     st.markdown("""
                     <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
@@ -277,60 +306,93 @@ def gestion_estudiantes():
                     
                     url_acuds = f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}"
                     res_acuds = requests.get(url_acuds, headers=headers)
-                    acudientes_vinculados = res_acuds.json() if res_acuds.status_code == 200 else []
+                    acudientes = res_acuds.json() if res_acuds.status_code == 200 else []
 
-                    if acudientes_vinculados:
-                        for acud in acudientes_vinculados:
+                    if acudientes:
+                        for acud in acudientes:
                             es_princ = acud.get('es_principal', False)
                             borde = "#3B82F6" if es_princ else "#E2E8F0"
                             fondo_badge = "#DBEAFE" if es_princ else "#F1F5F9"
                             texto_badge = "#1D4ED8" if es_princ else "#64748B"
+                            acud_id = acud.get('id')
                             
                             st.markdown(f"""
-                            <div style="background: white; border: 1.5px solid {borde}; border-radius: 8px; padding: 10px; margin-bottom: 6px;">
+                            <div style="background: white; border: 1.5px solid {borde}; border-radius: 8px; padding: 9px 12px; margin-bottom: 6px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <span style="font-size: 13px; font-weight: 700; color: #0F172A;">{acud.get('nombre_acudiente')} ({acud.get('parentesco', 'Tutor')})</span>
                                     <span style="font-size: 10px; font-weight: 700; color: {texto_badge}; background: {fondo_badge}; padding: 2px 6px; border-radius: 4px;">
                                         {'⭐ PRINCIPAL' if es_princ else 'Secundario'}
                                     </span>
                                 </div>
-                                <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
-                                    Doc: <b>{acud.get('documento_acudiente')}</b> | Tel: {acud.get('telefono_acudiente', 'N/A')} | {acud.get('email_acudiente', '')}
+                                <div style="font-size: 11px; color: #64748B; margin-top: 3px;">
+                                    Doc: <b>{acud.get('documento_acudiente')}</b> | 📞 {acud.get('telefono_acudiente', 'Sin tel')} | ✉️ {acud.get('email_acudiente', 'Sin correo')}
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            b1, b2, _ = st.columns([3, 3, 2])
-                            if not es_princ:
-                                if b1.button("⭐ Hacer Principal", key=f"p_{acud.get('id')}", use_container_width=True):
-                                    requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, json={"es_principal": False})
-                                    requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud.get('id')}", headers=headers, json={"es_principal": True})
+                            # Botones de acción rápida para este acudiente
+                            col_a1, col_a2, col_a3 = st.columns([3, 3, 3])
+                            
+                            # Opción 1: Editar Datos del Acudiente
+                            with col_a1:
+                                with st.popover("✏️ Editar", use_container_width=True):
+                                    st.write(f"**Editar a {acud.get('nombre_acudiente')}**")
+                                    with st.form(f"form_edit_acud_{acud_id}"):
+                                        ed_nombre = st.text_input("Nombre completo", value=acud.get('nombre_acudiente', ''))
+                                        par_actual = acud.get('parentesco', 'Padre')
+                                        idx_p = PARENTESCOS.index(par_actual) if par_actual in PARENTESCOS else 0
+                                        ed_par = st.selectbox("Parentesco", PARENTESCOS, index=idx_p)
+                                        ed_tel = st.text_input("Teléfono", value=acud.get('telefono_acudiente', ''))
+                                        ed_email = st.text_input("Email", value=acud.get('email_acudiente', ''))
+                                        
+                                        if st.form_submit_button("💾 Guardar Datos", type="primary"):
+                                            patch_acud = {
+                                                "nombre_acudiente": ed_nombre,
+                                                "parentesco": ed_par,
+                                                "telefono_acudiente": ed_tel,
+                                                "email_acudiente": ed_email
+                                            }
+                                            requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud_id}", headers=headers, json=patch_acud)
+                                            st.success("Acudiente actualizado")
+                                            st.rerun()
+
+                            # Opción 2: Hacer Principal
+                            with col_a2:
+                                if not es_princ:
+                                    if st.button("⭐ Principal", key=f"btn_p_{acud_id}", use_container_width=True):
+                                        requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, json={"es_principal": False})
+                                        requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud_id}", headers=headers, json={"es_principal": True})
+                                        st.rerun()
+                                else:
+                                    st.caption("Es principal")
+
+                            # Opción 3: Desvincular
+                            with col_a3:
+                                if st.button("🗑️ Quitar", key=f"btn_del_{acud_id}", use_container_width=True):
+                                    requests.delete(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud_id}", headers=headers)
                                     st.rerun()
-                            if b2.button("🗑️ Desvincular", key=f"d_{acud.get('id')}", use_container_width=True):
-                                requests.delete(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud.get('id')}", headers=headers)
-                                st.rerun()
                     else:
                         st.warning("Sin acudientes vinculados.")
 
-                    # Formulario compacto para vincular acudiente adicional
+                    # Formulario para vincular acudiente extra
                     with st.expander("➕ Vincular otro acudiente (Mamá, Papá, Tutor)", expanded=False):
-                        with st.form("form_add_acudiente", clear_on_submit=True):
+                        with st.form("form_add_acudiente_extra", clear_on_submit=True):
                             n_nom = st.text_input("Nombre completo *")
-                            c_d1, c_d2 = st.columns(2)
-                            with c_d1:
+                            ca1, ca2 = st.columns(2)
+                            with ca1:
                                 n_doc = st.text_input("Documento *")
-                            with c_d2:
+                            with ca2:
                                 n_par = st.selectbox("Parentesco *", PARENTESCOS)
-                            c_t1, c_t2 = st.columns(2)
-                            with c_t1:
+                            ca3, ca4 = st.columns(2)
+                            with ca3:
                                 n_tel = st.text_input("Teléfono")
-                            with c_t2:
+                            with ca4:
                                 n_em = st.text_input("Email")
                             n_pr = st.checkbox("Marcar como acudiente principal", value=False)
                             
                             if st.form_submit_button("🔗 Vincular al Alumno", type="primary", use_container_width=True):
                                 if not n_nom or not n_doc:
-                                    st.error("Nombre y documento son obligatorios")
+                                    st.error("Nombre y documento obligatorios")
                                 else:
                                     if n_pr:
                                         requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, json={"es_principal": False})
@@ -345,8 +407,7 @@ def gestion_estudiantes():
                                     st.success(f"✅ {n_nom} vinculado con éxito")
                                     st.rerun()
             else:
-                st.warning("🔍 No se encontró ningún estudiante con ese documento.")
-
+                st.warning("🔍 No se encontró ningún estudiante con el documento ingresado.")
 # ============================================
 # GESTIÓN DE DOCENTES
 # ============================================
