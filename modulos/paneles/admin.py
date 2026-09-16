@@ -239,12 +239,11 @@ def gestion_estudiantes():
                 estudiante = res_est.json()[0]
                 estado_actual = estudiante.get('estado', 'Activo')
                 
-                # DOS COLUMNAS EN LA LÍNEA DE VISIÓN
+                # DOS COLUMNAS EN LA MISMA PANTALLA
                 col_izq, col_der = st.columns([1, 1], gap="medium")
                 
-                # === COLUMNA IZQUIERDA: EXPEDIENTE Y ESTADO DEL ESTUDIANTE ===
+                # === COLUMNA IZQUIERDA: DATOS Y ESTADO DEL ESTUDIANTE ===
                 with col_izq:
-                    # Encabezado con estado visual
                     color_estado = "#16A34A" if estado_actual == "Activo" else "#DC2626"
                     bg_estado = "#DCFCE7" if estado_actual == "Activo" else "#FEE2E2"
                     
@@ -272,7 +271,7 @@ def gestion_estudiantes():
                         with c4:
                             estados_disp = ["Activo", "Retirado", "Graduado"]
                             est_idx = estados_disp.index(estado_actual) if estado_actual in estados_disp else 0
-                            estado_upd = st.selectbox("Estado del Estudiante", estados_disp, index=est_idx)
+                            estado_upd = st.selectbox("Estado", estados_disp, index=est_idx)
                             
                         c5, c6 = st.columns(2)
                         with c5:
@@ -292,11 +291,14 @@ def gestion_estudiantes():
                                 "email_estudiante": email_upd,
                                 "direccion_estudiante": direccion_upd
                             }
-                            requests.patch(f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}", headers=headers, json=payload)
-                            st.success("✅ Datos y estado actualizados")
-                            st.rerun()
+                            r_est_upd = requests.patch(f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}", headers=headers, json=payload)
+                            if r_est_upd.status_code in [200, 204]:
+                                st.success("✅ Alumno actualizado correctamente")
+                                st.rerun()
+                            else:
+                                st.error(f"Error al actualizar: {r_est_upd.text}")
 
-                # === COLUMNA DERECHA: GESTIÓN Y EDICIÓN DE ACUDIENTES ===
+                # === COLUMNA DERECHA: EDICIÓN COMPLETA DE ACUDIENTES ===
                 with col_der:
                     st.markdown("""
                     <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
@@ -309,72 +311,73 @@ def gestion_estudiantes():
                     acudientes = res_acuds.json() if res_acuds.status_code == 200 else []
 
                     if acudientes:
-                        for acud in acudientes:
+                        for idx, acud in enumerate(acudientes):
                             es_princ = acud.get('es_principal', False)
-                            borde = "#3B82F6" if es_princ else "#E2E8F0"
+                            doc_acud = acud.get('documento_acudiente')
+                            borde = "#2563EB" if es_princ else "#CBD5E1"
                             fondo_badge = "#DBEAFE" if es_princ else "#F1F5F9"
                             texto_badge = "#1D4ED8" if es_princ else "#64748B"
-                            acud_id = acud.get('id')
                             
                             st.markdown(f"""
-                            <div style="background: white; border: 1.5px solid {borde}; border-radius: 8px; padding: 9px 12px; margin-bottom: 6px;">
+                            <div style="background: white; border: 1.5px solid {borde}; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-size: 13px; font-weight: 700; color: #0F172A;">{acud.get('nombre_acudiente')} ({acud.get('parentesco', 'Tutor')})</span>
+                                    <span style="font-size: 13.5px; font-weight: 700; color: #0F172A;">{acud.get('nombre_acudiente')} ({acud.get('parentesco', 'Tutor')})</span>
                                     <span style="font-size: 10px; font-weight: 700; color: {texto_badge}; background: {fondo_badge}; padding: 2px 6px; border-radius: 4px;">
                                         {'⭐ PRINCIPAL' if es_princ else 'Secundario'}
                                     </span>
                                 </div>
-                                <div style="font-size: 11px; color: #64748B; margin-top: 3px;">
-                                    Doc: <b>{acud.get('documento_acudiente')}</b> | 📞 {acud.get('telefono_acudiente', 'Sin tel')} | ✉️ {acud.get('email_acudiente', 'Sin correo')}
+                                <div style="font-size: 11.5px; color: #475569; margin-top: 3px;">
+                                    📄 Doc: <b>{doc_acud}</b> | 📞 {acud.get('telefono_acudiente') or 'Sin tel'} | ✉️ {acud.get('email_acudiente') or 'Sin correo'}
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Botones de acción rápida para este acudiente
-                            col_a1, col_a2, col_a3 = st.columns([3, 3, 3])
-                            
-                            # Opción 1: Editar Datos del Acudiente
-                            with col_a1:
-                                with st.popover("✏️ Editar", use_container_width=True):
-                                    st.write(f"**Editar a {acud.get('nombre_acudiente')}**")
-                                    with st.form(f"form_edit_acud_{acud_id}"):
-                                        ed_nombre = st.text_input("Nombre completo", value=acud.get('nombre_acudiente', ''))
+                            # Formulario desplegable visible para editar este acudiente
+                            with st.expander(f"✏️ Editar datos de {acud.get('nombre_acudiente')}", expanded=False):
+                                with st.form(f"form_edit_acud_{doc_acud}_{idx}"):
+                                    ed_nombre = st.text_input("Nombre completo", value=acud.get('nombre_acudiente', ''))
+                                    c_p, c_t = st.columns(2)
+                                    with c_p:
                                         par_actual = acud.get('parentesco', 'Padre')
                                         idx_p = PARENTESCOS.index(par_actual) if par_actual in PARENTESCOS else 0
                                         ed_par = st.selectbox("Parentesco", PARENTESCOS, index=idx_p)
+                                    with c_t:
                                         ed_tel = st.text_input("Teléfono", value=acud.get('telefono_acudiente', ''))
-                                        ed_email = st.text_input("Email", value=acud.get('email_acudiente', ''))
-                                        
-                                        if st.form_submit_button("💾 Guardar Datos", type="primary"):
-                                            patch_acud = {
-                                                "nombre_acudiente": ed_nombre,
-                                                "parentesco": ed_par,
-                                                "telefono_acudiente": ed_tel,
-                                                "email_acudiente": ed_email
-                                            }
-                                            requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud_id}", headers=headers, json=patch_acud)
-                                            st.success("Acudiente actualizado")
+                                    ed_email = st.text_input("Correo electrónico", value=acud.get('email_acudiente', ''))
+                                    
+                                    if st.form_submit_button("💾 Guardar Datos del Acudiente", type="primary", use_container_width=True):
+                                        payload_acud = {
+                                            "nombre_acudiente": ed_nombre,
+                                            "parentesco": ed_par,
+                                            "telefono_acudiente": ed_tel,
+                                            "email_acudiente": ed_email
+                                        }
+                                        # Actualización segura por clave compuesta
+                                        url_upd = f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}"
+                                        r_upd = requests.patch(url_upd, headers=headers, json=payload_acud)
+                                        if r_upd.status_code in [200, 204]:
+                                            st.success("✅ Acudiente actualizado correctamente")
                                             st.rerun()
-
-                            # Opción 2: Hacer Principal
-                            with col_a2:
+                                        else:
+                                            st.error(f"Error ({r_upd.status_code}): {r_upd.text}")
+                            
+                            # Botones de jerarquía y desvinculación
+                            col_b1, col_b2 = st.columns(2)
+                            with col_b1:
                                 if not es_princ:
-                                    if st.button("⭐ Principal", key=f"btn_p_{acud_id}", use_container_width=True):
+                                    if st.button("⭐ Hacer Principal", key=f"btn_p_{doc_acud}_{idx}", use_container_width=True):
                                         requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, json={"es_principal": False})
-                                        requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud_id}", headers=headers, json={"es_principal": True})
+                                        requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}", headers=headers, json={"es_principal": True})
                                         st.rerun()
-                                else:
-                                    st.caption("Es principal")
-
-                            # Opción 3: Desvincular
-                            with col_a3:
-                                if st.button("🗑️ Quitar", key=f"btn_del_{acud_id}", use_container_width=True):
-                                    requests.delete(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?id=eq.{acud_id}", headers=headers)
+                            with col_b2:
+                                if st.button("🗑️ Desvincular", key=f"btn_del_{doc_acud}_{idx}", use_container_width=True):
+                                    requests.delete(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}", headers=headers)
                                     st.rerun()
+                            st.write("")
                     else:
-                        st.warning("Sin acudientes vinculados.")
+                        st.warning("Este estudiante no tiene acudientes vinculados.")
 
-                    # Formulario para vincular acudiente extra
+                    # Formulario para vincular un acudiente adicional
                     with st.expander("➕ Vincular otro acudiente (Mamá, Papá, Tutor)", expanded=False):
                         with st.form("form_add_acudiente_extra", clear_on_submit=True):
                             n_nom = st.text_input("Nombre completo *")
