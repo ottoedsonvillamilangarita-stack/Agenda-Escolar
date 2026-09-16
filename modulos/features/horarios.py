@@ -18,7 +18,7 @@ DIAS_SEMANA_MAP = {
 DIAS_INVERSO = {v: k for k, v in DIAS_SEMANA_MAP.items()}
 
 # ==============================================================================
-# 1. FRANJAS HORARIAS POR NIVEL
+# 1. FRANJAS HORARIAS POR NIVEL (ADMINISTRADOR)
 # ==============================================================================
 def configurar_horas_nivel(headers=None):
     if headers is None:
@@ -129,7 +129,7 @@ def configurar_horas_nivel(headers=None):
 
 
 # ==============================================================================
-# 2. JORNADAS LABORALES
+# 2. JORNADAS LABORALES (ADMINISTRADOR)
 # ==============================================================================
 def configurar_jornada_nivel(headers=None):
     if headers is None:
@@ -217,7 +217,7 @@ def configurar_jornada_nivel(headers=None):
 
 
 # ==============================================================================
-# 3. HORARIOS POR CURSO (MALLA SEMANAL ZERO-SCROLL)
+# 3. HORARIOS POR CURSO (ADMINISTRADOR)
 # ==============================================================================
 def configurar_horario_curso(headers=None):
     if headers is None:
@@ -436,7 +436,7 @@ def gestion_festivos(headers=None):
 
 
 # ==============================================================================
-# 5. FUNCIONES DE VISTA DE HORARIOS (DOCENTES / ESTUDIANTES)
+# 5. FUNCIONES DE VISTA DE HORARIOS (ESTUDIANTE / DOCENTE / UNIFICADO)
 # ==============================================================================
 def mostrar_horario_docente_tabla(docente_doc=None, headers=None):
     """Muestra el horario semanal personal de un docente."""
@@ -521,3 +521,37 @@ def mostrar_horario_estudiante_tabla(curso=None, headers=None):
         })
 
     st.dataframe(pd.DataFrame(filas).set_index("Bloque"), use_container_width=True)
+
+
+def mostrar_horario_unificado(*args, **kwargs):
+    """
+    Función puente que atiende llamadas de estudiante.py, docente.py y acudiente.py,
+    detectando automáticamente si se consulta por curso o por docente.
+    """
+    headers = kwargs.get("headers", get_headers())
+    
+    # 1. Determinar datos pasados por argumentos posicionales o por nombre
+    data = None
+    curso = kwargs.get("curso")
+    docente_doc = kwargs.get("documento_docente") or kwargs.get("docente")
+
+    if args:
+        primer_arg = args[0]
+        if isinstance(primer_arg, dict):
+            data = primer_arg
+            curso = curso or data.get("curso")
+            docente_doc = docente_doc or data.get("documento_docente") or data.get("documento")
+        elif isinstance(primer_arg, str):
+            # Si parece curso corto (ej: 901, 1002)
+            if len(primer_arg) <= 6:
+                curso = curso or primer_arg
+            else:
+                docente_doc = docente_doc or primer_arg
+
+    # 2. Enrutar según el tipo de consulta
+    if curso:
+        mostrar_horario_estudiante_tabla(curso=curso, headers=headers)
+    elif docente_doc:
+        mostrar_horario_docente_tabla(docente_doc=docente_doc, headers=headers)
+    else:
+        st.info("📅 Consulta de horario semanal lista para visualizar.")
