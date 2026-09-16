@@ -537,7 +537,7 @@ def gestion_docentes():
 
 
 # ============================================
-# GESTIÓN ACADÉMICA 1: NIVELES EDUCATIVOS (COMPACTO)
+# GESTIÓN ACADÉMICA 1: NIVELES EDUCATIVOS
 # ============================================
 def configurar_niveles():
     st.subheader("📚 Niveles Educativos")
@@ -559,7 +559,6 @@ def configurar_niveles():
             df_niv = pd.DataFrame(niveles)[['orden', 'nombre']].rename(columns={'orden': 'Orden', 'nombre': 'Nivel Educativo'})
             st.dataframe(df_niv, use_container_width=True, height=260)
             
-            # Selector compacto para eliminar
             c_del1, c_del2 = st.columns([2, 1])
             with c_del1:
                 niv_del = st.selectbox("Seleccionar para eliminar:", [n['nombre'] for n in niveles], label_visibility="collapsed")
@@ -595,7 +594,7 @@ def configurar_niveles():
 
 
 # ============================================
-# GESTIÓN ACADÉMICA 2: ASIGNATURAS Y PÉNSUM (COMPACTO)
+# GESTIÓN ACADÉMICA 2: ASIGNATURAS & PÉNSUM (EDITABLE)
 # ============================================
 def gestionar_asignaturas():
     st.subheader("📚 Gestión de Asignaturas y Pénsum")
@@ -620,71 +619,118 @@ def gestionar_asignaturas():
         if m_id and n_id in id_a_nivel:
             niveles_por_materia.setdefault(m_id, []).append(id_a_nivel[n_id])
 
-    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
+    col_tabla, col_form = st.columns([1.2, 1.1], gap="medium")
 
+    # COLUMNA IZQUIERDA: RESUMEN DE ASIGNATURAS Y NIVELES
     with col_tabla:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">📘 Catálogo de Asignaturas y Grados que la Cursan</b>
+            <b style="color: #0F172A; font-size: 13.5px;">📘 Pénsum Institucional (Materias y Niveles)</b>
         </div>
         """, unsafe_allow_html=True)
 
         if materias:
             datos_mat = []
             for m in materias:
-                nivs = ", ".join(niveles_por_materia.get(m['id'], [])) or "Sin asignar"
+                nivs = ", ".join(niveles_por_materia.get(m['id'], [])) or "⚠️ Sin nivel"
                 datos_mat.append({
-                    "ID": m['id'],
                     "Asignatura": m.get('nombre'),
                     "Código": m.get('codigo') or "-",
-                    "Niveles Educativos": nivs
+                    "Niveles Asignados": nivs
                 })
             df_mat = pd.DataFrame(datos_mat)
-            st.dataframe(df_mat[['Asignatura', 'Código', 'Niveles Educativos']], use_container_width=True, height=280)
-
-            c_del1, c_del2 = st.columns([2, 1])
-            with c_del1:
-                mat_del_nom = st.selectbox("Eliminar asignatura:", [m['nombre'] for m in materias], label_visibility="collapsed")
-            with c_del2:
-                if st.button("🗑️ Eliminar", use_container_width=True, key="btn_del_mat"):
-                    id_mat_del = next(m['id'] for m in materias if m['nombre'] == mat_del_nom)
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{id_mat_del}", headers=headers)
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{id_mat_del}", headers=headers)
-                    st.success(f"Asignatura eliminada")
-                    st.rerun()
+            st.dataframe(df_mat[['Asignatura', 'Código', 'Niveles Asignados']], use_container_width=True, height=330)
+            st.caption(f"Total: {len(materias)} asignaturas en el pénsum")
         else:
             st.info("No hay asignaturas registradas.")
 
+    # COLUMNA DERECHA: PESTAÑAS EDITAR Y CREAR
     with col_form:
-        st.markdown("""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">➕ Nueva Asignatura / Pénsum</b>
-        </div>
-        """, unsafe_allow_html=True)
+        subtab_edit, subtab_new = st.tabs(["✏️ Modificar Asignatura", "➕ Nueva Asignatura"])
 
-        with st.form("form_nueva_materia", clear_on_submit=True):
-            nombre_mat = st.text_input("Nombre de la asignatura *")
-            codigo_mat = st.text_input("Código o abreviatura (Ej: MAT-01)")
-            niveles_sel = st.multiselect("Niveles donde se imparte *", nivel_nombres)
+        # SUB-PESTAÑA 1: EDITAR NOMBRE, CÓDIGO Y NIVELES
+        with subtab_edit:
+            if materias:
+                mat_opciones = {m['id']: f"{m['nombre']} ({m.get('codigo') or 'Sin código'})" for m in materias}
+                materia_sel_id = st.selectbox(
+                    "Selecciona la asignatura a corregir o reasignar:",
+                    options=list(mat_opciones.keys()),
+                    format_func=lambda x: mat_opciones[x],
+                    key="asig_edit_sel"
+                )
 
-            if st.form_submit_button("💾 Guardar Asignatura", type="primary", use_container_width=True):
-                if not nombre_mat or not niveles_sel:
-                    st.error("❌ Nombre y niveles son obligatorios")
-                else:
-                    data = {"nombre": nombre_mat.upper().strip(), "codigo": codigo_mat.upper().strip() if codigo_mat else None}
-                    r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
-                    if r.status_code == 201:
-                        m_id = r.json()[0]['id']
-                        for n_nom in niveles_sel:
-                            requests.post(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers, json={"materia_id": m_id, "nivel_id": niveles_dict.get(n_nom)})
-                        st.success("✅ Asignatura creada")
+                materia_actual = next((m for m in materias if m['id'] == materia_sel_id), None)
+                niveles_actuales = [n for n in niveles_por_materia.get(materia_sel_id, []) if n in nivel_nombres]
+
+                if materia_actual:
+                    with st.form(f"form_edit_materia_{materia_sel_id}"):
+                        nuevo_nom_mat = st.text_input("Nombre de la asignatura *", value=materia_actual.get('nombre', ''))
+                        nuevo_cod_mat = st.text_input("Código / Abreviatura", value=materia_actual.get('codigo') or '')
+                        nuevos_niveles_sel = st.multiselect(
+                            "Niveles donde se dicta esta materia *",
+                            options=nivel_nombres,
+                            default=niveles_actuales
+                        )
+
+                        c_btn_save, c_btn_del = st.columns([2, 1])
+                        with c_btn_save:
+                            submit_upd_mat = st.form_submit_button("💾 Actualizar Asignatura", type="primary", use_container_width=True)
+
+                        if submit_upd_mat:
+                            if not nuevo_nom_mat or not nuevos_niveles_sel:
+                                st.error("❌ Nombre y al menos un nivel son obligatorios")
+                            else:
+                                # 1. Actualizar datos básicos de la materia
+                                payload_mat = {
+                                    "nombre": nuevo_nom_mat.upper().strip(),
+                                    "codigo": nuevo_cod_mat.upper().strip() if nuevo_cod_mat else None
+                                }
+                                requests.patch(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_sel_id}", headers=headers, json=payload_mat)
+
+                                # 2. Sincronizar niveles (borrar anteriores y reinsertar seleccionados)
+                                requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_sel_id}", headers=headers)
+                                for n_nom in nuevos_niveles_sel:
+                                    n_id = niveles_dict.get(n_nom)
+                                    if n_id:
+                                        requests.post(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers, json={"materia_id": materia_sel_id, "nivel_id": n_id})
+
+                                st.success("✅ Asignatura y niveles actualizados")
+                                st.rerun()
+
+                    # Opción directa de eliminación
+                    if st.button("🗑️ Eliminar esta asignatura del sistema", key=f"del_mat_btn_{materia_sel_id}", use_container_width=True):
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_sel_id}", headers=headers)
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_sel_id}", headers=headers)
+                        st.warning("Asignatura eliminada")
                         st.rerun()
+            else:
+                st.info("Registra asignaturas para poder editarlas.")
+
+        # SUB-PESTAÑA 2: REGISTRAR NUEVA
+        with subtab_new:
+            with st.form("form_nueva_materia", clear_on_submit=True):
+                nombre_mat = st.text_input("Nombre de la asignatura *")
+                codigo_mat = st.text_input("Código / Abreviatura (Ej: MAT-01)")
+                niveles_sel = st.multiselect("Niveles donde aplica *", nivel_nombres)
+
+                if st.form_submit_button("💾 Guardar Asignatura", type="primary", use_container_width=True):
+                    if not nombre_mat or not niveles_sel:
+                        st.error("❌ Nombre y niveles son obligatorios")
                     else:
-                        st.error(f"Error: {r.text}")
+                        data = {"nombre": nombre_mat.upper().strip(), "codigo": codigo_mat.upper().strip() if codigo_mat else None}
+                        r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
+                        if r.status_code == 201:
+                            m_id = r.json()[0]['id']
+                            for n_nom in niveles_sel:
+                                requests.post(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers, json={"materia_id": m_id, "nivel_id": niveles_dict.get(n_nom)})
+                            st.success("✅ Asignatura creada")
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {r.text}")
 
 
 # ============================================
-# GESTIÓN ACADÉMICA 3: CURSOS Y GRADOS (COMPACTO)
+# GESTIÓN ACADÉMICA 3: CURSOS Y GRADOS (EDITABLE)
 # ============================================
 def gestionar_grados():
     st.subheader("📚 Gestión de Grados y Cursos")
@@ -692,62 +738,100 @@ def gestionar_grados():
     
     r_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     niveles = r_niveles.json() if r_niveles.status_code == 200 else []
+    nivel_nombres = [n['nombre'] for n in niveles]
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
-    
+    id_a_nivel = {n['id']: n['nombre'] for n in niveles}
+
     r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
     grados = r_grados.json() if r_grados.status_code == 200 else []
 
-    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
+    col_tabla, col_form = st.columns([1.2, 1.1], gap="medium")
 
+    # COLUMNA IZQUIERDA: LISTA DE CURSOS Y SU NIVEL
     with col_tabla:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">📋 Cursos y Grados Matriculados</b>
+            <b style="color: #0F172A; font-size: 13.5px;">📋 Cursos y Salones Activos</b>
         </div>
         """, unsafe_allow_html=True)
 
         if grados:
             data = []
             for g in grados:
-                n_nombre = next((n['nombre'] for n in niveles if n['id'] == g.get('nivel_id')), "Sin nivel")
-                data.append({"Curso / Salón": g.get('curso'), "Nivel Educativo": n_nombre})
-            st.dataframe(pd.DataFrame(data), use_container_width=True, height=280)
-
-            c_del1, c_del2 = st.columns([2, 1])
-            with c_del1:
-                cur_del = st.selectbox("Eliminar curso:", [g['curso'] for g in grados if g.get('curso')], label_visibility="collapsed")
-            with c_del2:
-                if st.button("🗑️ Eliminar", use_container_width=True, key="btn_del_curso"):
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{cur_del}", headers=headers)
-                    st.success(f"Curso {cur_del} eliminado")
-                    st.rerun()
+                n_nombre = id_a_nivel.get(g.get('nivel_id'), "Sin nivel asignado")
+                data.append({"Curso / Grado": g.get('curso'), "Nivel Educativo": n_nombre})
+            st.dataframe(pd.DataFrame(data), use_container_width=True, height=310)
+            st.caption(f"Total: {len(grados)} cursos configurados")
         else:
             st.info("No hay cursos creados.")
 
+    # COLUMNA DERECHA: PESTAÑAS EDITAR Y CREAR CURSO
     with col_form:
-        st.markdown("""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">➕ Crear Nuevo Curso</b>
-        </div>
-        """, unsafe_allow_html=True)
+        subtab_edit_c, subtab_new_c = st.tabs(["✏️ Modificar Curso", "➕ Nuevo Curso"])
 
-        with st.form("nuevo_grado", clear_on_submit=True):
-            nombre_cur = st.text_input("Nombre del Curso (Ej: 601, 702, Jardín A) *")
-            nivel_cur = st.selectbox("Nivel Educativo al que pertenece *", [n['nombre'] for n in niveles])
+        # SUB-PESTAÑA 1: EDITAR CURSO Y NIVEL ASOCIADO
+        with subtab_edit_c:
+            if grados:
+                cursos_nombres = [g['curso'] for g in grados if g.get('curso')]
+                cur_sel = st.selectbox("Selecciona el curso a editar:", cursos_nombres, key="cur_sel_edit")
+                grado_actual = next((g for g in grados if g.get('curso') == cur_sel), None)
 
-            if st.form_submit_button("💾 Guardar Curso", type="primary", use_container_width=True):
-                if nombre_cur:
-                    data = {"curso": nombre_cur.upper().strip(), "nivel_id": niveles_dict.get(nivel_cur)}
-                    r = requests.post(f"{SUPABASE_URL}/rest/v1/grados", headers=headers, json=data)
-                    if r.status_code == 201:
-                        st.success(f"✅ Curso {nombre_cur} creado")
+                if grado_actual:
+                    nivel_actual_id = grado_actual.get('nivel_id')
+                    nivel_actual_nom = id_a_nivel.get(nivel_actual_id, nivel_nombres[0] if nivel_nombres else "")
+                    idx_nivel = nivel_nombres.index(nivel_actual_nom) if nivel_actual_nom in nivel_nombres else 0
+
+                    with st.form(f"form_edit_curso_{cur_sel}"):
+                        nuevo_nom_cur = st.text_input("Nombre del Curso (Ej: 901, Jardín A) *", value=grado_actual.get('curso', ''))
+                        nuevo_nivel_cur = st.selectbox("Nivel Educativo al que pertenece *", options=nivel_nombres, index=idx_nivel)
+
+                        if st.form_submit_button("💾 Guardar Cambios del Curso", type="primary", use_container_width=True):
+                            if not nuevo_nom_cur:
+                                st.error("❌ El nombre del curso es obligatorio")
+                            else:
+                                payload_grado = {
+                                    "curso": nuevo_nom_cur.upper().strip(),
+                                    "nivel_id": niveles_dict.get(nuevo_nivel_cur)
+                                }
+                                # Actualizar por ID si existe, o por clave curso
+                                if grado_actual.get('id'):
+                                    url_patch = f"{SUPABASE_URL}/rest/v1/grados?id=eq.{grado_actual.get('id')}"
+                                else:
+                                    url_patch = f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{cur_sel}"
+
+                                r_p = requests.patch(url_patch, headers=headers, json=payload_grado)
+                                if r_p.status_code in [200, 204]:
+                                    st.success(f"✅ Curso {nuevo_nom_cur} actualizado correctamente")
+                                    st.rerun()
+                                else:
+                                    st.error(f"Error al actualizar: {r_p.text}")
+
+                    if st.button("🗑️ Eliminar este curso", key=f"btn_del_cur_{cur_sel}", use_container_width=True):
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{cur_sel}", headers=headers)
+                        st.warning(f"Curso {cur_sel} eliminado")
                         st.rerun()
-                    else:
-                        st.error(f"Error: {r.text}")
+            else:
+                st.info("Crea un curso para poder editarlo.")
+
+        # SUB-PESTAÑA 2: NUEVO CURSO
+        with subtab_new_c:
+            with st.form("nuevo_grado", clear_on_submit=True):
+                nombre_cur = st.text_input("Nombre del Curso (Ej: 601, 701, Jardín) *")
+                nivel_cur = st.selectbox("Nivel Educativo *", nivel_nombres)
+
+                if st.form_submit_button("💾 Crear Curso", type="primary", use_container_width=True):
+                    if nombre_cur:
+                        data = {"curso": nombre_cur.upper().strip(), "nivel_id": niveles_dict.get(nivel_cur)}
+                        r = requests.post(f"{SUPABASE_URL}/rest/v1/grados", headers=headers, json=data)
+                        if r.status_code == 201:
+                            st.success(f"✅ Curso {nombre_cur} creado")
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {r.text}")
 
 
 # ============================================
-# GESTIÓN ACADÉMICA 4: DIRECTORES DE GRUPO (PANORAMA GENERAL)
+# GESTIÓN ACADÉMICA 4: DIRECTORES DE GRUPO
 # ============================================
 def gestion_directores_grupo():
     st.subheader("👨‍🏫 Asignación de Directores de Grupo")
@@ -809,7 +893,7 @@ def gestion_directores_grupo():
 
 
 # ============================================
-# GESTIÓN ACADÉMICA 5: ASIGNACIÓN DOCENTE POR MATERIA (COMPACTO)
+# GESTIÓN ACADÉMICA 5: CARGA ACADÉMICA POR CURSO
 # ============================================
 def asignar_docentes_curso():
     st.subheader("👨‍🏫 Carga Académica Docente por Curso")
@@ -826,7 +910,6 @@ def asignar_docentes_curso():
     r_mat = requests.get(f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc", headers=headers)
     materias = r_mat.json() if r_mat.status_code == 200 else []
 
-    # Barra superior ultra compacta
     col_c1, _ = st.columns([1.5, 2.5])
     with col_c1:
         curso_sel = st.selectbox("Selecciona el curso a consultar/gestionar:", cursos, key="asig_curso_sel")
