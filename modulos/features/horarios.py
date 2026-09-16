@@ -6,7 +6,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import time
-from utils import SUPABASE_URL
+from utils import SUPABASE_URL, get_headers
 
 DIAS_SEMANA_MAP = {
     1: "Lunes",
@@ -20,7 +20,10 @@ DIAS_INVERSO = {v: k for k, v in DIAS_SEMANA_MAP.items()}
 # ==============================================================================
 # 1. FRANJAS HORARIAS POR NIVEL
 # ==============================================================================
-def configurar_horas_nivel(headers):
+def configurar_horas_nivel(headers=None):
+    if headers is None:
+        headers = get_headers()
+
     st.markdown("### ⏰ Franjas Horarias por Nivel Educativo")
     
     r_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
@@ -39,13 +42,11 @@ def configurar_horas_nivel(headers):
     
     nivel_id = dict_niveles[nivel_sel]
     
-    # Consultar franjas del nivel
     r_franjas = requests.get(f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}&order=numero_hora.asc", headers=headers)
     franjas = r_franjas.json() if r_franjas.status_code == 200 else []
 
     col_izq, col_der = st.columns([1.3, 1], gap="medium")
 
-    # Columna Izquierda: Grilla actual de horas
     with col_izq:
         st.markdown(f"""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
@@ -76,7 +77,6 @@ def configurar_horas_nivel(headers):
         else:
             st.info(f"No hay bloques creados para {nivel_sel}. Puedes agregarlos a la derecha.")
 
-    # Columna Derecha: Formulario manual y generador rápido
     with col_der:
         tab_manual, tab_auto = st.tabs(["➕ Agregar Bloque", "⚡ Cargar Estándar"])
 
@@ -111,7 +111,7 @@ def configurar_horas_nivel(headers):
                         st.error(f"Error al guardar: {r.text}")
 
         with tab_auto:
-            st.caption("Aplica una jornada clásica de 6 bloques pedagógicos de 55 min con descanso intermedio:")
+            st.caption("Aplica una jornada clásica de 6 bloques pedagógicos de 55 min con descanso:")
             if st.button("🚀 Generar Jornada Estándar (7:00 a 13:00)", type="secondary", use_container_width=True):
                 requests.delete(f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id}", headers=headers)
                 franjas_def = [
@@ -131,7 +131,10 @@ def configurar_horas_nivel(headers):
 # ==============================================================================
 # 2. JORNADAS LABORALES
 # ==============================================================================
-def configurar_jornada_nivel(headers):
+def configurar_jornada_nivel(headers=None):
+    if headers is None:
+        headers = get_headers()
+
     st.markdown("### 🏛️ Jornadas Institucionales por Nivel")
     
     r_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
@@ -143,7 +146,6 @@ def configurar_jornada_nivel(headers):
 
     nombres_niveles = [n['nombre'] for n in niveles]
     dict_niveles = {n['nombre']: n['id'] for n in niveles}
-    id_a_nivel = {n['id']: n['nombre'] for n in niveles}
 
     r_jornadas = requests.get(f"{SUPABASE_URL}/rest/v1/jornadas_nivel", headers=headers)
     jornadas = r_jornadas.json() if r_jornadas.status_code == 200 else []
@@ -151,7 +153,6 @@ def configurar_jornada_nivel(headers):
 
     col_izq, col_der = st.columns([1.3, 1], gap="medium")
 
-    # Columna Izquierda: Panorama general de horarios
     with col_izq:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
@@ -179,7 +180,6 @@ def configurar_jornada_nivel(headers):
                 })
         st.dataframe(pd.DataFrame(resumen), use_container_width=True, height=270)
 
-    # Columna Derecha: Configuración del nivel seleccionado
     with col_der:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
@@ -219,7 +219,10 @@ def configurar_jornada_nivel(headers):
 # ==============================================================================
 # 3. HORARIOS POR CURSO (MALLA SEMANAL ZERO-SCROLL)
 # ==============================================================================
-def configurar_horario_curso(headers):
+def configurar_horario_curso(headers=None):
+    if headers is None:
+        headers = get_headers()
+
     st.markdown("### 📅 Malla Curricular Semanal por Curso")
     
     r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=curso,nivel_id&order=curso.asc", headers=headers)
@@ -232,18 +235,15 @@ def configurar_horario_curso(headers):
     cursos_disp = sorted(list(set([g['curso'] for g in grados if g.get('curso')])))
     dict_curso_nivel = {g['curso']: g.get('nivel_id') for g in grados}
 
-    # Barra superior ultra compacta
     col_cur, col_info_top = st.columns([1.5, 2.5])
     with col_cur:
         curso_sel = st.selectbox("Seleccionar Curso:", cursos_disp, key="horario_curso_sel")
     
     nivel_id_curso = dict_curso_nivel.get(curso_sel)
 
-    # 1. Obtener Franjas de este nivel
     r_franjas = requests.get(f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id_curso}&order=numero_hora.asc", headers=headers) if nivel_id_curso else None
     franjas = r_franjas.json() if r_franjas and r_franjas.status_code == 200 and r_franjas.json() else []
 
-    # Si no tiene franjas configuradas, usar 6 estándar de respaldo
     if not franjas:
         franjas = [
             {"numero_hora": 1, "hora_inicio": "07:00", "hora_fin": "07:55", "tipo": "Clase"},
@@ -255,18 +255,15 @@ def configurar_horario_curso(headers):
             {"numero_hora": 7, "hora_inicio": "12:05", "hora_fin": "13:00", "tipo": "Clase"},
         ]
 
-    # 2. Cargar Asignación Académica (Docentes por Materia en este curso)
     r_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}", headers=headers)
     asignaciones = [a for a in r_asig.json() if "DIRECCION" not in str(a.get('asignatura', '')).upper()] if r_asig.status_code == 200 else []
     docente_por_materia = {a['asignatura']: a.get('documento_docente') for a in asignaciones}
     materias_curso = sorted(list(docente_por_materia.keys()))
 
-    # Docentes para resolución de nombres
     r_doc = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     docentes = r_doc.json() if r_doc.status_code == 200 else []
     doc_nombres = {d['documento_docente']: f"{d['nombre_docente'].split()[0]} {d['apellidos_docente'].split()[0]}" for d in docentes}
 
-    # 3. Cargar Horario Registrado en Supabase
     r_horario = requests.get(f"{SUPABASE_URL}/rest/v1/horarios_curso?curso=eq.{curso_sel}", headers=headers)
     horario_items = r_horario.json() if r_horario.status_code == 200 else []
 
@@ -286,7 +283,6 @@ def configurar_horario_curso(headers):
         </div>
         """, unsafe_allow_html=True)
 
-    # LAYOUT 2 COLUMNAS (MALLA SEMANAL 70% | GESTIÓN RÁPIDA 30%)
     col_matriz, col_asignar = st.columns([1.8, 1.1], gap="medium")
 
     with col_matriz:
@@ -324,7 +320,6 @@ def configurar_horario_curso(headers):
 
         st.dataframe(pd.DataFrame(filas).set_index("Bloque"), use_container_width=True, height=330)
 
-    # Panel lateral derecho para asignar materia a la casilla
     with col_asignar:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
@@ -349,7 +344,7 @@ def configurar_horario_curso(headers):
                 prof_asoc = doc_nombres.get(doc_doc_auto, "Sin docente asignado")
                 st.caption(f"👨‍🏫 Imparte: **{prof_asoc}**")
             else:
-                st.warning("No hay asignaturas vinculadas a este curso. Agrégalas en Gestión Académica.")
+                st.warning("No hay asignaturas vinculadas a este curso.")
                 asig_sel = None
                 doc_doc_auto = None
 
@@ -359,35 +354,35 @@ def configurar_horario_curso(headers):
             with c_btn2:
                 borrar_slot = st.form_submit_button("🗑️ Vaciar Casilla", use_container_width=True)
 
-            if guardar_slot:
-                if asig_sel:
-                    # Eliminar ocupación previa de esa casilla en el curso
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/horarios_curso?curso=eq.{curso_sel}&dia_semana=eq.{dia_cod}&numero_hora=eq.{bloque_sel}", headers=headers)
-                    
-                    payload = {
-                        "curso": curso_sel,
-                        "dia_semana": dia_cod,
-                        "numero_hora": bloque_sel,
-                        "asignatura": asig_sel,
-                        "documento_docente": doc_doc_auto
-                    }
-                    r = requests.post(f"{SUPABASE_URL}/rest/v1/horarios_curso", headers=headers, json=payload)
-                    if r.status_code in [200, 201]:
-                        st.success(f"{asig_sel} asignada al {dia_nom}")
-                        st.rerun()
-                    else:
-                        st.error(f"Error: {r.text}")
+            if guardar_slot and asig_sel:
+                requests.delete(f"{SUPABASE_URL}/rest/v1/horarios_curso?curso=eq.{curso_sel}&dia_semana=eq.{dia_cod}&numero_hora=eq.{bloque_sel}", headers=headers)
+                payload = {
+                    "curso": curso_sel,
+                    "dia_semana": dia_cod,
+                    "numero_hora": bloque_sel,
+                    "asignatura": asig_sel,
+                    "documento_docente": doc_doc_auto
+                }
+                r = requests.post(f"{SUPABASE_URL}/rest/v1/horarios_curso", headers=headers, json=payload)
+                if r.status_code in [200, 201]:
+                    st.success(f"{asig_sel} asignada")
+                    st.rerun()
+                else:
+                    st.error(f"Error: {r.text}")
 
             if borrar_slot:
                 requests.delete(f"{SUPABASE_URL}/rest/v1/horarios_curso?curso=eq.{curso_sel}&dia_semana=eq.{dia_cod}&numero_hora=eq.{bloque_sel}", headers=headers)
-                st.info(f"Casilla de {dia_nom} vaciada")
+                st.info("Casilla vaciada")
                 st.rerun()
 
 
 # ==============================================================================
 # 4. GESTIÓN DE FESTIVOS & CALENDARIO
 # ==============================================================================
-def gestion_festivos(headers):
+def gestion_festivos(headers=None):
+    if headers is None:
+        headers = get_headers()
+
     st.markdown("### 🏖️ Calendario Escolar y Días No Lectivos")
     
     r_festivos = requests.get(f"{SUPABASE_URL}/rest/v1/festivos?order=fecha.asc", headers=headers)
@@ -438,3 +433,91 @@ def gestion_festivos(headers):
                         st.rerun()
                     else:
                         st.error(f"Error: {r.text}")
+
+
+# ==============================================================================
+# 5. FUNCIONES DE VISTA DE HORARIOS (DOCENTES / ESTUDIANTES)
+# ==============================================================================
+def mostrar_horario_docente_tabla(docente_doc=None, headers=None):
+    """Muestra el horario semanal personal de un docente."""
+    if headers is None:
+        headers = get_headers()
+
+    if isinstance(docente_doc, dict):
+        docente_doc = docente_doc.get("documento") or docente_doc.get("username")
+
+    if not docente_doc:
+        st.info("No se especificó documento del docente para consultar el horario.")
+        return
+
+    r = requests.get(f"{SUPABASE_URL}/rest/v1/horarios_curso?documento_docente=eq.{docente_doc}&order=dia_semana.asc,numero_hora.asc", headers=headers)
+    clases = r.json() if r.status_code == 200 else []
+
+    if not clases:
+        st.info("No tienes clases programadas en tu horario semanal.")
+        return
+
+    matriz = {}
+    horas_set = set()
+    for c in clases:
+        d = c.get('dia_semana')
+        h = c.get('numero_hora')
+        asig = c.get('asignatura')
+        curso = c.get('curso')
+        horas_set.add(h)
+        matriz[(d, h)] = f"{asig} ({curso})"
+
+    filas = []
+    for h in sorted(list(horas_set)):
+        filas.append({
+            "Bloque": f"Hora #{h}",
+            "Lunes": matriz.get((1, h), "—"),
+            "Martes": matriz.get((2, h), "—"),
+            "Miércoles": matriz.get((3, h), "—"),
+            "Jueves": matriz.get((4, h), "—"),
+            "Viernes": matriz.get((5, h), "—")
+        })
+
+    st.dataframe(pd.DataFrame(filas).set_index("Bloque"), use_container_width=True)
+
+
+def mostrar_horario_estudiante_tabla(curso=None, headers=None):
+    """Muestra el horario semanal de un curso/estudiante."""
+    if headers is None:
+        headers = get_headers()
+
+    if isinstance(curso, dict):
+        curso = curso.get("curso")
+
+    if not curso:
+        st.info("No se especificó el curso a consultar.")
+        return
+
+    r = requests.get(f"{SUPABASE_URL}/rest/v1/horarios_curso?curso=eq.{curso}&order=dia_semana.asc,numero_hora.asc", headers=headers)
+    clases = r.json() if r.status_code == 200 else []
+
+    if not clases:
+        st.info(f"No hay horario registrado para el curso {curso}.")
+        return
+
+    matriz = {}
+    horas_set = set()
+    for c in clases:
+        d = c.get('dia_semana')
+        h = c.get('numero_hora')
+        asig = c.get('asignatura')
+        horas_set.add(h)
+        matriz[(d, h)] = asig
+
+    filas = []
+    for h in sorted(list(horas_set)):
+        filas.append({
+            "Bloque": f"Hora #{h}",
+            "Lunes": matriz.get((1, h), "—"),
+            "Martes": matriz.get((2, h), "—"),
+            "Miércoles": matriz.get((3, h), "—"),
+            "Jueves": matriz.get((4, h), "—"),
+            "Viernes": matriz.get((5, h), "—")
+        })
+
+    st.dataframe(pd.DataFrame(filas).set_index("Bloque"), use_container_width=True)
