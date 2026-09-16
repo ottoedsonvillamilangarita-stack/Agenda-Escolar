@@ -1,5 +1,5 @@
 # ============================================
-# modulos/paneles/admin.py - VERSIÓN MODERNA, COMPACTA & COMPLETA
+# modulos/paneles/admin.py - VERSIÓN COMPACTA & ZERO-SCROLL
 # ============================================
 
 import streamlit as st
@@ -34,19 +34,19 @@ def mostrar(data):
     headers = get_headers()
     
     st.markdown("""
-    <div style="background: white; padding: 20px 24px; border-radius: 12px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-        <div style="display: flex; align-items: center; gap: 16px;">
-            <div style="width: 54px; height: 54px; background: linear-gradient(135deg, #1E3A8A, #3B82F6); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; color: white;">
+    <div style="background: white; padding: 18px 22px; border-radius: 12px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #1E3A8A, #3B82F6); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white;">
                 🏫
             </div>
             <div>
-                <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #0F172A;">COLEGIO DE PRUEBA</h2>
-                <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748B; font-style: italic;">"Preparando gente para el futuro"</p>
+                <h2 style="margin: 0; font-size: 19px; font-weight: 700; color: #0F172A;">COLEGIO DE PRUEBA</h2>
+                <p style="margin: 2px 0 0 0; font-size: 12.5px; color: #64748B; font-style: italic;">"Preparando gente para el futuro"</p>
             </div>
         </div>
         <div style="text-align: right;">
-            <span style="background: #DCFCE7; color: #166534; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px;">🟢 Sistema Activo</span>
-            <span style="background: #EEF2F6; color: #334155; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-left: 6px;">📅 Año 2026</span>
+            <span style="background: #DCFCE7; color: #166534; font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 16px;">🟢 Sistema Activo</span>
+            <span style="background: #EEF2F6; color: #334155; font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 16px; margin-left: 6px;">📅 Año 2026</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -72,43 +72,41 @@ def mostrar(data):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"""
-        <div style="background: white; padding: 18px; border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 700;">👨‍🎓 Estudiantes</div>
-            <div style="font-size: 28px; font-weight: 700; color: #0F172A; margin: 4px 0;">{total_estudiantes}</div>
+        <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #E2E8F0;">
+            <div style="font-size: 10.5px; text-transform: uppercase; color: #64748B; font-weight: 700;">👨‍🎓 Estudiantes</div>
+            <div style="font-size: 26px; font-weight: 700; color: #0F172A; margin: 3px 0;">{total_estudiantes}</div>
             <div style="font-size: 11px; color: #16A34A; font-weight: 600;">Matriculados activos</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"""
-        <div style="background: white; padding: 18px; border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 700;">👨‍🏫 Docentes</div>
-            <div style="font-size: 28px; font-weight: 700; color: #0F172A; margin: 4px 0;">{total_docentes}</div>
+        <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #E2E8F0;">
+            <div style="font-size: 10.5px; text-transform: uppercase; color: #64748B; font-weight: 700;">👨‍🏫 Docentes</div>
+            <div style="font-size: 26px; font-weight: 700; color: #0F172A; margin: 3px 0;">{total_docentes}</div>
             <div style="font-size: 11px; color: #2563EB; font-weight: 600;">Planta vinculada</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col3:
         st.markdown(f"""
-        <div style="background: white; padding: 18px; border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 700;">📚 Cursos / Grados</div>
-            <div style="font-size: 28px; font-weight: 700; color: #0F172A; margin: 4px 0;">{total_cursos}</div>
+        <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #E2E8F0;">
+            <div style="font-size: 10.5px; text-transform: uppercase; color: #64748B; font-weight: 700;">📚 Cursos / Grados</div>
+            <div style="font-size: 26px; font-weight: 700; color: #0F172A; margin: 3px 0;">{total_cursos}</div>
             <div style="font-size: 11px; color: #8B5CF6; font-weight: 600;">Registrados en sede</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col4:
         st.markdown(f"""
-        <div style="background: white; padding: 18px; border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-            <div style="font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 700;">👨‍👩‍👧 Familias</div>
-            <div style="font-size: 28px; font-weight: 700; color: #0F172A; margin: 4px 0;">189+</div>
+        <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #E2E8F0;">
+            <div style="font-size: 10.5px; text-transform: uppercase; color: #64748B; font-weight: 700;">👨‍👩‍👧 Familias</div>
+            <div style="font-size: 26px; font-weight: 700; color: #0F172A; margin: 3px 0;">189+</div>
             <div style="font-size: 11px; color: #EA580C; font-weight: 600;">Acudientes activos</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.write("")
-    st.write("")
-
     col_izq, col_der = st.columns([2, 1])
     with col_izq:
         st.subheader("📢 Agenda & Novedades Institucionales")
@@ -117,7 +115,6 @@ def mostrar(data):
 
     with col_der:
         st.subheader("⚡ Acceso Rápido")
-        st.caption("Navega desde el menú superior o lateral a los módulos:")
         st.write("• **👥 Comunidad Escolar:** Registro y consulta de estudiantes y docentes.")
         st.write("• **📚 Gestión Académica:** Pénsum, asignaturas y dirección de grupo.")
         st.write("• **⏰ Horarios:** Franjas horarias y cronogramas semanales.")
@@ -132,7 +129,6 @@ def gestion_estudiantes():
     
     tab1, tab2, tab3 = st.tabs(["📋 Directorio de Alumnos", "➕ Matricular Estudiante", "✏️ Ficha del Estudiante & Familia"])
     
-    # ---------------- TAB 1: DIRECTORIO ROBUSTO CON FILTROS ----------------
     with tab1:
         try:
             response = requests.get(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers)
@@ -140,7 +136,6 @@ def gestion_estudiantes():
                 estudiantes = response.json()
                 if estudiantes:
                     df = pd.DataFrame(estudiantes)
-                    
                     if 'estado' not in df.columns:
                         df['estado'] = 'Activo'
                     else:
@@ -154,7 +149,7 @@ def gestion_estudiantes():
                     with c_f2:
                         filtro_curso = st.selectbox("Curso:", ["Todos"] + cursos_reales, index=0)
                     with c_f3:
-                        busq_nombre = st.text_input("Buscar por nombre o documento:", placeholder="Escribe para filtrar...")
+                        busq_nombre = st.text_input("Buscar alumno:", placeholder="Nombre o documento...")
 
                     df_filtrado = df.copy()
                     if filtro_estado != "Todos":
@@ -179,16 +174,15 @@ def gestion_estudiantes():
                     df_mostrar = df_filtrado[cols_finales].copy()
                     df_mostrar.columns = [c.replace('_estudiante', '').capitalize() for c in df_mostrar.columns]
 
-                    st.dataframe(df_mostrar, use_container_width=True, height=380)
+                    st.dataframe(df_mostrar, use_container_width=True, height=360)
                     st.caption(f"Mostrando **{len(df_mostrar)}** de **{len(df)}** alumnos registrados")
                 else:
-                    st.info("No hay estudiantes registrados en la base de datos.")
+                    st.info("No hay estudiantes registrados.")
             else:
                 st.error(f"Error ({response.status_code}): {response.text}")
         except Exception as e:
             st.error(f"Error al cargar estudiantes: {str(e)}")
     
-    # ---------------- TAB 2: MATRICULAR ESTUDIANTE ----------------
     with tab2:
         st.write("**Formulario de Matrícula y Acudiente Inicial**")
         with st.form("nuevo_estudiante", clear_on_submit=True):
@@ -208,11 +202,11 @@ def gestion_estudiantes():
                 documento_acudiente = st.text_input("Documento del acudiente *")
                 parentesco = st.selectbox("Parentesco *", PARENTESCOS)
                 telefono_acudiente = st.text_input("Teléfono acudiente")
-                email_acudiente = st.text_input("Correo acudiente (para notificaciones)")
+                email_acudiente = st.text_input("Correo acudiente (notificaciones)")
             
             if st.form_submit_button("💾 Completar Matrícula", type="primary", use_container_width=True):
                 if not all([nombre, apellidos, documento, curso, nombre_acudiente, documento_acudiente]):
-                    st.error("❌ Completa todos los campos obligatorios (*)")
+                    st.error("❌ Completa los campos obligatorios (*)")
                 else:
                     check_url = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento}"
                     check_res = requests.get(check_url, headers=headers)
@@ -243,15 +237,14 @@ def gestion_estudiantes():
                                 "username": documento_acudiente, "password_hash": "demo2026", "rol": "acudiente", "documento": documento_acudiente, "roles": ["acudiente"]
                             })
                             st.success(f"✅ Alumno {nombre} {apellidos} matriculado exitosamente")
-                            st.info(f"🔑 Credenciales: Alumno: `{documento}` | Acudiente: `{documento_acudiente}` (Clave: `demo2026`)")
+                            st.rerun()
                         else:
                             st.error(f"Error al matricular: {res_est.status_code}")
 
-    # ---------------- TAB 3: EDICIÓN INTEGRAL (ALUMNO Y ACUDIENTES) ----------------
     with tab3:
         col_b1, _ = st.columns([3, 1])
         with col_b1:
-            documento_buscar = st.text_input("🔍 Buscar expediente por documento del estudiante", placeholder="Ingresa documento y presiona Enter", key="buscar_est_integral")
+            documento_buscar = st.text_input("🔍 Buscar expediente por documento:", placeholder="Ingresa documento y presiona Enter", key="buscar_est_integral")
         
         if documento_buscar:
             url_est = f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}"
@@ -263,15 +256,14 @@ def gestion_estudiantes():
                 
                 col_izq, col_der = st.columns([1, 1], gap="medium")
                 
-                # === COLUMNA IZQUIERDA: DATOS COMPLETOS DEL ESTUDIANTE ===
                 with col_izq:
                     color_estado = "#16A34A" if estado_actual == "Activo" else "#DC2626"
                     bg_estado = "#DCFCE7" if estado_actual == "Activo" else "#FEE2E2"
                     
                     st.markdown(f"""
-                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                        <b style="color: #0F172A; font-size: 14px;">👤 Datos del Alumno</b>
-                        <span style="font-size: 11px; font-weight: 700; color: {color_estado}; background: {bg_estado}; padding: 2px 8px; border-radius: 6px;">
+                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <b style="color: #0F172A; font-size: 13.5px;">👤 Datos del Alumno</b>
+                        <span style="font-size: 11px; font-weight: 700; color: {color_estado}; background: {bg_estado}; padding: 2px 7px; border-radius: 6px;">
                             {estado_actual.upper()}
                         </span>
                     </div>
@@ -300,9 +292,9 @@ def gestion_estudiantes():
                         with c6:
                             email_upd = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
                             
-                        direccion_upd = st.text_input("Dirección de residencia", value=estudiante.get('direccion_estudiante', ''))
+                        direccion_upd = st.text_input("Dirección", value=estudiante.get('direccion_estudiante', ''))
                         
-                        if st.form_submit_button("💾 Guardar Cambios del Alumno", type="primary", use_container_width=True):
+                        if st.form_submit_button("💾 Guardar Cambios Alumno", type="primary", use_container_width=True):
                             payload = {
                                 "nombre_estudiante": nombre_upd,
                                 "apellidos_estudiante": apellidos_upd,
@@ -314,16 +306,15 @@ def gestion_estudiantes():
                             }
                             r_upd_est = requests.patch(f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}", headers=headers, json=payload)
                             if r_upd_est.status_code in [200, 204]:
-                                st.success("✅ Alumno actualizado correctamente")
+                                st.success("✅ Alumno actualizado")
                                 st.rerun()
                             else:
-                                st.error(f"Error al actualizar: {r_upd_est.text}")
+                                st.error(f"Error: {r_upd_est.text}")
 
-                # === COLUMNA DERECHA: NÚCLEO FAMILIAR (BOTONES EN LÍNEA) ===
                 with col_der:
                     st.markdown("""
-                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-                        <b style="color: #0F172A; font-size: 14px;">👨‍👩‍👧 Núcleo Familiar & Acudientes</b>
+                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+                        <b style="color: #0F172A; font-size: 13.5px;">👨‍👩‍👧 Acudientes Vinculados</b>
                     </div>
                     """, unsafe_allow_html=True)
                     
@@ -340,35 +331,32 @@ def gestion_estudiantes():
                             texto_badge = "#1D4ED8" if es_princ else "#64748B"
                             
                             st.markdown(f"""
-                            <div style="background: white; border: 1.5px solid {borde}; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;">
+                            <div style="background: white; border: 1.5px solid {borde}; border-radius: 8px; padding: 9px 12px; margin-bottom: 6px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-size: 13.5px; font-weight: 700; color: #0F172A;">{acud.get('nombre_acudiente')} ({acud.get('parentesco', 'Tutor')})</span>
-                                    <span style="font-size: 10px; font-weight: 700; color: {texto_badge}; background: {fondo_badge}; padding: 2px 6px; border-radius: 4px;">
+                                    <span style="font-size: 13px; font-weight: 700; color: #0F172A;">{acud.get('nombre_acudiente')} ({acud.get('parentesco', 'Tutor')})</span>
+                                    <span style="font-size: 9.5px; font-weight: 700; color: {texto_badge}; background: {fondo_badge}; padding: 2px 6px; border-radius: 4px;">
                                         {'⭐ PRINCIPAL' if es_princ else 'Secundario'}
                                     </span>
                                 </div>
-                                <div style="font-size: 11.5px; color: #475569; margin-top: 3px;">
+                                <div style="font-size: 11px; color: #475569; margin-top: 3px;">
                                     📄 Doc: <b>{doc_acud}</b> | 📞 {acud.get('telefono_acudiente') or 'Sin tel'} | ✉️ {acud.get('email_acudiente') or 'Sin correo'}
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # TRES BOTONES ALINEADOS EXACTAMENTE EN LA MISMA LÍNEA
                             c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
-                            
-                            # 1. EDITAR CUALQUIER DATO DEL ACUDIENTE
                             with c_btn1:
                                 with st.popover("✏️ Editar", use_container_width=True):
-                                    st.markdown(f"**Modificar datos de {acud.get('nombre_acudiente')}**")
+                                    st.markdown(f"**Modificar:** {acud.get('nombre_acudiente')}")
                                     with st.form(f"form_pop_acud_{doc_acud}_{idx}"):
                                         ed_nombre = st.text_input("Nombre completo", value=acud.get('nombre_acudiente', ''))
                                         par_actual = acud.get('parentesco', 'Padre')
                                         idx_p = PARENTESCOS.index(par_actual) if par_actual in PARENTESCOS else 0
                                         ed_par = st.selectbox("Parentesco", PARENTESCOS, index=idx_p)
                                         ed_tel = st.text_input("Teléfono", value=acud.get('telefono_acudiente', ''))
-                                        ed_email = st.text_input("Correo electrónico", value=acud.get('email_acudiente', ''))
+                                        ed_email = st.text_input("Correo", value=acud.get('email_acudiente', ''))
                                         
-                                        if st.form_submit_button("💾 Guardar Datos", type="primary", use_container_width=True):
+                                        if st.form_submit_button("💾 Guardar", type="primary", use_container_width=True):
                                             payload_acud = {
                                                 "nombre_acudiente": ed_nombre,
                                                 "parentesco": ed_par,
@@ -378,12 +366,11 @@ def gestion_estudiantes():
                                             url_upd = f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}"
                                             r_upd = requests.patch(url_upd, headers=headers, json=payload_acud)
                                             if r_upd.status_code in [200, 204]:
-                                                st.success("✅ Datos del acudiente actualizados")
+                                                st.success("✅ Acudiente actualizado")
                                                 st.rerun()
                                             else:
                                                 st.error(f"Error ({r_upd.status_code}): {r_upd.text}")
                             
-                            # 2. DESIGNAR ACUDIENTE PRINCIPAL
                             with c_btn2:
                                 if not es_princ:
                                     if st.button("⭐ Principal", key=f"btn_p_{doc_acud}_{idx}", use_container_width=True):
@@ -393,7 +380,6 @@ def gestion_estudiantes():
                                 else:
                                     st.button("⭐ Principal", disabled=True, use_container_width=True, key=f"btn_dis_{doc_acud}_{idx}")
                             
-                            # 3. DESVINCULAR ACUDIENTE
                             with c_btn3:
                                 if st.button("🗑️ Quitar", key=f"btn_del_{doc_acud}_{idx}", use_container_width=True):
                                     requests.delete(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}", headers=headers)
@@ -401,10 +387,9 @@ def gestion_estudiantes():
                             
                             st.write("")
                     else:
-                        st.warning("Este estudiante no tiene acudientes vinculados.")
+                        st.warning("Sin acudientes vinculados.")
 
-                    # FORMULARIO PARA VINCULAR OTRO ACUDIENTE
-                    with st.expander("➕ Vincular otro acudiente (Mamá, Papá, Tutor)", expanded=False):
+                    with st.expander("➕ Vincular otro acudiente", expanded=False):
                         with st.form("form_add_acudiente_extra", clear_on_submit=True):
                             n_nom = st.text_input("Nombre completo *")
                             ca1, ca2 = st.columns(2)
@@ -421,7 +406,7 @@ def gestion_estudiantes():
                             
                             if st.form_submit_button("🔗 Vincular al Alumno", type="primary", use_container_width=True):
                                 if not n_nom or not n_doc:
-                                    st.error("Nombre y documento son obligatorios")
+                                    st.error("Nombre y documento obligatorios")
                                 else:
                                     if n_pr:
                                         requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, json={"es_principal": False})
@@ -436,7 +421,7 @@ def gestion_estudiantes():
                                     st.success(f"✅ {n_nom} vinculado exitosamente")
                                     st.rerun()
             else:
-                st.warning("🔍 No se encontró ningún estudiante con el documento ingresado.")
+                st.warning("🔍 No se encontró ningún estudiante con ese documento.")
 
 
 # ============================================
@@ -458,10 +443,10 @@ def gestion_docentes():
                     cols = ['documento_docente', 'nombre_docente', 'apellidos_docente', 'titulo', 'tipo_contrato', 'telefono_docente', 'email_docente']
                     df_final = df[[c for c in cols if c in df.columns]]
                     df_final.columns = [c.replace('_docente', '').capitalize() for c in df_final.columns]
-                    st.dataframe(df_final, use_container_width=True)
-                    st.caption(f"Total docentes activos: {len(docentes)}")
+                    st.dataframe(df_final, use_container_width=True, height=360)
+                    st.caption(f"Total docentes: {len(docentes)}")
                 else:
-                    st.info("No hay docentes registrados")
+                    st.info("No hay docentes registrados.")
         except Exception as e:
             st.error(f"Error: {str(e)}")
     
@@ -476,20 +461,20 @@ def gestion_docentes():
                 fecha_nacimiento = st.date_input("Fecha de nacimiento", value=None)
                 sexo = st.selectbox("Sexo", SEXOS)
             with col2:
-                telefono = st.text_input("Teléfono de contacto")
-                email = st.text_input("Correo electrónico")
-                titulo = st.text_input("Título o especialidad docente")
+                telefono = st.text_input("Teléfono")
+                email = st.text_input("Email")
+                titulo = st.text_input("Título profesional")
                 tipo_contrato = st.selectbox("Tipo de contrato", TIPOS_CONTRATO)
                 fecha_ingreso = st.date_input("Fecha de ingreso", value=None)
             
-            if st.form_submit_button("💾 Guardar Docente", type="primary"):
+            if st.form_submit_button("💾 Guardar Docente", type="primary", use_container_width=True):
                 if not all([nombre, apellidos, documento]):
-                    st.error("❌ Nombre, apellidos y documento son obligatorios (*)")
+                    st.error("❌ Completa los campos obligatorios (*)")
                 else:
                     check_url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento}"
                     check_response = requests.get(check_url, headers=headers)
                     if check_response.status_code == 200 and check_response.json():
-                        st.error(f"❌ Ya existe un docente registrado con el documento {documento}")
+                        st.error(f"❌ Ya existe un docente con el documento {documento}")
                     else:
                         data = {
                             "nombre_docente": nombre,
@@ -514,14 +499,13 @@ def gestion_docentes():
                                 "roles": ["docente"]
                             }
                             requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json=user_data)
-                            st.success(f"✅ Docente {nombre} {apellidos} registrado exitosamente")
-                            st.info(f"🔑 Credenciales asignadas: Usuario: `{username}` | Clave demo: `demo2026`")
+                            st.success(f"✅ Docente {nombre} {apellidos} registrado")
+                            st.rerun()
                         else:
                             st.error(f"Error: {response.status_code}")
     
     with tab3:
-        st.write("**Consultar y editar ficha docente**")
-        documento_buscar = st.text_input("Documento del docente", placeholder="Ej: 79123456", key="buscar_doc_edit")
+        documento_buscar = st.text_input("Buscar docente por documento:", placeholder="Ej: 79123456", key="buscar_doc_edit")
         if documento_buscar:
             url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento_buscar}"
             response = requests.get(url, headers=headers)
@@ -537,7 +521,7 @@ def gestion_docentes():
                         email = st.text_input("Email", value=docente.get('email_docente', ''))
                         titulo = st.text_input("Título", value=docente.get('titulo', ''))
                     
-                    if st.form_submit_button("💾 Guardar Cambios", type="primary"):
+                    if st.form_submit_button("💾 Guardar Cambios Docente", type="primary", use_container_width=True):
                         data_update = {
                             "nombre_docente": nombre,
                             "apellidos_docente": apellidos,
@@ -545,8 +529,7 @@ def gestion_docentes():
                             "email_docente": email,
                             "titulo": titulo
                         }
-                        update_url = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento_buscar}"
-                        requests.patch(update_url, headers=headers, json=data_update)
+                        requests.patch(f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{documento_buscar}", headers=headers, json=data_update)
                         st.success("✅ Ficha docente actualizada")
                         st.rerun()
             else:
@@ -554,105 +537,154 @@ def gestion_docentes():
 
 
 # ============================================
-# NIVELES EDUCATIVOS
+# GESTIÓN ACADÉMICA 1: NIVELES EDUCATIVOS (COMPACTO)
 # ============================================
 def configurar_niveles():
     st.subheader("📚 Niveles Educativos")
     headers = get_headers()
-    response = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
     
-    if response.status_code == 200:
-        niveles = response.json()
+    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
+    
+    r_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
+    niveles = r_niveles.json() if r_niveles.status_code == 200 else []
+
+    with col_tabla:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">📋 Niveles Activos en la Institución</b>
+        </div>
+        """, unsafe_allow_html=True)
+        
         if niveles:
-            for n in niveles:
-                st.write(f"- **{n['nombre']}** (Orden: {n.get('orden')})")
-    
-    with st.expander("➕ Agregar nuevo nivel"):
-        nuevo_nivel = st.text_input("Nombre del nivel")
-        if st.button("Guardar Nivel", type="primary"):
-            if nuevo_nivel:
-                data = {"nombre": nuevo_nivel, "orden": len(niveles) + 1 if niveles else 1}
-                r = requests.post(f"{SUPABASE_URL}/rest/v1/niveles", headers=headers, json=data)
-                if r.status_code == 201:
-                    st.success(f"✅ Nivel '{nuevo_nivel}' agregado")
+            df_niv = pd.DataFrame(niveles)[['orden', 'nombre']].rename(columns={'orden': 'Orden', 'nombre': 'Nivel Educativo'})
+            st.dataframe(df_niv, use_container_width=True, height=260)
+            
+            # Selector compacto para eliminar
+            c_del1, c_del2 = st.columns([2, 1])
+            with c_del1:
+                niv_del = st.selectbox("Seleccionar para eliminar:", [n['nombre'] for n in niveles], label_visibility="collapsed")
+            with c_del2:
+                if st.button("🗑️ Eliminar", use_container_width=True):
+                    id_borrar = next(n['id'] for n in niveles if n['nombre'] == niv_del)
+                    requests.delete(f"{SUPABASE_URL}/rest/v1/niveles?id=eq.{id_borrar}", headers=headers)
+                    st.success(f"Nivel '{niv_del}' eliminado")
                     st.rerun()
+        else:
+            st.info("No hay niveles registrados.")
+
+    with col_form:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">➕ Registrar Nuevo Nivel</b>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("form_nuevo_nivel", clear_on_submit=True):
+            nuevo_nivel = st.text_input("Nombre del Nivel (Ej: Bachillerato, Primaria) *")
+            orden_nivel = st.number_input("Orden de visualización", min_value=1, value=len(niveles) + 1 if niveles else 1)
+            
+            if st.form_submit_button("💾 Guardar Nivel", type="primary", use_container_width=True):
+                if nuevo_nivel:
+                    data = {"nombre": nuevo_nivel.strip(), "orden": int(orden_nivel)}
+                    r = requests.post(f"{SUPABASE_URL}/rest/v1/niveles", headers=headers, json=data)
+                    if r.status_code == 201:
+                        st.success(f"✅ Nivel '{nuevo_nivel}' creado")
+                        st.rerun()
+                    else:
+                        st.error(f"Error: {r.text}")
 
 
 # ============================================
-# ASIGNATURAS Y PÉNSUM
+# GESTIÓN ACADÉMICA 2: ASIGNATURAS Y PÉNSUM (COMPACTO)
 # ============================================
 def gestionar_asignaturas():
     st.subheader("📚 Gestión de Asignaturas y Pénsum")
     headers = get_headers()
     
-    response_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
-    if response_niveles.status_code != 200:
-        st.error("Error al cargar niveles")
-        return
-    
-    niveles = response_niveles.json()
+    r_niveles = requests.get(f"{SUPABASE_URL}/rest/v1/niveles?order=orden.asc", headers=headers)
+    niveles = r_niveles.json() if r_niveles.status_code == 200 else []
     nivel_nombres = [n['nombre'] for n in niveles]
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
-    
-    response_materias = requests.get(f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc", headers=headers)
-    materias = response_materias.json() if response_materias.status_code == 200 else []
-    
-    response_relaciones = requests.get(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers)
-    relaciones = response_relaciones.json() if response_relaciones.status_code == 200 else []
-    
+    id_a_nivel = {n['id']: n['nombre'] for n in niveles}
+
+    r_materias = requests.get(f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc", headers=headers)
+    materias = r_materias.json() if r_materias.status_code == 200 else []
+
+    r_rel = requests.get(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers)
+    relaciones = r_rel.json() if r_rel.status_code == 200 else []
+
     niveles_por_materia = {}
     for r in relaciones:
-        m_id, n_id = r['materia_id'], r['nivel_id']
-        niveles_por_materia.setdefault(m_id, []).append(n_id)
-    
-    st.write("### Asignaturas registradas por nivel")
-    for m in materias:
-        with st.expander(f"📘 {m['nombre']}"):
-            niveles_ids = niveles_por_materia.get(m['id'], [])
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"Código: {m.get('codigo', 'Sin código')}")
-            with col2:
-                if st.button("🗑️ Eliminar", key=f"del_materia_{m['id']}"):
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{m['id']}", headers=headers)
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{m['id']}", headers=headers)
-                    st.rerun()
-            
-            st.write("**Niveles donde se imparte:**")
-            cols = st.columns(len(nivel_nombres))
-            for idx, nivel in enumerate(nivel_nombres):
-                with cols[idx]:
-                    n_id = niveles_dict.get(nivel)
-                    checked = n_id in niveles_ids if n_id else False
-                    if st.checkbox(nivel, value=checked, key=f"m_{m['id']}_{nivel}"):
-                        if not checked and n_id:
-                            requests.post(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers, json={"materia_id": m['id'], "nivel_id": n_id})
-                    else:
-                        if checked and n_id:
-                            requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{m['id']}&nivel_id=eq.{n_id}", headers=headers)
+        m_id = r.get('materia_id')
+        n_id = r.get('nivel_id')
+        if m_id and n_id in id_a_nivel:
+            niveles_por_materia.setdefault(m_id, []).append(id_a_nivel[n_id])
 
-    st.divider()
-    with st.expander("➕ Crear nueva asignatura"):
-        with st.form("nueva_materia"):
-            nombre = st.text_input("Nombre de la asignatura *")
-            codigo = st.text_input("Código (opcional)")
-            niveles_nueva = st.multiselect("Niveles donde aplica *", nivel_nombres)
-            if st.form_submit_button("💾 Guardar Asignatura", type="primary"):
-                if not nombre or not niveles_nueva:
+    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
+
+    with col_tabla:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">📘 Catálogo de Asignaturas y Grados que la Cursan</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if materias:
+            datos_mat = []
+            for m in materias:
+                nivs = ", ".join(niveles_por_materia.get(m['id'], [])) or "Sin asignar"
+                datos_mat.append({
+                    "ID": m['id'],
+                    "Asignatura": m.get('nombre'),
+                    "Código": m.get('codigo') or "-",
+                    "Niveles Educativos": nivs
+                })
+            df_mat = pd.DataFrame(datos_mat)
+            st.dataframe(df_mat[['Asignatura', 'Código', 'Niveles Educativos']], use_container_width=True, height=280)
+
+            c_del1, c_del2 = st.columns([2, 1])
+            with c_del1:
+                mat_del_nom = st.selectbox("Eliminar asignatura:", [m['nombre'] for m in materias], label_visibility="collapsed")
+            with c_del2:
+                if st.button("🗑️ Eliminar", use_container_width=True, key="btn_del_mat"):
+                    id_mat_del = next(m['id'] for m in materias if m['nombre'] == mat_del_nom)
+                    requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{id_mat_del}", headers=headers)
+                    requests.delete(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{id_mat_del}", headers=headers)
+                    st.success(f"Asignatura eliminada")
+                    st.rerun()
+        else:
+            st.info("No hay asignaturas registradas.")
+
+    with col_form:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">➕ Nueva Asignatura / Pénsum</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("form_nueva_materia", clear_on_submit=True):
+            nombre_mat = st.text_input("Nombre de la asignatura *")
+            codigo_mat = st.text_input("Código o abreviatura (Ej: MAT-01)")
+            niveles_sel = st.multiselect("Niveles donde se imparte *", nivel_nombres)
+
+            if st.form_submit_button("💾 Guardar Asignatura", type="primary", use_container_width=True):
+                if not nombre_mat or not niveles_sel:
                     st.error("❌ Nombre y niveles son obligatorios")
                 else:
-                    data = {"nombre": nombre.upper().strip(), "codigo": codigo.upper().strip() if codigo else None}
+                    data = {"nombre": nombre_mat.upper().strip(), "codigo": codigo_mat.upper().strip() if codigo_mat else None}
                     r = requests.post(f"{SUPABASE_URL}/rest/v1/materias", headers=headers, json=data)
                     if r.status_code == 201:
                         m_id = r.json()[0]['id']
-                        for n_nom in niveles_nueva:
+                        for n_nom in niveles_sel:
                             requests.post(f"{SUPABASE_URL}/rest/v1/materias_niveles", headers=headers, json={"materia_id": m_id, "nivel_id": niveles_dict.get(n_nom)})
-                        st.success("✅ Asignatura creada con éxito")
+                        st.success("✅ Asignatura creada")
                         st.rerun()
+                    else:
+                        st.error(f"Error: {r.text}")
 
 
 # ============================================
-# CURSOS / GRADOS
+# GESTIÓN ACADÉMICA 3: CURSOS Y GRADOS (COMPACTO)
 # ============================================
 def gestionar_grados():
     st.subheader("📚 Gestión de Grados y Cursos")
@@ -662,102 +694,190 @@ def gestionar_grados():
     niveles = r_niveles.json() if r_niveles.status_code == 200 else []
     niveles_dict = {n['nombre']: n['id'] for n in niveles}
     
-    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados", headers=headers)
+    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
     grados = r_grados.json() if r_grados.status_code == 200 else []
-    
-    if grados:
-        data = []
-        for g in grados:
-            n_nombre = next((n['nombre'] for n in niveles if n['id'] == g.get('nivel_id')), "Sin nivel")
-            data.append({"Curso": g.get('curso'), "Nivel": n_nombre})
-        st.dataframe(pd.DataFrame(data), use_container_width=True)
-    
-    with st.expander("➕ Agregar nuevo curso"):
-        with st.form("nuevo_grado"):
-            nombre = st.text_input("Nombre del curso (Ej: 601, 701, Jardín) *")
-            nivel_sel = st.selectbox("Nivel *", [n['nombre'] for n in niveles])
-            if st.form_submit_button("💾 Crear Curso", type="primary"):
-                if nombre:
-                    data = {"curso": nombre.upper().strip(), "nivel_id": niveles_dict.get(nivel_sel)}
+
+    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
+
+    with col_tabla:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">📋 Cursos y Grados Matriculados</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if grados:
+            data = []
+            for g in grados:
+                n_nombre = next((n['nombre'] for n in niveles if n['id'] == g.get('nivel_id')), "Sin nivel")
+                data.append({"Curso / Salón": g.get('curso'), "Nivel Educativo": n_nombre})
+            st.dataframe(pd.DataFrame(data), use_container_width=True, height=280)
+
+            c_del1, c_del2 = st.columns([2, 1])
+            with c_del1:
+                cur_del = st.selectbox("Eliminar curso:", [g['curso'] for g in grados if g.get('curso')], label_visibility="collapsed")
+            with c_del2:
+                if st.button("🗑️ Eliminar", use_container_width=True, key="btn_del_curso"):
+                    requests.delete(f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{cur_del}", headers=headers)
+                    st.success(f"Curso {cur_del} eliminado")
+                    st.rerun()
+        else:
+            st.info("No hay cursos creados.")
+
+    with col_form:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">➕ Crear Nuevo Curso</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("nuevo_grado", clear_on_submit=True):
+            nombre_cur = st.text_input("Nombre del Curso (Ej: 601, 702, Jardín A) *")
+            nivel_cur = st.selectbox("Nivel Educativo al que pertenece *", [n['nombre'] for n in niveles])
+
+            if st.form_submit_button("💾 Guardar Curso", type="primary", use_container_width=True):
+                if nombre_cur:
+                    data = {"curso": nombre_cur.upper().strip(), "nivel_id": niveles_dict.get(nivel_cur)}
                     r = requests.post(f"{SUPABASE_URL}/rest/v1/grados", headers=headers, json=data)
                     if r.status_code == 201:
-                        st.success(f"✅ Curso {nombre} creado")
+                        st.success(f"✅ Curso {nombre_cur} creado")
                         st.rerun()
+                    else:
+                        st.error(f"Error: {r.text}")
 
 
 # ============================================
-# DIRECTORES DE GRUPO
+# GESTIÓN ACADÉMICA 4: DIRECTORES DE GRUPO (PANORAMA GENERAL)
 # ============================================
 def gestion_directores_grupo():
-    st.subheader("👨‍🏫 Directores de Grupo")
+    st.subheader("👨‍🏫 Asignación de Directores de Grupo")
     headers = get_headers()
     
-    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=curso", headers=headers)
-    cursos = sorted(list(set([g['curso'] for g in r_grados.json() if g.get('curso')]))) if r_grados.status_code == 200 and r_grados.json() else CURSOS
-    
-    curso_sel = st.selectbox("Seleccionar curso", cursos)
-    
-    r_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=curso&order=curso.asc", headers=headers)
+    cursos = [g['curso'] for g in r_grados.json() if g.get('curso')] if r_grados.status_code == 200 and r_grados.json() else CURSOS
+    cursos = sorted(list(set(cursos)))
+
+    r_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?order=apellidos_docente.asc", headers=headers)
     docentes = r_docentes.json() if r_docentes.status_code == 200 else []
-    doc_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
-    
-    r_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=ilike.%direccion%", headers=headers)
-    asig = r_asig.json() if r_asig.status_code == 200 else []
-    actual_id = asig[0].get('documento_docente') if asig else None
-    
-    st.info(f"📌 Director actual de {curso_sel}: **{doc_dict.get(actual_id, 'Sin asignar')}**")
-    nuevo_dir = st.selectbox("Asignar nuevo director:", [""] + list(doc_dict.keys()), format_func=lambda x: doc_dict.get(x, "Ninguno") if x else "Ninguno")
-    
-    if st.button("💾 Guardar Director", type="primary"):
-        if actual_id:
-            requests.delete(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=ilike.%direccion%", headers=headers)
-        if nuevo_dir:
-            data = {"curso": curso_sel, "asignatura": "DIRECCION DE CURSO", "documento_docente": nuevo_dir, "anio": datetime.now().year}
-            requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
-            st.success(f"✅ Director asignado para {curso_sel}")
-            st.rerun()
+    doc_dict = {d['documento_docente']: f"{d['apellidos_docente']} {d['nombre_docente']}" for d in docentes}
+
+    r_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?asignatura=ilike.%direccion%", headers=headers)
+    directores_actuales = r_asig.json() if r_asig.status_code == 200 else []
+    dir_por_curso = {a['curso']: a['documento_docente'] for a in directores_actuales if a.get('curso')}
+
+    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
+
+    with col_tabla:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">📋 Panorama Institucional de Direcciones de Grupo</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        resumen = []
+        for c in cursos:
+            doc_id = dir_por_curso.get(c)
+            nombre_doc = doc_dict.get(doc_id, "⚠️ Sin asignar") if doc_id else "⚠️ Sin asignar"
+            resumen.append({"Curso": c, "Director de Grupo": nombre_doc})
+        
+        st.dataframe(pd.DataFrame(resumen), use_container_width=True, height=310)
+
+    with col_form:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">✏️ Asignar o Cambiar Director</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("form_asignar_director"):
+            curso_sel = st.selectbox("Seleccionar Curso:", cursos)
+            doc_actual_id = dir_por_curso.get(curso_sel)
+            doc_actual_nom = doc_dict.get(doc_actual_id, "Ninguno") if doc_actual_id else "Ninguno"
+            st.caption(f"Director actual de **{curso_sel}**: `{doc_actual_nom}`")
+
+            nuevo_doc_id = st.selectbox("Nuevo Director Docente:", [""] + list(doc_dict.keys()), format_func=lambda x: doc_dict.get(x, "Ninguno (Dejar Vacante)") if x else "Ninguno (Dejar Vacante)")
+
+            if st.form_submit_button("💾 Guardar Director", type="primary", use_container_width=True):
+                requests.delete(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=ilike.%direccion%", headers=headers)
+                if nuevo_doc_id:
+                    data = {"curso": curso_sel, "asignatura": "DIRECCION DE CURSO", "documento_docente": nuevo_doc_id, "anio": datetime.now().year}
+                    requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
+                    st.success(f"✅ Director asignado para {curso_sel}")
+                else:
+                    st.info(f"Dirección de {curso_sel} liberada.")
+                st.rerun()
 
 
 # ============================================
-# ASIGNACIÓN ACADÉMICA DOCENTE
+# GESTIÓN ACADÉMICA 5: ASIGNACIÓN DOCENTE POR MATERIA (COMPACTO)
 # ============================================
 def asignar_docentes_curso():
-    st.subheader("👨‍🏫 Asignación Académica (Docentes por Materia)")
+    st.subheader("👨‍🏫 Carga Académica Docente por Curso")
     headers = get_headers()
     
-    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=curso", headers=headers)
-    cursos = sorted(list(set([g['curso'] for g in r_grados.json() if g.get('curso')]))) if r_grados.status_code == 200 and r_grados.json() else CURSOS
-    
-    curso_sel = st.selectbox("Seleccionar curso a gestionar", cursos, key="asig_curso_sel")
-    
-    r_doc = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=curso&order=curso.asc", headers=headers)
+    cursos = [g['curso'] for g in r_grados.json() if g.get('curso')] if r_grados.status_code == 200 and r_grados.json() else CURSOS
+    cursos = sorted(list(set(cursos)))
+
+    r_doc = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?order=apellidos_docente.asc", headers=headers)
     docentes = r_doc.json() if r_doc.status_code == 200 else []
-    doc_dict = {d['documento_docente']: f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
-    
+    doc_dict = {d['documento_docente']: f"{d['apellidos_docente']} {d['nombre_docente']}" for d in docentes}
+
     r_mat = requests.get(f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc", headers=headers)
     materias = r_mat.json() if r_mat.status_code == 200 else []
-    
+
+    # Barra superior ultra compacta
+    col_c1, _ = st.columns([1.5, 2.5])
+    with col_c1:
+        curso_sel = st.selectbox("Selecciona el curso a consultar/gestionar:", cursos, key="asig_curso_sel")
+
     r_actuales = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}", headers=headers)
-    actuales = r_actuales.json() if r_actuales.status_code == 200 else []
-    
-    st.write(f"### Carga académica actual de {curso_sel}")
-    if actuales:
-        tabla = [{"Asignatura": a.get('asignatura'), "Docente": doc_dict.get(a.get('documento_docente'), a.get('documento_docente'))} for a in actuales]
-        st.dataframe(pd.DataFrame(tabla), use_container_width=True)
-    else:
-        st.info("No hay asignaciones académicas registradas para este curso")
-    
-    with st.expander("➕ Asignar o modificar materia a docente"):
-        with st.form("form_asignar_doc"):
-            materia_nom = st.selectbox("Asignatura", [m['nombre'] for m in materias])
-            docente_id = st.selectbox("Docente", list(doc_dict.keys()), format_func=lambda x: doc_dict.get(x))
-            if st.form_submit_button("💾 Guardar Asignación", type="primary"):
+    actuales = [a for a in r_actuales.json() if "DIRECCION" not in str(a.get('asignatura', '')).upper()] if r_actuales.status_code == 200 else []
+
+    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
+
+    with col_tabla:
+        st.markdown(f"""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">📋 Asignaturas y Docentes del Grado {curso_sel}</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if actuales:
+            tabla = [{"Asignatura": a.get('asignatura'), "Docente Encargado": doc_dict.get(a.get('documento_docente'), a.get('documento_docente'))} for a in actuales]
+            st.dataframe(pd.DataFrame(tabla), use_container_width=True, height=270)
+
+            c_del1, c_del2 = st.columns([2, 1])
+            with c_del1:
+                asig_del = st.selectbox("Desvincular materia:", [a.get('asignatura') for a in actuales], label_visibility="collapsed")
+            with c_del2:
+                if st.button("🗑️ Quitar", use_container_width=True):
+                    requests.delete(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=eq.{asig_del}", headers=headers)
+                    st.success(f"{asig_del} removida de {curso_sel}")
+                    st.rerun()
+        else:
+            st.info(f"El grado {curso_sel} no tiene asignaturas ni docentes vinculados.")
+
+    with col_form:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
+            <b style="color: #0F172A; font-size: 13.5px;">➕ Asignar Asignatura a Docente</b>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("form_asignar_doc", clear_on_submit=True):
+            materia_nom = st.selectbox("Asignatura:", [m['nombre'] for m in materias])
+            docente_id = st.selectbox("Docente Asignado:", list(doc_dict.keys()), format_func=lambda x: doc_dict.get(x))
+
+            if st.form_submit_button("💾 Guardar Carga Académica", type="primary", use_container_width=True):
                 requests.delete(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=eq.{materia_nom}", headers=headers)
                 data = {"curso": curso_sel, "asignatura": materia_nom, "documento_docente": docente_id, "anio": datetime.now().year}
                 r = requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
                 if r.status_code == 201:
-                    st.success(f"✅ {materia_nom} asignada correctamente")
+                    st.success(f"✅ {materia_nom} asignada con éxito")
                     st.rerun()
+                else:
+                    st.error(f"Error: {r.text}")
 
 
 # ============================================
