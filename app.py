@@ -1,9 +1,10 @@
 # ============================================
-# app.py - ORQUESTADOR PRINCIPAL & UI MODERNA
+# app.py - ORQUESTADOR PRINCIPAL & MARCA BLANCA
 # ============================================
 
 import streamlit as st
 import requests
+import os
 from utils import SUPABASE_URL, get_headers
 
 # =============================================
@@ -37,60 +38,84 @@ if ES_MOVIL:
     aplicar_css_movil()
 
 # =============================================
-# ESTILOS CSS PERSONALIZADOS (ESTÉTICA MODERNA)
+# ESTILOS CSS PERSONALIZADOS
 # =============================================
 st.markdown("""
 <style>
-    /* Estilos globales */
     .main {
         background-color: #F8FAFC;
     }
-    
-    /* Encabezado y títulos */
     h1, h2, h3 {
         color: #0F172A;
         font-weight: 700;
         letter-spacing: -0.02em;
     }
-    
-    /* Tarjeta de usuario en el sidebar */
     .user-badge {
         background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
-        padding: 16px;
+        padding: 14px 16px;
         border-radius: 12px;
         color: #FFFFFF;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
     .user-badge h4 {
         margin: 0;
         color: #F8FAFC;
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
     .user-badge p {
         margin: 4px 0 0 0;
         color: #94A3B8;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
-
-    /* Botones primarios y de navegación */
     .stButton > button {
         border-radius: 8px;
         font-weight: 500;
         transition: all 0.2s ease-in-out;
     }
-    .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
-
-    /* Ocultar menú nativo innecesario */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
+
+# =============================================
+# FUNCIÓN DEL PIE CORPORATIVO (EVALUAR S.A.S.)
+# =============================================
+def mostrar_pie_evaluar():
+    st.sidebar.markdown("---")
+    
+    # Contenedor corporativo de EVALUAR S.A.S.
+    col_logo, col_info = st.sidebar.columns([1, 2.4])
+    
+    with col_logo:
+        ruta_logo = "LOGO-EVALUAR-SAS.ico"
+        if os.path.exists(ruta_logo):
+            st.image(ruta_logo, width=60)
+        else:
+            st.markdown("📈")
+
+    with col_info:
+        st.markdown("""
+        <div style="line-height: 1.25; margin-top: 2px;">
+            <span style="font-size: 9px; color: #64748B; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">
+                Solución provista por
+            </span><br>
+            <b style="font-size: 13px; color: #0F172A;">EVALUAR S.A.S.</b><br>
+            <span style="font-size: 10px; color: #475569; font-style: italic;">
+                "Innovación y soluciones tecnológicas para la gestión escolar"
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.sidebar.markdown("""
+    <div style="text-align: center; margin-top: 8px;">
+        <span style="font-size: 9px; color: #059669; font-weight: 600; background: #ECFDF5; padding: 2px 8px; border-radius: 10px; border: 1px solid #A7F3D0;">
+            Licencia SaaS Multi-Colegio Activa
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # =============================================
 # CONTROL DE SESIÓN
@@ -101,7 +126,7 @@ if "logged_in" not in st.session_state:
 if not st.session_state.logged_in:
     login.mostrar_login()
 else:
-    # Sincronizar permisos y roles con Supabase
+    # Sincronización de roles y datos con Supabase
     username = st.session_state.usuario
     headers = get_headers()
     
@@ -120,19 +145,15 @@ else:
 
     rol_actual = st.session_state.get('rol_actual', st.session_state.user_data.get('rol', ''))
 
-    # =============================================
-    # BARRA LATERAL (SIDEBAR COMÚN)
-    # =============================================
+    # Ficha del usuario en el Sidebar
     with st.sidebar:
-        # Ficha elegante del usuario
         st.markdown(f"""
         <div class="user-badge">
             <h4>👤 {username}</h4>
-            <p>Rol Activo: <b>{rol_actual.replace('_grupo', '').upper()}</b></p>
+            <p>Rol: <b>{rol_actual.replace('_grupo', '').upper()}</b></p>
         </div>
         """, unsafe_allow_html=True)
 
-        # Selector de perfil múltiple (si aplica)
         user_roles = [r for r in st.session_state.user_data.get('roles', []) if r]
         if len(user_roles) > 1:
             st.caption("🔄 CAMBIAR PERFIL")
@@ -149,13 +170,11 @@ else:
             st.divider()
 
     # =============================================
-    # NAVEGACIÓN Y VISTAS PARA ADMINISTRADOR
+    # NAVEGACIÓN ADMINISTRADOR
     # =============================================
     if rol_actual == 'admin':
         with st.sidebar:
             st.caption("📌 MENÚ ADMINISTRATIVO")
-            
-            # Navegación compacta por categorías
             categoria = st.radio(
                 "Módulos del Sistema",
                 options=[
@@ -173,7 +192,10 @@ else:
                 st.session_state.logged_in = False
                 st.rerun()
 
-        # Renderizado de vistas según la categoría seleccionada
+        # Pie corporativo para Administrador
+        mostrar_pie_evaluar()
+
+        # Renderizado del módulo seleccionado
         if categoria == "📊 Panel General":
             admin.mostrar(st.session_state.user_data)
             
@@ -216,7 +238,7 @@ else:
                 admin.reportes_academicos()
 
     # =============================================
-    # VISTAS PARA OTROS ROLES (DOCENTE, FAMILIA, ETC.)
+    # NAVEGACIÓN OTROS ROLES (DOCENTE, FAMILIA, ETC.)
     # =============================================
     else:
         with st.sidebar:
@@ -224,6 +246,9 @@ else:
             if st.button("🚪 Cerrar Sesión", use_container_width=True, type="secondary"):
                 st.session_state.logged_in = False
                 st.rerun()
+
+        # Pie corporativo para los demás perfiles
+        mostrar_pie_evaluar()
 
         ROLES_VALIDOS = {
             'estudiante': estudiante.mostrar,
