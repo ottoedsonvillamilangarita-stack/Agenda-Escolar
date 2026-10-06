@@ -1,5 +1,5 @@
 # ==============================================================================
-# modulos/features/horarios.py - GESTIÓN COMPACTA CON BASE SANEADA
+# modulos/features/horarios.py - GESTIÓN COMPACTA Y VISUALIZACIÓN OPTIMIZADA
 # ==============================================================================
 
 import streamlit as st
@@ -30,6 +30,15 @@ def parse_hora(hora_str):
         if len(partes) >= 2:
             return time(int(partes[0]), int(partes[1]))
     return time(7, 0)
+
+def formatear_nombre_corto(nombre_completo):
+    """Devuelve primer nombre y primer apellido para no desbordar celdas"""
+    if not nombre_completo:
+        return ""
+    partes = str(nombre_completo).strip().split()
+    if len(partes) >= 2:
+        return f"{partes[0].capitalize()} {partes[1].capitalize()}"
+    return partes[0].capitalize() if partes else ""
 
 
 # ==============================================================================
@@ -254,7 +263,7 @@ def configurar_jornada_nivel(headers=None):
 
 
 # ==============================================================================
-# 4. HORARIO POR CURSO (horario_base - LECTURA DIRECTA Y EDICIÓN COMPACTA)
+# 4. HORARIO POR CURSO (ADMIN - horario_base)
 # ==============================================================================
 def configurar_horario_curso(headers=None):
     if headers is None:
@@ -262,7 +271,6 @@ def configurar_horario_curso(headers=None):
 
     st.subheader("📅 Malla Curricular por Curso")
 
-    # 1. Obtener cursos y niveles desde grados
     r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
     grados_data = r_grados.json() if r_grados.status_code == 200 else []
     
@@ -279,12 +287,10 @@ def configurar_horario_curso(headers=None):
 
     nivel_id_curso = map_curso_nivel.get(curso_sel, 1)
 
-    # 2. Cargar clases existentes desde horario_base
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso_sel}&order=orden_clase.asc,dia_semana.asc"
     r_horario = requests.get(url_horario, headers=headers)
     horarios_curso = r_horario.json() if r_horario.status_code == 200 else []
 
-    # 3. Franjas horarias: buscar en horas_nivel y asegurar las presentes en horario_base
     url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id_curso}&order=orden.asc"
     r_horas = requests.get(url_horas, headers=headers)
     horas_db = r_horas.json() if r_horas.status_code == 200 else []
@@ -315,12 +321,10 @@ def configurar_horario_curso(headers=None):
 
     lista_horas = [horas_map[k] for k in sorted(horas_map.keys())]
 
-    # 4. Diccionario de docentes
     r_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     docentes = r_docentes.json() if r_docentes.status_code == 200 else []
-    docentes_dict = {str(d['documento_docente']): f"{d['nombre_docente']} {d['apellidos_docente']}" for d in docentes}
+    docentes_dict = {str(d['documento_docente']): f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip() for d in docentes}
 
-    # Indexar clases por (dia_semana, orden_clase)
     matriz_clases = {}
     for cl in horarios_curso:
         try:
@@ -336,10 +340,10 @@ def configurar_horario_curso(headers=None):
             border: 1px solid #CBD5E1;
             padding: 4px 2px;
             text-align: center;
-            height: 52px;
+            min-height: 56px;
+            height: auto;
             background-color: white;
             border-radius: 6px;
-            font-size: 11px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -360,12 +364,16 @@ def configurar_horario_curso(headers=None):
             color: #1E3A8A;
         }
         .celda-malla .prof {
-            font-size: 9px;
+            font-size: 9.5px;
             color: #475569;
             line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 95%;
         }
         .celda-malla .sal {
-            font-size: 8.5px;
+            font-size: 8px;
             color: #64748B;
         }
         .hdr-col {
@@ -391,24 +399,25 @@ def configurar_horario_curso(headers=None):
             font-size: 9.5px;
             border-radius: 6px;
             color: #334155;
-            height: 52px;
+            min-height: 56px;
+            height: auto;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             box-sizing: border-box;
             margin-bottom: 3px;
+            line-height: 1.15;
         }
     </style>
     """, unsafe_allow_html=True)
 
     col_malla, col_editor = st.columns([1.8, 1.1], gap="medium")
 
-    # === COLUMNA IZQUIERDA: MALLA SEMANAL COMPLETA ===
     with col_malla:
         st.markdown(f"""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 7px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-            <b style="color: #0F172A; font-size: 13px;">🗓️ Horario Semanal: Grado {curso_sel}</b>
+            <b style="color: #0F172A; font-size: 13px;">🗓️️ Horario Semanal: Grado {curso_sel}</b>
             <span style="font-size: 11px; color: #166534; background: #DCFCE7; padding: 2px 8px; border-radius: 12px; font-weight: 600;">
                 {len(horarios_curso)} clases cargadas
             </span>
@@ -430,16 +439,15 @@ def configurar_horario_curso(headers=None):
             o_num = h_info['orden']
             c_row = st.columns(len(dias_cols) + 1, gap="small")
             with c_row[0]:
-                st.markdown(f'<div class="hdr-hora"><b>#{o_num}</b><br>{h_info["inicio"]}-{h_info["fin"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="hdr-hora"><b>#{o_num}</b><br><span style="color:#64748B;">{h_info["inicio"]}<br>{h_info["fin"]}</span></div>', unsafe_allow_html=True)
             
             for i_d, d_num in enumerate(dias_cols):
                 with c_row[i_d + 1]:
                     clase = matriz_clases.get((d_num, o_num))
                     if clase:
                         doc_id = str(clase.get('documento_docente') or '')
-                        doc_nom = docentes_dict.get(doc_id, doc_id) if doc_id else ""
-                        partes = doc_nom.split()
-                        doc_corto = f"{partes[0]} {partes[1]}" if len(partes) >= 2 else doc_nom
+                        doc_nom = docentes_dict.get(doc_id, '')
+                        doc_corto = formatear_nombre_corto(doc_nom)
                         salon_badge = f'<div class="sal">📌 {clase.get("salon")}</div>' if clase.get("salon") else ''
 
                         st.markdown(f'''
@@ -452,7 +460,6 @@ def configurar_horario_curso(headers=None):
                     else:
                         st.markdown('<div class="celda-malla vacia"><span style="color:#94A3B8;">—</span></div>', unsafe_allow_html=True)
 
-    # === COLUMNA DERECHA: ASIGNADOR RÁPIDO DIRECTO A horario_base ===
     with col_editor:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 7px 12px; margin-bottom: 6px;">
@@ -608,66 +615,73 @@ def gestion_horarios_admin(data):
 # ==============================================================================
 # 7. VISUALIZACIÓN UNIFICADA (DOCENTE / ESTUDIANTE / ACUDIENTE)
 # ==============================================================================
-def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal", tipo_vista="docente"):
-    """Muestra el horario en tarjetas estilizadas para docente o alumno."""
+def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal", tipo_vista="estudiante"):
+    """Muestra el horario en tarjetas estilizadas sin desbordes ni repeticiones."""
     if not horarios:
         st.info("No hay horario disponible")
         return
 
+    headers = get_headers()
     dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
-    
+
+    # Precarga optimizada de docentes para evitar llamadas lentas una por una
+    try:
+        r_docs = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
+        docentes_db = r_docs.json() if r_docs.status_code == 200 else []
+        map_docentes = {str(d['documento_docente']): f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip() for d in docentes_db}
+    except Exception:
+        map_docentes = {}
+
     horas_dict = {}
+    horas_orden_map = {}
+
     for clase in horarios:
-        hora_inicio = clase.get('hora_inicio', '')[:5] if clase.get('hora_inicio') else ''
-        hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
-        hora_key = f"{hora_inicio} - {hora_fin}" if (hora_inicio and hora_fin) else f"Hora #{clase.get('orden_clase', '?')}"
+        o_clase = clase.get('orden_clase') or 1
+        h_ini = str(clase.get('hora_inicio', ''))[:5]
+        h_fin = str(clase.get('hora_fin', ''))[:5]
         
-        if hora_key not in horas_dict:
-            horas_dict[hora_key] = {dia: None for dia in dias.values()}
-        
+        # Etiqueta de la hora limpia
+        if h_ini and h_fin:
+            hora_label = f"#{o_clase}<br><span style='font-size:9.5px; color:#64748B;'>{h_ini}-{h_fin}</span>"
+        else:
+            hora_label = f"#{o_clase}"
+
+        if o_clase not in horas_dict:
+            horas_dict[o_clase] = {dia: None for dia in dias.values()}
+            horas_orden_map[o_clase] = hora_label
+
         try:
             dia_num = int(clase.get('dia_semana'))
         except Exception:
             dia_num = 1
-        dia = dias.get(dia_num, "Lunes")
-        
-        docente_nombre = ""
-        if tipo_vista == "estudiante":
-            doc_documento = clase.get('documento_docente')
-            if doc_documento:
-                try:
-                    url_doc = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{doc_documento}"
-                    response_doc = requests.get(url_doc, headers=get_headers())
-                    if response_doc.status_code == 200 and response_doc.json():
-                        d = response_doc.json()[0]
-                        docente_nombre = f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip()
-                except Exception:
-                    docente_nombre = doc_documento
-        
-        horas_dict[hora_key][dia] = {
-            "asignatura": clase.get('asignatura', '?'),
-            "curso": clase.get('curso'),
-            "salon": clase.get('salon', ''),
-            "docente": docente_nombre if docente_nombre else (clase.get('documento_docente') or '')
+        dia_nom = dias.get(dia_num, "Lunes")
+
+        doc_doc = str(clase.get('documento_docente') or '')
+        doc_nom_largo = map_docentes.get(doc_doc, '')
+        doc_corto = formatear_nombre_corto(doc_nom_largo)
+
+        horas_dict[o_clase][dia_nom] = {
+            "asignatura": str(clase.get('asignatura', '?')).upper(),
+            "curso": str(clase.get('curso', '')),
+            "salon": str(clase.get('salon', '')).strip(),
+            "docente": doc_corto
         }
-    
-    horas_ordenadas = sorted(horas_dict.keys())
-    if not horas_ordenadas:
+
+    ordenes_ordenados = sorted(horas_dict.keys())
+    if not ordenes_ordenados:
         st.info("No hay horario configurado")
         return
 
     st.markdown("""
     <style>
         .horario-celda {
-            border: 1px solid #E2E8F0;
-            padding: 4px 2px;
+            border: 1px solid #CBD5E1;
+            padding: 5px 3px;
             text-align: center;
-            min-height: 48px;
-            height: 48px;
-            max-height: 48px;
+            min-height: 56px;
+            height: auto;
             background-color: white;
             border-radius: 6px;
-            font-size: 11px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -675,98 +689,119 @@ def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal", tipo_v
             width: 100%;
             box-sizing: border-box;
             overflow: hidden;
+            margin-bottom: 3px;
         }
         .horario-celda.vacia {
             background-color: #F8FAFC;
+            border: 1px dashed #E2E8F0;
         }
         .horario-celda .asignatura {
             font-weight: 700;
-            font-size: 11.5px;
+            font-size: 11px;
             line-height: 1.15;
             color: #1E3A8A;
         }
         .horario-celda .curso {
             font-size: 10px;
-            color: #475569;
+            font-weight: 600;
+            color: #2563EB;
+            line-height: 1.1;
         }
         .horario-celda .docente {
             font-size: 9.5px;
-            color: #334155;
+            color: #475569;
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 95%;
         }
         .horario-celda .salon {
-            font-size: 8.5px;
+            font-size: 8px;
             color: #64748B;
         }
         .horario-header {
             background-color: #1E293B;
             color: white;
-            padding: 6px 2px;
+            padding: 4px 2px;
             text-align: center;
             font-weight: 700;
             font-size: 11px;
             border-radius: 6px;
-            width: 100%;
-            min-height: 36px;
-            height: 36px;
+            height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
+            margin-bottom: 3px;
         }
         .horario-hora {
             background-color: #F1F5F9;
-            padding: 6px 2px;
+            padding: 4px 2px;
             text-align: center;
             font-weight: 600;
-            font-size: 10.5px;
+            font-size: 9.5px;
             border-radius: 6px;
             border: 1px solid #CBD5E1;
             color: #334155;
-            width: 100%;
-            min-height: 48px;
-            height: 48px;
+            min-height: 56px;
+            height: auto;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            box-sizing: border-box;
+            margin-bottom: 3px;
+            line-height: 1.15;
         }
     </style>
     """, unsafe_allow_html=True)
-    
+
     st.markdown(f"#### {titulo}")
-    
-    cols = st.columns(len(dias) + 1, gap="small")
+
+    dias_activos = [1, 2, 3, 4, 5]
+    if any(cl.get('dia_semana') == 6 for cl in horarios):
+        dias_activos.append(6)
+
+    cols = st.columns(len(dias_activos) + 1, gap="small")
     with cols[0]:
-        st.markdown('<div class="hdr-col">Hora</div>', unsafe_allow_html=True)
-    for idx, dia in enumerate(dias.values()):
+        st.markdown('<div class="horario-header">Hora</div>', unsafe_allow_html=True)
+    for idx, d_num in enumerate(dias_activos):
         with cols[idx + 1]:
-            st.markdown(f'<div class="hdr-col">{dia[:3]}</div>', unsafe_allow_html=True)
-    
-    for hora in horas_ordenadas:
-        cols = st.columns(len(dias) + 1, gap="small")
+            st.markdown(f'<div class="horario-header">{DIAS_SEMANA_MAP[d_num][:3]}</div>', unsafe_allow_html=True)
+
+    for o_num in ordenes_ordenados:
+        cols = st.columns(len(dias_activos) + 1, gap="small")
         with cols[0]:
-            st.markdown(f'<div class="horario-hora">{hora}</div>', unsafe_allow_html=True)
-        for idx, dia in enumerate(dias.values()):
+            st.markdown(f'<div class="horario-hora">{horas_orden_map[o_num]}</div>', unsafe_allow_html=True)
+
+        for idx, d_num in enumerate(dias_activos):
+            dia_nom = DIAS_SEMANA_MAP[d_num]
             with cols[idx + 1]:
-                clase = horas_dict[hora].get(dia)
+                clase = horas_dict[o_num].get(dia_nom)
                 if clase:
-                    salon = f'<div class="salon">📌 {clase["salon"]}</div>' if clase.get('salon') else ''
+                    salon_badge = f'<div class="salon">📌 {clase["salon"]}</div>' if clase.get("salon") else ''
+                    
                     if tipo_vista == "docente":
+                        # El profesor ve Asignatura + Curso que le toca atender + Salón
                         st.markdown(f'''
                         <div class="horario-celda">
                             <span class="asignatura">{clase["asignatura"]}</span>
-                            <span class="curso">({clase["curso"]})</span>
-                            {salon}
+                            <span class="curso">👥 Grado {clase["curso"]}</span>
+                            {salon_badge}
                         </div>
                         ''', unsafe_allow_html=True)
                     else:
+                        # Estudiante y Acudiente ven Asignatura + Docente corto + Salón
+                        doc_badge = f'<span class="docente">👨‍🏫 {clase["docente"]}</span>' if clase.get("docente") else ''
                         st.markdown(f'''
                         <div class="horario-celda">
                             <span class="asignatura">{clase["asignatura"]}</span>
-                            <span class="docente">👨‍‍‍‍🏫 {clase["docente"]}</span>
-                            {salon}
+                            {doc_badge}
+                            {salon_badge}
                         </div>
                         ''', unsafe_allow_html=True)
                 else:
-                    st.markdown('<div class="horario-celda vacia"></div>', unsafe_allow_html=True)
+                    st.markdown('<div class="horario-celda vacia"><span style="color:#94A3B8;">—</span></div>', unsafe_allow_html=True)
 
 
 def mostrar_horario_docente_tabla(documento_docente, headers=None):
@@ -774,19 +809,14 @@ def mostrar_horario_docente_tabla(documento_docente, headers=None):
     if headers is None:
         headers = get_headers()
 
-    url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,orden_clase.asc"
+    url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=orden_clase.asc,dia_semana.asc"
     response = requests.get(url, headers=headers)
     
-    if response.status_code != 200:
-        st.info("No hay horario configurado para este docente")
+    if response.status_code != 200 or not response.json():
+        st.info("No tienes clases asignadas en el horario semanal.")
         return
     
-    horarios = response.json()
-    if not horarios:
-        st.info("No hay horario configurado para este docente")
-        return
-    
-    mostrar_horario_unificado(horarios, "📅 Mi Horario Semanal", "docente")
+    mostrar_horario_unificado(response.json(), "📅 Mi Horario Semanal", "docente")
 
 
 def mostrar_horario_estudiante_tabla(curso, headers=None):
@@ -794,16 +824,11 @@ def mostrar_horario_estudiante_tabla(curso, headers=None):
     if headers is None:
         headers = get_headers()
 
-    url = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+    url = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=orden_clase.asc,dia_semana.asc"
     response = requests.get(url, headers=headers)
     
-    if response.status_code != 200:
-        st.info(f"No hay horario configurado para el curso {curso}")
+    if response.status_code != 200 or not response.json():
+        st.info(f"No hay clases registradas para el grado {curso}.")
         return
     
-    horarios = response.json()
-    if not horarios:
-        st.info(f"No hay horario configurado para el curso {curso}")
-        return
-    
-    mostrar_horario_unificado(horarios, f"📅 Horario Semanal - {curso}", "estudiante")
+    mostrar_horario_unificado(response.json(), f"📅 Horario Semanal - Grado {curso}", "estudiante")
