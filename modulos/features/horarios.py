@@ -574,4 +574,236 @@ def gestion_festivos(headers=None):
         """, unsafe_allow_html=True)
 
         with st.form("form_add_festivo", clear_on_submit=True):
-            fecha = st.date_input("Fecha:", key="festivo_
+            fecha = st.date_input("Fecha:", key="festivo_fecha")
+            descripcion = st.text_input("Motivo (Ej: Día Cívico, Semana Santa):", key="festivo_desc")
+
+            if st.form_submit_button("💾 Guardar Festivo", type="primary", use_container_width=True):
+                if descripcion.strip():
+                    data = {"fecha": str(fecha), "descripcion": descripcion.strip(), "year": fecha.year}
+                    requests.post(f"{SUPABASE_URL}/rest/v1/festivos", headers=headers, json=data)
+                    st.success("Festivo agregado")
+                    st.rerun()
+
+
+# ==============================================================================
+# 6. MENÚ COMPLETO ADMIN HORARIOS
+# ==============================================================================
+def gestion_horarios_admin(data):
+    st.title("📅 Configuración de Horarios")
+    headers = get_headers()
+    tabs = st.tabs(["📚 Niveles", "⏰ Horas por Nivel", "📅 Días Laborales", "📖 Asignar Materias", "📆 Festivos"])
+    
+    with tabs[0]:
+        configurar_niveles(headers)
+    with tabs[1]:
+        configurar_horas_nivel(headers)
+    with tabs[2]:
+        configurar_jornada_nivel(headers)
+    with tabs[3]:
+        configurar_horario_curso(headers)
+    with tabs[4]:
+        gestion_festivos(headers)
+
+
+# ==============================================================================
+# 7. VISUALIZACIÓN UNIFICADA (DOCENTE / ESTUDIANTE / ACUDIENTE)
+# ==============================================================================
+def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal", tipo_vista="docente"):
+    """Muestra el horario en tarjetas estilizadas para docente o alumno."""
+    if not horarios:
+        st.info("No hay horario disponible")
+        return
+
+    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
+    
+    horas_dict = {}
+    for clase in horarios:
+        hora_inicio = clase.get('hora_inicio', '')[:5] if clase.get('hora_inicio') else ''
+        hora_fin = clase.get('hora_fin', '')[:5] if clase.get('hora_fin') else ''
+        hora_key = f"{hora_inicio} - {hora_fin}" if (hora_inicio and hora_fin) else f"Hora #{clase.get('orden_clase', '?')}"
+        
+        if hora_key not in horas_dict:
+            horas_dict[hora_key] = {dia: None for dia in dias.values()}
+        
+        try:
+            dia_num = int(clase.get('dia_semana'))
+        except Exception:
+            dia_num = 1
+        dia = dias.get(dia_num, "Lunes")
+        
+        docente_nombre = ""
+        if tipo_vista == "estudiante":
+            doc_documento = clase.get('documento_docente')
+            if doc_documento:
+                try:
+                    url_doc = f"{SUPABASE_URL}/rest/v1/docentes?documento_docente=eq.{doc_documento}"
+                    response_doc = requests.get(url_doc, headers=get_headers())
+                    if response_doc.status_code == 200 and response_doc.json():
+                        d = response_doc.json()[0]
+                        docente_nombre = f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip()
+                except Exception:
+                    docente_nombre = doc_documento
+        
+        horas_dict[hora_key][dia] = {
+            "asignatura": clase.get('asignatura', '?'),
+            "curso": clase.get('curso'),
+            "salon": clase.get('salon', ''),
+            "docente": docente_nombre if docente_nombre else (clase.get('documento_docente') or '')
+        }
+    
+    horas_ordenadas = sorted(horas_dict.keys())
+    if not horas_ordenadas:
+        st.info("No hay horario configurado")
+        return
+
+    st.markdown("""
+    <style>
+        .horario-celda {
+            border: 1px solid #E2E8F0;
+            padding: 4px 2px;
+            text-align: center;
+            min-height: 48px;
+            height: 48px;
+            max-height: 48px;
+            background-color: white;
+            border-radius: 6px;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .horario-celda.vacia {
+            background-color: #F8FAFC;
+        }
+        .horario-celda .asignatura {
+            font-weight: 700;
+            font-size: 11.5px;
+            line-height: 1.15;
+            color: #1E3A8A;
+        }
+        .horario-celda .curso {
+            font-size: 10px;
+            color: #475569;
+        }
+        .horario-celda .docente {
+            font-size: 9.5px;
+            color: #334155;
+        }
+        .horario-celda .salon {
+            font-size: 8.5px;
+            color: #64748B;
+        }
+        .horario-header {
+            background-color: #1E293B;
+            color: white;
+            padding: 6px 2px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 11px;
+            border-radius: 6px;
+            width: 100%;
+            min-height: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .horario-hora {
+            background-color: #F1F5F9;
+            padding: 6px 2px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 10.5px;
+            border-radius: 6px;
+            border: 1px solid #CBD5E1;
+            color: #334155;
+            width: 100%;
+            min-height: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"#### {titulo}")
+    
+    cols = st.columns(len(dias) + 1, gap="small")
+    with cols[0]:
+        st.markdown('<div class="hdr-col">Hora</div>', unsafe_allow_html=True)
+    for idx, dia in enumerate(dias.values()):
+        with cols[idx + 1]:
+            st.markdown(f'<div class="hdr-col">{dia[:3]}</div>', unsafe_allow_html=True)
+    
+    for hora in horas_ordenadas:
+        cols = st.columns(len(dias) + 1, gap="small")
+        with cols[0]:
+            st.markdown(f'<div class="horario-hora">{hora}</div>', unsafe_allow_html=True)
+        for idx, dia in enumerate(dias.values()):
+            with cols[idx + 1]:
+                clase = horas_dict[hora].get(dia)
+                if clase:
+                    salon = f'<div class="salon">📌 {clase["salon"]}</div>' if clase.get('salon') else ''
+                    if tipo_vista == "docente":
+                        st.markdown(f'''
+                        <div class="horario-celda">
+                            <span class="asignatura">{clase["asignatura"]}</span>
+                            <span class="curso">({clase["curso"]})</span>
+                            {salon}
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'''
+                        <div class="horario-celda">
+                            <span class="asignatura">{clase["asignatura"]}</span>
+                            <span class="docente">👨‍‍‍‍🏫 {clase["docente"]}</span>
+                            {salon}
+                        </div>
+                        ''', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="horario-celda vacia"></div>', unsafe_allow_html=True)
+
+
+def mostrar_horario_docente_tabla(documento_docente, headers=None):
+    """Muestra el horario del docente desde horario_base"""
+    if headers is None:
+        headers = get_headers()
+
+    url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=dia_semana.asc,orden_clase.asc"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        st.info("No hay horario configurado para este docente")
+        return
+    
+    horarios = response.json()
+    if not horarios:
+        st.info("No hay horario configurado para este docente")
+        return
+    
+    mostrar_horario_unificado(horarios, "📅 Mi Horario Semanal", "docente")
+
+
+def mostrar_horario_estudiante_tabla(curso, headers=None):
+    """Muestra el horario del estudiante desde horario_base"""
+    if headers is None:
+        headers = get_headers()
+
+    url = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=dia_semana.asc,orden_clase.asc"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        st.info(f"No hay horario configurado para el curso {curso}")
+        return
+    
+    horarios = response.json()
+    if not horarios:
+        st.info(f"No hay horario configurado para el curso {curso}")
+        return
+    
+    mostrar_horario_unificado(horarios, f"📅 Horario Semanal - {curso}", "estudiante")
