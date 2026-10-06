@@ -1,5 +1,5 @@
 # ==============================================================================
-# modulos/features/horarios.py - GESTIÓN COMPACTA Y VISUALIZACIÓN OPTIMIZADA
+# modulos/features/horarios.py - GESTIÓN COMPACTA CON AUTOCOMPLETADO INTELIGENTE
 # ==============================================================================
 
 import streamlit as st
@@ -32,7 +32,7 @@ def parse_hora(hora_str):
     return time(7, 0)
 
 def formatear_nombre_corto(nombre_completo):
-    """Devuelve primer nombre y primer apellido para no desbordar celdas"""
+    """Devuelve primer nombre y primer apellido para celdas compactas"""
     if not nombre_completo:
         return ""
     partes = str(nombre_completo).strip().split()
@@ -263,7 +263,7 @@ def configurar_jornada_nivel(headers=None):
 
 
 # ==============================================================================
-# 4. HORARIO POR CURSO (ADMIN - horario_base)
+# 4. HORARIO POR CURSO (VINCULADO DIRECTO A ASIGNACIÓN DOCENTE)
 # ==============================================================================
 def configurar_horario_curso(headers=None):
     if headers is None:
@@ -271,6 +271,7 @@ def configurar_horario_curso(headers=None):
 
     st.subheader("📅 Malla Curricular por Curso")
 
+    # 1. Cursos disponibles y su nivel_id desde grados
     r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?order=curso.asc", headers=headers)
     grados_data = r_grados.json() if r_grados.status_code == 200 else []
     
@@ -281,16 +282,53 @@ def configurar_horario_curso(headers=None):
         cursos = ["901", "902", "903", "1001", "1002", "1003", "1101"]
         map_curso_nivel = {}
 
-    col_sel_curso, _ = st.columns([1.5, 2.5])
+    col_sel_curso, col_sync = st.columns([1.5, 1.5])
     with col_sel_curso:
         curso_sel = st.selectbox("Selecciona el curso a gestionar:", cursos, key="curso_select_real")
 
     nivel_id_curso = map_curso_nivel.get(curso_sel, 1)
 
+    # 2. Cargar Asignación Académica del curso (Docentes preasignados por materia)
+    r_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}", headers=headers)
+    asignaciones_raw = r_asig.json() if r_asig.status_code == 200 else []
+    
+    # Mapeo: Asignatura (mayúsculas) -> documento_docente
+    mapa_carga_docente = {}
+    materias_disponibles = []
+    for a in asignaciones_raw:
+        asig_nom = str(a.get('asignatura', '')).strip().upper()
+        if asig_nom and "DIRECCION" not in asig_nom:
+            mapa_carga_docente[asig_nom] = str(a.get('documento_docente') or '')
+            if asig_nom not in materias_disponibles:
+                materias_disponibles.append(asig_nom)
+    materias_disponibles.sort()
+
+    # Botón de auto-sincronización en la barra superior
+    with col_sync:
+        st.write("")
+        if st.button("⚡ Sincronizar Docentes de Carga Académica", use_container_width=True, help="Asigna automáticamente el docente correspondiente a todas las clases ya guardadas en este curso"):
+            # Obtener clases del curso
+            r_clases_exist = requests.get(f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso_sel}", headers=headers)
+            clases_exist = r_clases_exist.json() if r_clases_exist.status_code == 200 else []
+            actualizadas = 0
+            for cl in clases_exist:
+                asig_limpia = str(cl.get('asignatura', '')).strip().upper()
+                doc_correspondiente = mapa_carga_docente.get(asig_limpia)
+                if doc_correspondiente and str(cl.get('documento_docente')) != doc_correspondiente:
+                    requests.patch(f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{cl['id']}", headers=headers, json={"documento_docente": doc_correspondiente})
+                    actualizadas += 1
+            if actualizadas > 0:
+                st.success(f"✅ Se sincronizaron {actualizadas} clases con sus docentes.")
+            else:
+                st.info("Todas las clases ya estaban correctamente sincronizadas.")
+            st.rerun()
+
+    # 3. Cargar clases de horario_base
     url_horario = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso_sel}&order=orden_clase.asc,dia_semana.asc"
     r_horario = requests.get(url_horario, headers=headers)
     horarios_curso = r_horario.json() if r_horario.status_code == 200 else []
 
+    # 4. Horas y franjas
     url_horas = f"{SUPABASE_URL}/rest/v1/horas_nivel?nivel_id=eq.{nivel_id_curso}&order=orden.asc"
     r_horas = requests.get(url_horas, headers=headers)
     horas_db = r_horas.json() if r_horas.status_code == 200 else []
@@ -321,6 +359,7 @@ def configurar_horario_curso(headers=None):
 
     lista_horas = [horas_map[k] for k in sorted(horas_map.keys())]
 
+    # 5. Diccionario de docentes
     r_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
     docentes = r_docentes.json() if r_docentes.status_code == 200 else []
     docentes_dict = {str(d['documento_docente']): f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip() for d in docentes}
@@ -414,10 +453,11 @@ def configurar_horario_curso(headers=None):
 
     col_malla, col_editor = st.columns([1.8, 1.1], gap="medium")
 
+    # === COLUMNA IZQUIERDA: MALLA SEMANAL COMPLETA ===
     with col_malla:
         st.markdown(f"""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 7px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-            <b style="color: #0F172A; font-size: 13px;">🗓️️ Horario Semanal: Grado {curso_sel}</b>
+            <b style="color: #0F172A; font-size: 13px;">🗓️ Horario Semanal: Grado {curso_sel}</b>
             <span style="font-size: 11px; color: #166534; background: #DCFCE7; padding: 2px 8px; border-radius: 12px; font-weight: 600;">
                 {len(horarios_curso)} clases cargadas
             </span>
@@ -448,18 +488,20 @@ def configurar_horario_curso(headers=None):
                         doc_id = str(clase.get('documento_docente') or '')
                         doc_nom = docentes_dict.get(doc_id, '')
                         doc_corto = formatear_nombre_corto(doc_nom)
+                        doc_label = f"👨‍🏫 {doc_corto}" if doc_corto else "<span style='color:#EF4444;'>⚠️ Sin docente</span>"
                         salon_badge = f'<div class="sal">📌 {clase.get("salon")}</div>' if clase.get("salon") else ''
 
                         st.markdown(f'''
                         <div class="celda-malla">
                             <span class="asig">{clase.get("asignatura", "?")}</span>
-                            <span class="prof">👨‍🏫 {doc_corto}</span>
+                            <span class="prof">{doc_label}</span>
                             {salon_badge}
                         </div>
                         ''', unsafe_allow_html=True)
                     else:
                         st.markdown('<div class="celda-malla vacia"><span style="color:#94A3B8;">—</span></div>', unsafe_allow_html=True)
 
+    # === COLUMNA DERECHA: ASIGNADOR RÁPIDO CON AUTOCOMPLETADO ===
     with col_editor:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 7px 12px; margin-bottom: 6px;">
@@ -477,358 +519,16 @@ def configurar_horario_curso(headers=None):
         h_actual = next((h for h in lista_horas if h['orden'] == hora_sel_orden), lista_horas[0])
         existente = matriz_clases.get((dia_num, hora_sel_orden))
 
-        with st.form("form_asignar_casilla_real"):
-            asig_val = existente.get('asignatura', '') if existente else ''
-            doc_val = str(existente.get('documento_docente') or '') if existente else ''
-            salon_val = existente.get('salon', '') if existente else ''
-
-            asignatura_in = st.text_input("Asignatura *:", value=asig_val, placeholder="Ej: FISICA, SOCIALES")
-
-            lista_docs = [""] + list(docentes_dict.keys())
-            idx_doc = lista_docs.index(doc_val) if doc_val in lista_docs else 0
-            docente_in = st.selectbox(
-                "Docente:",
-                options=lista_docs,
-                index=idx_doc,
-                format_func=lambda x: docentes_dict.get(x, "Sin docente") if x else "Ninguno"
-            )
-
-            salon_in = st.text_input("Salón / Aula:", value=salon_val, placeholder="Ej: Aula 101, Lab")
-
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                btn_guardar = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True)
-            with col_b2:
-                btn_vaciar = st.form_submit_button("🗑️ Vaciar", use_container_width=True)
-
-            if btn_guardar:
-                if not asignatura_in.strip():
-                    st.error("Escribe la asignatura")
-                else:
-                    payload = {
-                        "curso": curso_sel,
-                        "nivel_id": nivel_id_curso,
-                        "dia_semana": dia_num,
-                        "orden_clase": hora_sel_orden,
-                        "hora_inicio": f"{h_actual['inicio']}:00",
-                        "hora_fin": f"{h_actual['fin']}:00",
-                        "asignatura": asignatura_in.strip().upper(),
-                        "documento_docente": docente_in if docente_in else None,
-                        "salon": salon_in.strip().upper() if salon_in else ""
-                    }
-                    if existente and existente.get('id'):
-                        requests.patch(f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}", headers=headers, json=payload)
-                    else:
-                        requests.post(f"{SUPABASE_URL}/rest/v1/horario_base", headers=headers, json=payload)
-                    
-                    st.success("Casilla guardada")
-                    st.rerun()
-
-            if btn_vaciar:
-                if existente and existente.get('id'):
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/horario_base?id=eq.{existente['id']}", headers=headers)
-                    st.info("Casilla vaciada")
-                    st.rerun()
-
-
-# ==============================================================================
-# 5. GESTIÓN DE FESTIVOS (festivos)
-# ==============================================================================
-def gestion_festivos(headers=None):
-    if headers is None:
-        headers = get_headers()
-
-    st.subheader("📆 Calendario Escolar y Festivos")
-    
-    col_sel_y, _ = st.columns([1.5, 2.5])
-    with col_sel_y:
-        year = st.selectbox("Año Lectivo:", [2025, 2026, 2027], index=1, key="festivos_year")
-
-    url_festivos = f"{SUPABASE_URL}/rest/v1/festivos?year=eq.{year}&order=fecha.asc"
-    res_f = requests.get(url_festivos, headers=headers)
-    festivos = res_f.json() if res_f.status_code == 200 else []
-
-    col_izq, col_der = st.columns([1.3, 1], gap="medium")
-
-    with col_izq:
-        st.markdown(f"""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">📋 Días No Lectivos de {year}</b>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if festivos:
-            df = pd.DataFrame(festivos)[['fecha', 'descripcion']].rename(columns={'fecha': 'Fecha', 'descripcion': 'Motivo'})
-            st.dataframe(df, use_container_width=True, height=270)
-
-            c_del1, c_del2 = st.columns([2, 1])
-            with c_del1:
-                f_del_item = st.selectbox("Festivo a eliminar:", [f"{f['fecha']} ({f.get('descripcion')})" for f in festivos], label_visibility="collapsed")
-            with c_del2:
-                if st.button("🗑️ Quitar", use_container_width=True):
-                    idx_f = [f"{f['fecha']} ({f.get('descripcion')})" for f in festivos].index(f_del_item)
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/festivos?id=eq.{festivos[idx_f]['id']}", headers=headers)
-                    st.success("Festivo eliminado")
-                    st.rerun()
-        else:
-            st.info(f"No hay festivos registrados para {year}.")
-
-    with col_der:
-        st.markdown("""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">➕ Registrar Festivo</b>
-        </div>
-        """, unsafe_allow_html=True)
-
-        with st.form("form_add_festivo", clear_on_submit=True):
-            fecha = st.date_input("Fecha:", key="festivo_fecha")
-            descripcion = st.text_input("Motivo (Ej: Día Cívico, Semana Santa):", key="festivo_desc")
-
-            if st.form_submit_button("💾 Guardar Festivo", type="primary", use_container_width=True):
-                if descripcion.strip():
-                    data = {"fecha": str(fecha), "descripcion": descripcion.strip(), "year": fecha.year}
-                    requests.post(f"{SUPABASE_URL}/rest/v1/festivos", headers=headers, json=data)
-                    st.success("Festivo agregado")
-                    st.rerun()
-
-
-# ==============================================================================
-# 6. MENÚ COMPLETO ADMIN HORARIOS
-# ==============================================================================
-def gestion_horarios_admin(data):
-    st.title("📅 Configuración de Horarios")
-    headers = get_headers()
-    tabs = st.tabs(["📚 Niveles", "⏰ Horas por Nivel", "📅 Días Laborales", "📖 Asignar Materias", "📆 Festivos"])
-    
-    with tabs[0]:
-        configurar_niveles(headers)
-    with tabs[1]:
-        configurar_horas_nivel(headers)
-    with tabs[2]:
-        configurar_jornada_nivel(headers)
-    with tabs[3]:
-        configurar_horario_curso(headers)
-    with tabs[4]:
-        gestion_festivos(headers)
-
-
-# ==============================================================================
-# 7. VISUALIZACIÓN UNIFICADA (DOCENTE / ESTUDIANTE / ACUDIENTE)
-# ==============================================================================
-def mostrar_horario_unificado(horarios, titulo="📅 Mi Horario Semanal", tipo_vista="estudiante"):
-    """Muestra el horario en tarjetas estilizadas sin desbordes ni repeticiones."""
-    if not horarios:
-        st.info("No hay horario disponible")
-        return
-
-    headers = get_headers()
-    dias = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado"}
-
-    # Precarga optimizada de docentes para evitar llamadas lentas una por una
-    try:
-        r_docs = requests.get(f"{SUPABASE_URL}/rest/v1/docentes", headers=headers)
-        docentes_db = r_docs.json() if r_docs.status_code == 200 else []
-        map_docentes = {str(d['documento_docente']): f"{d.get('nombre_docente', '')} {d.get('apellidos_docente', '')}".strip() for d in docentes_db}
-    except Exception:
-        map_docentes = {}
-
-    horas_dict = {}
-    horas_orden_map = {}
-
-    for clase in horarios:
-        o_clase = clase.get('orden_clase') or 1
-        h_ini = str(clase.get('hora_inicio', ''))[:5]
-        h_fin = str(clase.get('hora_fin', ''))[:5]
+        asig_actual = existente.get('asignatura', '') if existente else ''
         
-        # Etiqueta de la hora limpia
-        if h_ini and h_fin:
-            hora_label = f"#{o_clase}<br><span style='font-size:9.5px; color:#64748B;'>{h_ini}-{h_fin}</span>"
+        # Selector de Asignatura: Si hay asignadas en Gestión Académica, se muestran en lista desplegable
+        if materias_disponibles:
+            opciones_mat = [""] + materias_disponibles + ["OTRA..."]
+            idx_mat = opciones_mat.index(asig_actual) if asig_actual in opciones_mat else 0
+            materia_elegida = st.selectbox("Asignatura del curso *:", opciones_mat, index=idx_mat, key="mat_select_carga")
+            if materia_elegida == "OTRA...":
+                asignatura_final = st.text_input("Escribe el nombre de la materia:", value=asig_actual).strip().upper()
+            else:
+                asignatura_final = materia_elegida
         else:
-            hora_label = f"#{o_clase}"
-
-        if o_clase not in horas_dict:
-            horas_dict[o_clase] = {dia: None for dia in dias.values()}
-            horas_orden_map[o_clase] = hora_label
-
-        try:
-            dia_num = int(clase.get('dia_semana'))
-        except Exception:
-            dia_num = 1
-        dia_nom = dias.get(dia_num, "Lunes")
-
-        doc_doc = str(clase.get('documento_docente') or '')
-        doc_nom_largo = map_docentes.get(doc_doc, '')
-        doc_corto = formatear_nombre_corto(doc_nom_largo)
-
-        horas_dict[o_clase][dia_nom] = {
-            "asignatura": str(clase.get('asignatura', '?')).upper(),
-            "curso": str(clase.get('curso', '')),
-            "salon": str(clase.get('salon', '')).strip(),
-            "docente": doc_corto
-        }
-
-    ordenes_ordenados = sorted(horas_dict.keys())
-    if not ordenes_ordenados:
-        st.info("No hay horario configurado")
-        return
-
-    st.markdown("""
-    <style>
-        .horario-celda {
-            border: 1px solid #CBD5E1;
-            padding: 5px 3px;
-            text-align: center;
-            min-height: 56px;
-            height: auto;
-            background-color: white;
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            box-sizing: border-box;
-            overflow: hidden;
-            margin-bottom: 3px;
-        }
-        .horario-celda.vacia {
-            background-color: #F8FAFC;
-            border: 1px dashed #E2E8F0;
-        }
-        .horario-celda .asignatura {
-            font-weight: 700;
-            font-size: 11px;
-            line-height: 1.15;
-            color: #1E3A8A;
-        }
-        .horario-celda .curso {
-            font-size: 10px;
-            font-weight: 600;
-            color: #2563EB;
-            line-height: 1.1;
-        }
-        .horario-celda .docente {
-            font-size: 9.5px;
-            color: #475569;
-            line-height: 1.1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 95%;
-        }
-        .horario-celda .salon {
-            font-size: 8px;
-            color: #64748B;
-        }
-        .horario-header {
-            background-color: #1E293B;
-            color: white;
-            padding: 4px 2px;
-            text-align: center;
-            font-weight: 700;
-            font-size: 11px;
-            border-radius: 6px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 3px;
-        }
-        .horario-hora {
-            background-color: #F1F5F9;
-            padding: 4px 2px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 9.5px;
-            border-radius: 6px;
-            border: 1px solid #CBD5E1;
-            color: #334155;
-            min-height: 56px;
-            height: auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-sizing: border-box;
-            margin-bottom: 3px;
-            line-height: 1.15;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"#### {titulo}")
-
-    dias_activos = [1, 2, 3, 4, 5]
-    if any(cl.get('dia_semana') == 6 for cl in horarios):
-        dias_activos.append(6)
-
-    cols = st.columns(len(dias_activos) + 1, gap="small")
-    with cols[0]:
-        st.markdown('<div class="horario-header">Hora</div>', unsafe_allow_html=True)
-    for idx, d_num in enumerate(dias_activos):
-        with cols[idx + 1]:
-            st.markdown(f'<div class="horario-header">{DIAS_SEMANA_MAP[d_num][:3]}</div>', unsafe_allow_html=True)
-
-    for o_num in ordenes_ordenados:
-        cols = st.columns(len(dias_activos) + 1, gap="small")
-        with cols[0]:
-            st.markdown(f'<div class="horario-hora">{horas_orden_map[o_num]}</div>', unsafe_allow_html=True)
-
-        for idx, d_num in enumerate(dias_activos):
-            dia_nom = DIAS_SEMANA_MAP[d_num]
-            with cols[idx + 1]:
-                clase = horas_dict[o_num].get(dia_nom)
-                if clase:
-                    salon_badge = f'<div class="salon">📌 {clase["salon"]}</div>' if clase.get("salon") else ''
-                    
-                    if tipo_vista == "docente":
-                        # El profesor ve Asignatura + Curso que le toca atender + Salón
-                        st.markdown(f'''
-                        <div class="horario-celda">
-                            <span class="asignatura">{clase["asignatura"]}</span>
-                            <span class="curso">👥 Grado {clase["curso"]}</span>
-                            {salon_badge}
-                        </div>
-                        ''', unsafe_allow_html=True)
-                    else:
-                        # Estudiante y Acudiente ven Asignatura + Docente corto + Salón
-                        doc_badge = f'<span class="docente">👨‍🏫 {clase["docente"]}</span>' if clase.get("docente") else ''
-                        st.markdown(f'''
-                        <div class="horario-celda">
-                            <span class="asignatura">{clase["asignatura"]}</span>
-                            {doc_badge}
-                            {salon_badge}
-                        </div>
-                        ''', unsafe_allow_html=True)
-                else:
-                    st.markdown('<div class="horario-celda vacia"><span style="color:#94A3B8;">—</span></div>', unsafe_allow_html=True)
-
-
-def mostrar_horario_docente_tabla(documento_docente, headers=None):
-    """Muestra el horario del docente desde horario_base"""
-    if headers is None:
-        headers = get_headers()
-
-    url = f"{SUPABASE_URL}/rest/v1/horario_base?documento_docente=eq.{documento_docente}&order=orden_clase.asc,dia_semana.asc"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code != 200 or not response.json():
-        st.info("No tienes clases asignadas en el horario semanal.")
-        return
-    
-    mostrar_horario_unificado(response.json(), "📅 Mi Horario Semanal", "docente")
-
-
-def mostrar_horario_estudiante_tabla(curso, headers=None):
-    """Muestra el horario del estudiante desde horario_base"""
-    if headers is None:
-        headers = get_headers()
-
-    url = f"{SUPABASE_URL}/rest/v1/horario_base?curso=eq.{curso}&order=orden_clase.asc,dia_semana.asc"
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code != 200 or not response.json():
-        st.info(f"No hay clases registradas para el grado {curso}.")
-        return
-    
-    mostrar_horario_unificado(response.json(), f"📅 Horario Semanal - Grado {curso}", "estudiante")
+            asignatura_final = st.text_input("Asignatura *:", value=
