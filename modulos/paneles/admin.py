@@ -1,6 +1,6 @@
-# ============================================
-# modulos/paneles/admin.py - VERSIÓN COMPACTA & ZERO-SCROLL
-# ============================================
+# ==============================================================================
+# modulos/paneles/admin.py - PANEL ADMINISTRADOR (IMPORTACIÓN ROBUSTA)
+# ==============================================================================
 
 import streamlit as st
 import requests
@@ -8,15 +8,8 @@ import pandas as pd
 from datetime import datetime
 from utils import SUPABASE_URL, get_headers
 
-# ============================================
-# IMPORTAR FUNCIONES DE HORARIOS
-# ============================================
-from modulos.features.horarios import (
-    configurar_horas_nivel as horarios_configurar_horas,
-    configurar_jornada_nivel as horarios_configurar_jornada,
-    configurar_horario_curso as horarios_configurar_horario,
-    gestion_festivos as horarios_gestion_festivos
-)
+# IMPORTACIÓN DIRECTA DEL MÓDULO HORARIOS
+import modulos.features.horarios as horarios_feature
 
 # ============================================
 # CONSTANTES
@@ -64,7 +57,7 @@ def mostrar(data):
         total_docentes = 0
 
     try:
-        r_cur = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=id", headers=headers)
+        r_cur = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=id_grado", headers=headers)
         total_cursos = len(r_cur.json()) if r_cur.status_code == 200 and r_cur.json() else len(CURSOS)
     except Exception:
         total_cursos = len(CURSOS)
@@ -168,7 +161,7 @@ def gestion_estudiantes():
                     if 'curso' in df_filtrado.columns and 'apellidos_estudiante' in df_filtrado.columns:
                         df_filtrado = df_filtrado.sort_values(by=['curso', 'apellidos_estudiante'])
 
-                    cols_preferidas = ['documento_estudiante', 'nombre_estudiante', 'apellidos_estudiante', 'curso', 'estado', 'telefono_estudiante', 'email_estudiante', 'direccion_estudiante']
+                    cols_preferidas = ['documento_estudiante', 'nombre_estudiante', 'apellidos_estudiante', 'curso', 'estado', 'telefono_acudiente', 'email_acudiente']
                     cols_finales = [c for c in cols_preferidas if c in df_filtrado.columns]
                     
                     df_mostrar = df_filtrado[cols_finales].copy()
@@ -193,9 +186,6 @@ def gestion_estudiantes():
                 apellidos = st.text_input("Apellidos *")
                 documento = st.text_input("Documento de Identidad *")
                 curso = st.selectbox("Curso a matricular *", CURSOS)
-                telefono = st.text_input("Teléfono del estudiante")
-                email = st.text_input("Correo electrónico estudiante")
-                direccion = st.text_input("Dirección de residencia")
             with c_acu:
                 st.markdown("##### 👨‍👩‍👧 Acudiente Principal")
                 nombre_acudiente = st.text_input("Nombre completo acudiente *")
@@ -219,9 +209,11 @@ def gestion_estudiantes():
                             "documento_estudiante": documento,
                             "curso": curso,
                             "estado": "Activo",
-                            "telefono_estudiante": telefono,
-                            "email_estudiante": email,
-                            "direccion_estudiante": direccion
+                            "nombre_acudiente": nombre_acudiente,
+                            "documento_acudiente": documento_acudiente,
+                            "parentesco": parentesco,
+                            "telefono_acudiente": telefono_acudiente,
+                            "email_acudiente": email_acudiente
                         }
                         res_est = requests.post(f"{SUPABASE_URL}/rest/v1/estudiantes", headers=headers, json=data_est)
                         if res_est.status_code == 201:
@@ -286,23 +278,12 @@ def gestion_estudiantes():
                             est_idx = estados_disp.index(estado_actual) if estado_actual in estados_disp else 0
                             estado_upd = st.selectbox("Estado", estados_disp, index=est_idx)
                             
-                        c5, c6 = st.columns(2)
-                        with c5:
-                            telefono_upd = st.text_input("Teléfono", value=estudiante.get('telefono_estudiante', ''))
-                        with c6:
-                            email_upd = st.text_input("Email", value=estudiante.get('email_estudiante', ''))
-                            
-                        direccion_upd = st.text_input("Dirección", value=estudiante.get('direccion_estudiante', ''))
-                        
                         if st.form_submit_button("💾 Guardar Cambios Alumno", type="primary", use_container_width=True):
                             payload = {
                                 "nombre_estudiante": nombre_upd,
                                 "apellidos_estudiante": apellidos_upd,
                                 "curso": curso_upd,
-                                "estado": estado_upd,
-                                "telefono_estudiante": telefono_upd,
-                                "email_estudiante": email_upd,
-                                "direccion_estudiante": direccion_upd
+                                "estado": estado_upd
                             }
                             r_upd_est = requests.patch(f"{SUPABASE_URL}/rest/v1/estudiantes?documento_estudiante=eq.{documento_buscar}", headers=headers, json=payload)
                             if r_upd_est.status_code in [200, 204]:
@@ -343,83 +324,8 @@ def gestion_estudiantes():
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
-                            
-                            c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
-                            with c_btn1:
-                                with st.popover("✏️ Editar", use_container_width=True):
-                                    st.markdown(f"**Modificar:** {acud.get('nombre_acudiente')}")
-                                    with st.form(f"form_pop_acud_{doc_acud}_{idx}"):
-                                        ed_nombre = st.text_input("Nombre completo", value=acud.get('nombre_acudiente', ''))
-                                        par_actual = acud.get('parentesco', 'Padre')
-                                        idx_p = PARENTESCOS.index(par_actual) if par_actual in PARENTESCOS else 0
-                                        ed_par = st.selectbox("Parentesco", PARENTESCOS, index=idx_p)
-                                        ed_tel = st.text_input("Teléfono", value=acud.get('telefono_acudiente', ''))
-                                        ed_email = st.text_input("Correo", value=acud.get('email_acudiente', ''))
-                                        
-                                        if st.form_submit_button("💾 Guardar", type="primary", use_container_width=True):
-                                            payload_acud = {
-                                                "nombre_acudiente": ed_nombre,
-                                                "parentesco": ed_par,
-                                                "telefono_acudiente": ed_tel,
-                                                "email_acudiente": ed_email
-                                            }
-                                            url_upd = f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}"
-                                            r_upd = requests.patch(url_upd, headers=headers, json=payload_acud)
-                                            if r_upd.status_code in [200, 204]:
-                                                st.success("✅ Acudiente actualizado")
-                                                st.rerun()
-                                            else:
-                                                st.error(f"Error ({r_upd.status_code}): {r_upd.text}")
-                            
-                            with c_btn2:
-                                if not es_princ:
-                                    if st.button("⭐ Principal", key=f"btn_p_{doc_acud}_{idx}", use_container_width=True):
-                                        requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, json={"es_principal": False})
-                                        requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}", headers=headers, json={"es_principal": True})
-                                        st.rerun()
-                                else:
-                                    st.button("⭐ Principal", disabled=True, use_container_width=True, key=f"btn_dis_{doc_acud}_{idx}")
-                            
-                            with c_btn3:
-                                if st.button("🗑️ Quitar", key=f"btn_del_{doc_acud}_{idx}", use_container_width=True):
-                                    requests.delete(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}&documento_acudiente=eq.{doc_acud}", headers=headers)
-                                    st.rerun()
-                            
-                            st.write("")
                     else:
                         st.warning("Sin acudientes vinculados.")
-
-                    with st.expander("➕ Vincular otro acudiente", expanded=False):
-                        with st.form("form_add_acudiente_extra", clear_on_submit=True):
-                            n_nom = st.text_input("Nombre completo *")
-                            ca1, ca2 = st.columns(2)
-                            with ca1:
-                                n_doc = st.text_input("Documento *")
-                            with ca2:
-                                n_par = st.selectbox("Parentesco *", PARENTESCOS)
-                            ca3, ca4 = st.columns(2)
-                            with ca3:
-                                n_tel = st.text_input("Teléfono")
-                            with ca4:
-                                n_em = st.text_input("Email")
-                            n_pr = st.checkbox("Marcar como acudiente principal", value=False)
-                            
-                            if st.form_submit_button("🔗 Vincular al Alumno", type="primary", use_container_width=True):
-                                if not n_nom or not n_doc:
-                                    st.error("Nombre y documento obligatorios")
-                                else:
-                                    if n_pr:
-                                        requests.patch(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente?documento_estudiante=eq.{documento_buscar}", headers=headers, json={"es_principal": False})
-                                    requests.post(f"{SUPABASE_URL}/rest/v1/estudiante_acudiente", headers=headers, json={
-                                        "documento_estudiante": documento_buscar, "documento_acudiente": n_doc,
-                                        "nombre_acudiente": n_nom, "parentesco": n_par,
-                                        "telefono_acudiente": n_tel, "email_acudiente": n_em, "es_principal": n_pr
-                                    })
-                                    requests.post(f"{SUPABASE_URL}/rest/v1/usuarios_login", headers=headers, json={
-                                        "username": n_doc, "password_hash": "demo2026", "rol": "acudiente", "documento": n_doc, "roles": ["acudiente"]
-                                    })
-                                    st.success(f"✅ {n_nom} vinculado exitosamente")
-                                    st.rerun()
             else:
                 st.warning("🔍 No se encontró ningún estudiante con ese documento.")
 
@@ -594,7 +500,7 @@ def configurar_niveles():
 
 
 # ============================================
-# GESTIÓN ACADÉMICA 2: ASIGNATURAS & PÉNSUM (EDITABLE)
+# GESTIÓN ACADÉMICA 2: ASIGNATURAS & PÉNSUM
 # ============================================
 def gestionar_asignaturas():
     st.subheader("📚 Gestión de Asignaturas y Pénsum")
@@ -621,7 +527,6 @@ def gestionar_asignaturas():
 
     col_tabla, col_form = st.columns([1.2, 1.1], gap="medium")
 
-    # COLUMNA IZQUIERDA: RESUMEN DE ASIGNATURAS Y NIVELES
     with col_tabla:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
@@ -644,16 +549,14 @@ def gestionar_asignaturas():
         else:
             st.info("No hay asignaturas registradas.")
 
-    # COLUMNA DERECHA: PESTAÑAS EDITAR Y CREAR
     with col_form:
         subtab_edit, subtab_new = st.tabs(["✏️ Modificar Asignatura", "➕ Nueva Asignatura"])
 
-        # SUB-PESTAÑA 1: EDITAR NOMBRE, CÓDIGO Y NIVELES
         with subtab_edit:
             if materias:
                 mat_opciones = {m['id']: f"{m['nombre']} ({m.get('codigo') or 'Sin código'})" for m in materias}
                 materia_sel_id = st.selectbox(
-                    "Selecciona la asignatura a corregir o reasignar:",
+                    "Selecciona la asignatura a corregir:",
                     options=list(mat_opciones.keys()),
                     format_func=lambda x: mat_opciones[x],
                     key="asig_edit_sel"
@@ -672,22 +575,16 @@ def gestionar_asignaturas():
                             default=niveles_actuales
                         )
 
-                        c_btn_save, c_btn_del = st.columns([2, 1])
-                        with c_btn_save:
-                            submit_upd_mat = st.form_submit_button("💾 Actualizar Asignatura", type="primary", use_container_width=True)
-
-                        if submit_upd_mat:
+                        if st.form_submit_button("💾 Actualizar Asignatura", type="primary", use_container_width=True):
                             if not nuevo_nom_mat or not nuevos_niveles_sel:
                                 st.error("❌ Nombre y al menos un nivel son obligatorios")
                             else:
-                                # 1. Actualizar datos básicos de la materia
                                 payload_mat = {
                                     "nombre": nuevo_nom_mat.upper().strip(),
                                     "codigo": nuevo_cod_mat.upper().strip() if nuevo_cod_mat else None
                                 }
                                 requests.patch(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_sel_id}", headers=headers, json=payload_mat)
 
-                                # 2. Sincronizar niveles (borrar anteriores y reinsertar seleccionados)
                                 requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_sel_id}", headers=headers)
                                 for n_nom in nuevos_niveles_sel:
                                     n_id = niveles_dict.get(n_nom)
@@ -697,7 +594,6 @@ def gestionar_asignaturas():
                                 st.success("✅ Asignatura y niveles actualizados")
                                 st.rerun()
 
-                    # Opción directa de eliminación
                     if st.button("🗑️ Eliminar esta asignatura del sistema", key=f"del_mat_btn_{materia_sel_id}", use_container_width=True):
                         requests.delete(f"{SUPABASE_URL}/rest/v1/materias_niveles?materia_id=eq.{materia_sel_id}", headers=headers)
                         requests.delete(f"{SUPABASE_URL}/rest/v1/materias?id=eq.{materia_sel_id}", headers=headers)
@@ -706,7 +602,6 @@ def gestionar_asignaturas():
             else:
                 st.info("Registra asignaturas para poder editarlas.")
 
-        # SUB-PESTAÑA 2: REGISTRAR NUEVA
         with subtab_new:
             with st.form("form_nueva_materia", clear_on_submit=True):
                 nombre_mat = st.text_input("Nombre de la asignatura *")
@@ -730,7 +625,7 @@ def gestionar_asignaturas():
 
 
 # ============================================
-# GESTIÓN ACADÉMICA 3: CURSOS Y GRADOS (EDITABLE)
+# GESTIÓN ACADÉMICA 3: CURSOS Y GRADOS
 # ============================================
 def gestionar_grados():
     st.subheader("📚 Gestión de Grados y Cursos")
@@ -747,7 +642,6 @@ def gestionar_grados():
 
     col_tabla, col_form = st.columns([1.2, 1.1], gap="medium")
 
-    # COLUMNA IZQUIERDA: LISTA DE CURSOS Y SU NIVEL
     with col_tabla:
         st.markdown("""
         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
@@ -765,11 +659,9 @@ def gestionar_grados():
         else:
             st.info("No hay cursos creados.")
 
-    # COLUMNA DERECHA: PESTAÑAS EDITAR Y CREAR CURSO
     with col_form:
         subtab_edit_c, subtab_new_c = st.tabs(["✏️ Modificar Curso", "➕ Nuevo Curso"])
 
-        # SUB-PESTAÑA 1: EDITAR CURSO Y NIVEL ASOCIADO
         with subtab_edit_c:
             if grados:
                 cursos_nombres = [g['curso'] for g in grados if g.get('curso')]
@@ -779,220 +671,4 @@ def gestionar_grados():
                 if grado_actual:
                     nivel_actual_id = grado_actual.get('nivel_id')
                     nivel_actual_nom = id_a_nivel.get(nivel_actual_id, nivel_nombres[0] if nivel_nombres else "")
-                    idx_nivel = nivel_nombres.index(nivel_actual_nom) if nivel_actual_nom in nivel_nombres else 0
-
-                    with st.form(f"form_edit_curso_{cur_sel}"):
-                        nuevo_nom_cur = st.text_input("Nombre del Curso (Ej: 901, Jardín A) *", value=grado_actual.get('curso', ''))
-                        nuevo_nivel_cur = st.selectbox("Nivel Educativo al que pertenece *", options=nivel_nombres, index=idx_nivel)
-
-                        if st.form_submit_button("💾 Guardar Cambios del Curso", type="primary", use_container_width=True):
-                            if not nuevo_nom_cur:
-                                st.error("❌ El nombre del curso es obligatorio")
-                            else:
-                                payload_grado = {
-                                    "curso": nuevo_nom_cur.upper().strip(),
-                                    "nivel_id": niveles_dict.get(nuevo_nivel_cur)
-                                }
-                                # Actualizar por ID si existe, o por clave curso
-                                if grado_actual.get('id'):
-                                    url_patch = f"{SUPABASE_URL}/rest/v1/grados?id=eq.{grado_actual.get('id')}"
-                                else:
-                                    url_patch = f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{cur_sel}"
-
-                                r_p = requests.patch(url_patch, headers=headers, json=payload_grado)
-                                if r_p.status_code in [200, 204]:
-                                    st.success(f"✅ Curso {nuevo_nom_cur} actualizado correctamente")
-                                    st.rerun()
-                                else:
-                                    st.error(f"Error al actualizar: {r_p.text}")
-
-                    if st.button("🗑️ Eliminar este curso", key=f"btn_del_cur_{cur_sel}", use_container_width=True):
-                        requests.delete(f"{SUPABASE_URL}/rest/v1/grados?curso=eq.{cur_sel}", headers=headers)
-                        st.warning(f"Curso {cur_sel} eliminado")
-                        st.rerun()
-            else:
-                st.info("Crea un curso para poder editarlo.")
-
-        # SUB-PESTAÑA 2: NUEVO CURSO
-        with subtab_new_c:
-            with st.form("nuevo_grado", clear_on_submit=True):
-                nombre_cur = st.text_input("Nombre del Curso (Ej: 601, 701, Jardín) *")
-                nivel_cur = st.selectbox("Nivel Educativo *", nivel_nombres)
-
-                if st.form_submit_button("💾 Crear Curso", type="primary", use_container_width=True):
-                    if nombre_cur:
-                        data = {"curso": nombre_cur.upper().strip(), "nivel_id": niveles_dict.get(nivel_cur)}
-                        r = requests.post(f"{SUPABASE_URL}/rest/v1/grados", headers=headers, json=data)
-                        if r.status_code == 201:
-                            st.success(f"✅ Curso {nombre_cur} creado")
-                            st.rerun()
-                        else:
-                            st.error(f"Error: {r.text}")
-
-
-# ============================================
-# GESTIÓN ACADÉMICA 4: DIRECTORES DE GRUPO
-# ============================================
-def gestion_directores_grupo():
-    st.subheader("👨‍🏫 Asignación de Directores de Grupo")
-    headers = get_headers()
-    
-    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=curso&order=curso.asc", headers=headers)
-    cursos = [g['curso'] for g in r_grados.json() if g.get('curso')] if r_grados.status_code == 200 and r_grados.json() else CURSOS
-    cursos = sorted(list(set(cursos)))
-
-    r_docentes = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?order=apellidos_docente.asc", headers=headers)
-    docentes = r_docentes.json() if r_docentes.status_code == 200 else []
-    doc_dict = {d['documento_docente']: f"{d['apellidos_docente']} {d['nombre_docente']}" for d in docentes}
-
-    r_asig = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?asignatura=ilike.%direccion%", headers=headers)
-    directores_actuales = r_asig.json() if r_asig.status_code == 200 else []
-    dir_por_curso = {a['curso']: a['documento_docente'] for a in directores_actuales if a.get('curso')}
-
-    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
-
-    with col_tabla:
-        st.markdown("""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">📋 Panorama Institucional de Direcciones de Grupo</b>
-        </div>
-        """, unsafe_allow_html=True)
-
-        resumen = []
-        for c in cursos:
-            doc_id = dir_por_curso.get(c)
-            nombre_doc = doc_dict.get(doc_id, "⚠️ Sin asignar") if doc_id else "⚠️ Sin asignar"
-            resumen.append({"Curso": c, "Director de Grupo": nombre_doc})
-        
-        st.dataframe(pd.DataFrame(resumen), use_container_width=True, height=310)
-
-    with col_form:
-        st.markdown("""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">✏️ Asignar o Cambiar Director</b>
-        </div>
-        """, unsafe_allow_html=True)
-
-        with st.form("form_asignar_director"):
-            curso_sel = st.selectbox("Seleccionar Curso:", cursos)
-            doc_actual_id = dir_por_curso.get(curso_sel)
-            doc_actual_nom = doc_dict.get(doc_actual_id, "Ninguno") if doc_actual_id else "Ninguno"
-            st.caption(f"Director actual de **{curso_sel}**: `{doc_actual_nom}`")
-
-            nuevo_doc_id = st.selectbox("Nuevo Director Docente:", [""] + list(doc_dict.keys()), format_func=lambda x: doc_dict.get(x, "Ninguno (Dejar Vacante)") if x else "Ninguno (Dejar Vacante)")
-
-            if st.form_submit_button("💾 Guardar Director", type="primary", use_container_width=True):
-                requests.delete(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=ilike.%direccion%", headers=headers)
-                if nuevo_doc_id:
-                    data = {"curso": curso_sel, "asignatura": "DIRECCION DE CURSO", "documento_docente": nuevo_doc_id, "anio": datetime.now().year}
-                    requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
-                    st.success(f"✅ Director asignado para {curso_sel}")
-                else:
-                    st.info(f"Dirección de {curso_sel} liberada.")
-                st.rerun()
-
-
-# ============================================
-# GESTIÓN ACADÉMICA 5: CARGA ACADÉMICA POR CURSO
-# ============================================
-def asignar_docentes_curso():
-    st.subheader("👨‍🏫 Carga Académica Docente por Curso")
-    headers = get_headers()
-    
-    r_grados = requests.get(f"{SUPABASE_URL}/rest/v1/grados?select=curso&order=curso.asc", headers=headers)
-    cursos = [g['curso'] for g in r_grados.json() if g.get('curso')] if r_grados.status_code == 200 and r_grados.json() else CURSOS
-    cursos = sorted(list(set(cursos)))
-
-    r_doc = requests.get(f"{SUPABASE_URL}/rest/v1/docentes?order=apellidos_docente.asc", headers=headers)
-    docentes = r_doc.json() if r_doc.status_code == 200 else []
-    doc_dict = {d['documento_docente']: f"{d['apellidos_docente']} {d['nombre_docente']}" for d in docentes}
-
-    r_mat = requests.get(f"{SUPABASE_URL}/rest/v1/materias?order=nombre.asc", headers=headers)
-    materias = r_mat.json() if r_mat.status_code == 200 else []
-
-    col_c1, _ = st.columns([1.5, 2.5])
-    with col_c1:
-        curso_sel = st.selectbox("Selecciona el curso a consultar/gestionar:", cursos, key="asig_curso_sel")
-
-    r_actuales = requests.get(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}", headers=headers)
-    actuales = [a for a in r_actuales.json() if "DIRECCION" not in str(a.get('asignatura', '')).upper()] if r_actuales.status_code == 200 else []
-
-    col_tabla, col_form = st.columns([1.3, 1], gap="medium")
-
-    with col_tabla:
-        st.markdown(f"""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">📋 Asignaturas y Docentes del Grado {curso_sel}</b>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if actuales:
-            tabla = [{"Asignatura": a.get('asignatura'), "Docente Encargado": doc_dict.get(a.get('documento_docente'), a.get('documento_docente'))} for a in actuales]
-            st.dataframe(pd.DataFrame(tabla), use_container_width=True, height=270)
-
-            c_del1, c_del2 = st.columns([2, 1])
-            with c_del1:
-                asig_del = st.selectbox("Desvincular materia:", [a.get('asignatura') for a in actuales], label_visibility="collapsed")
-            with c_del2:
-                if st.button("🗑️ Quitar", use_container_width=True):
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=eq.{asig_del}", headers=headers)
-                    st.success(f"{asig_del} removida de {curso_sel}")
-                    st.rerun()
-        else:
-            st.info(f"El grado {curso_sel} no tiene asignaturas ni docentes vinculados.")
-
-    with col_form:
-        st.markdown("""
-        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px;">
-            <b style="color: #0F172A; font-size: 13.5px;">➕ Asignar Asignatura a Docente</b>
-        </div>
-        """, unsafe_allow_html=True)
-
-        with st.form("form_asignar_doc", clear_on_submit=True):
-            materia_nom = st.selectbox("Asignatura:", [m['nombre'] for m in materias])
-            docente_id = st.selectbox("Docente Asignado:", list(doc_dict.keys()), format_func=lambda x: doc_dict.get(x))
-
-            if st.form_submit_button("💾 Guardar Carga Académica", type="primary", use_container_width=True):
-                requests.delete(f"{SUPABASE_URL}/rest/v1/asignacion_academica?curso=eq.{curso_sel}&asignatura=eq.{materia_nom}", headers=headers)
-                data = {"curso": curso_sel, "asignatura": materia_nom, "documento_docente": docente_id, "anio": datetime.now().year}
-                r = requests.post(f"{SUPABASE_URL}/rest/v1/asignacion_academica", headers=headers, json=data)
-                if r.status_code == 201:
-                    st.success(f"✅ {materia_nom} asignada con éxito")
-                    st.rerun()
-                else:
-                    st.error(f"Error: {r.text}")
-
-
-# ============================================
-# HORARIOS Y SISTEMA
-# ============================================
-def configurar_horas_nivel():
-    horarios_configurar_horas(get_headers())
-
-def configurar_jornada_nivel():
-    horarios_configurar_jornada(get_headers())
-
-def configurar_horario_curso():
-    horarios_configurar_horario(get_headers())
-
-def gestion_festivos():
-    horarios_gestion_festivos(get_headers())
-
-def mostrar_sistema():
-    st.subheader("⚙️ Configuración Institucional")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.text_input("Nombre de la Institución", value="Colegio de Prueba")
-        st.text_input("Eslogan Institucional", value="Preparando gente para el futuro")
-        st.number_input("Año Lectivo", value=datetime.now().year)
-        if st.button("💾 Guardar Configuración", type="primary"):
-            st.success("✅ Configuración guardada exitosamente")
-    with col2:
-        st.write("**Información de Plataforma**")
-        st.write("- Proveedor: **EVALUAR S.A.S.**")
-        st.write("- Modalidad: Plataforma Escolar Multicolegio SaaS")
-        st.write("- Versión: 2.0.0")
-
-def reportes_academicos():
-    st.subheader("📊 Reportes Académicos")
-    st.info("Módulo de consolidación y exportación de notas y ausencias.")
+                    idx_nivel = nivel_nombres.index(nivel_actual_nom) if nivel_actual_nom in nivel_nombres else
