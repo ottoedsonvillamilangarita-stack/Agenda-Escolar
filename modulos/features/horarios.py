@@ -1,5 +1,5 @@
 # ==============================================================================
-# modulos/features/horarios.py - GESTION DE HORARIOS (SINTAXIS LIMPIA)
+# modulos/features/horarios.py - GESTION DE HORARIOS COMPLETA
 # ==============================================================================
 
 import streamlit as st
@@ -733,6 +733,4 @@ def mostrar_horario_unificado(horarios, titulo="Mi Horario Semanal", tipo_vista=
             background-color: #F8FAFC;
             border: 1px dashed #E2E8F0;
         }
-        .horario-celda .asignatura {
-            font-weight: 700;
-            font-size: 11px
+        .
